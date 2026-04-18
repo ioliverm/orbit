@@ -68,12 +68,13 @@ db-reset:
     docker compose -f scripts/dev/docker-compose.yaml down -v
     @echo "[db-reset] Volume deleted. Run \`just db-up\` to re-init."
 
-# Copy the server's self-signed cert to scripts/dev/.server.crt so host
-# tools (psql, sqlx) can use sslmode=verify-full. Git-ignored.
+# Copy the dev CA cert to scripts/dev/.ca.crt so host tools (psql, sqlx)
+# can use sslmode=verify-full against the server cert issued by that CA.
+# Git-ignored. (The server's leaf cert stays inside the cert volume.)
 db-cert:
-    docker cp orbit-postgres-dev:/etc/postgresql/certs/server.crt scripts/dev/.server.crt
-    @chmod 644 scripts/dev/.server.crt
-    @echo "[db-cert] Wrote scripts/dev/.server.crt"
+    docker cp orbit-postgres-dev:/etc/postgresql/certs/ca.crt scripts/dev/.ca.crt
+    @chmod 644 scripts/dev/.ca.crt
+    @echo "[db-cert] Wrote scripts/dev/.ca.crt"
 
 # Apply pending migrations via scripts/dev/seed.sh (sqlx-cli preferred;
 # psql fallback). T6 owns the actual migration content.
