@@ -36,14 +36,18 @@ dev:
 # Database (local Docker Postgres, Slice 0a)
 # ---------------------------------------------------------------------------
 
-# Boot the local Postgres container. TLS cert is generated on first boot.
+# Boot the local Postgres container. The `tls-init` sidecar generates the
+# self-signed cert into a named volume on first boot, then Postgres starts.
+# Once healthy, we also copy the cert out to scripts/dev/.server.crt so host
+# tools (sqlx, psql) with sslmode=verify-full can trust it.
 db-up:
     docker compose -f scripts/dev/docker-compose.yaml up -d
     @echo "[db-up] Waiting for Postgres to report healthy..."
     @until [ "$(docker inspect -f '{{{{.State.Health.Status}}}}' orbit-postgres-dev 2>/dev/null)" = "healthy" ]; do \
         sleep 1; \
     done
-    @echo "[db-up] Postgres is healthy. Run \`just db-cert\` to copy the self-signed cert to scripts/dev/.server.crt."
+    @just db-cert
+    @echo "[db-up] Postgres is healthy and scripts/dev/.server.crt is in place."
 
 # Tear down the container (keeps the named volume — data persists).
 db-down:
