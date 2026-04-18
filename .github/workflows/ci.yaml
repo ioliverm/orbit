@@ -117,9 +117,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    defaults:
-      run:
-        working-directory: frontend
+    # NOTE: pnpm-lock.yaml and pnpm-workspace.yaml live at the repo root; each
+    # step runs at the repo root by default. Frontend-specific scripts are
+    # invoked via `pnpm --filter @orbit/frontend <script>`.
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -134,7 +134,7 @@ jobs:
         with:
           run_install: false
 
-      - name: Detect pnpm lockfile
+      - name: Detect pnpm lockfile (at workspace root)
         id: lockfile
         shell: bash
         run: |
@@ -142,7 +142,7 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::frontend/pnpm-lock.yaml missing — T8 lands it. Skipping install/lint/typecheck/test."
+            echo "::warning::pnpm-lock.yaml missing — T8 lands it. Skipping install/lint/typecheck/test."
           fi
 
       - name: pnpm install --frozen-lockfile
@@ -155,7 +155,7 @@ jobs:
         shell: bash
         run: |
           has_script() {
-            jq -e --arg s "$1" '.scripts[$s] // empty' package.json >/dev/null 2>&1
+            jq -e --arg s "$1" '.scripts[$s] // empty' frontend/package.json >/dev/null 2>&1
           }
           for s in lint typecheck test; do
             if has_script "$s"; then
@@ -168,15 +168,15 @@ jobs:
 
       - name: pnpm lint
         if: steps.lockfile.outputs.present == 'true' && steps.scripts.outputs.lint == 'true'
-        run: pnpm lint
+        run: pnpm --filter @orbit/frontend lint
 
       - name: pnpm typecheck
         if: steps.lockfile.outputs.present == 'true' && steps.scripts.outputs.typecheck == 'true'
-        run: pnpm typecheck
+        run: pnpm --filter @orbit/frontend typecheck
 
       - name: pnpm test
         if: steps.lockfile.outputs.present == 'true' && steps.scripts.outputs.test == 'true'
-        run: pnpm test
+        run: pnpm --filter @orbit/frontend test
 
       # S0-03: `pnpm audit` always runs when a lockfile exists. If the
       # frontend has not yet landed `pnpm-lock.yaml` (T8 scope), `pnpm audit`

@@ -18,3 +18,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+# `sqlx` and `uuid` are already in [dependencies] and are re-used by the
+# integration test harness in `tests/rls_cross_tenant.rs`; no additional
+# dev-deps needed. The `uuid::Uuid::new_v4()` call requires the `v4` feature
+# which the workspace pin already enables (see root Cargo.toml).

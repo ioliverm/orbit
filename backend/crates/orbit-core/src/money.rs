@@ -4,9 +4,18 @@
 //! Does NOT implement `orbit_log::SafeToLog`; attempting `event!(m = money)` is
 //! a compile error. (SEC-050)
 
-/// Monetary amount. Real fields land in Slice 0b.
+use std::fmt;
+
+/// Monetary amount. Real fields land in Slice 1+.
 ///
-/// `Debug` is permitted for internal dev / panics; it is NOT a log-safe type
-/// per SEC-050 and there is no path to emit a `Money` through `orbit_log`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// `Debug` is a manual redacted impl so `format!("{m:?}")`, `tracing::event!(?m)`,
+/// `panic!("{m:?}")`, and `dbg!(m)` cannot leak contents. `orbit_log::event!` is
+/// separately blocked at compile time via the sealed `SafeToLog` trait. (SEC-050)
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Money;
+
+impl fmt::Debug for Money {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Money(<redacted>)")
+    }
+}

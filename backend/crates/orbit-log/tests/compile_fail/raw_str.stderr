@@ -1,0 +1,11 @@
+error[E0597]: `owned` does not live long enough
+ --> tests/compile_fail/raw_str.rs:7:19
+  |
+6 |     let owned: String = "untrusted".to_string();
+  |         ----- binding `owned` declared here
+7 |     let s: &str = owned.as_str();
+  |                   ^^^^^ borrowed value does not live long enough
+8 |     event!(Level::Info, "event", field = s);
+  |     --------------------------------------- argument requires that `owned` is borrowed for `'static`
+9 | }
+  | - `owned` dropped here while still borrowed
