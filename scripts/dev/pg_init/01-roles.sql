@@ -16,10 +16,12 @@
 -- bootstrap `postgres` account that only exists to run this init script.
 -- T6 owns migrations (DDL + grants + policies) — this file stops at roles.
 --
--- NOTE ON PASSWORDS: `${POSTGRES_ORBIT_MIGRATE_PASSWORD}` style placeholders
--- are rendered by `00-render-roles.sh` (envsubst) before this SQL reaches
--- psql. The rendered text is NEVER written to disk — it is piped from
--- `envsubst` directly into `psql`. See 00-render-roles.sh.
+-- NOTE ON PASSWORDS: `:'orbit_migrate_password'` style placeholders use
+-- psql's built-in `:'var'` substitution (standard since Postgres 8.4).
+-- `00-render-roles.sh` passes the three values via `-v var=value`; psql
+-- expands them with proper single-quote escaping inline. The rendered
+-- SQL never touches disk. We avoid envsubst / gettext-base because those
+-- are not shipped in the postgres:16-bookworm image.
 
 -- Defensive: fail if any of the three roles already exists. The init scripts
 -- only run on first boot so this should never trigger, but if somebody has
@@ -49,7 +51,7 @@ CREATE ROLE orbit_migrate
        NOBYPASSRLS
        INHERIT
        CONNECTION LIMIT 4
-       PASSWORD '${POSTGRES_ORBIT_MIGRATE_PASSWORD}';
+       PASSWORD :'orbit_migrate_password';
 
 -- orbit_app: runtime role the API + worker bind as. RLS applies. DML grants
 -- are issued by migrations (T6) — this role starts with only the implicit
@@ -63,7 +65,7 @@ CREATE ROLE orbit_app
        NOBYPASSRLS
        INHERIT
        CONNECTION LIMIT 50
-       PASSWORD '${POSTGRES_ORBIT_APP_PASSWORD}';
+       PASSWORD :'orbit_app_password';
 
 -- orbit_support: read-only support role. SELECT grants are issued by
 -- migrations (T6) on the specific audit/support-relevant tables. Never
@@ -77,7 +79,7 @@ CREATE ROLE orbit_support
        NOBYPASSRLS
        INHERIT
        CONNECTION LIMIT 4
-       PASSWORD '${POSTGRES_ORBIT_SUPPORT_PASSWORD}';
+       PASSWORD :'orbit_support_password';
 
 -- Make orbit_migrate the owner of the `orbit` database so migrations can run
 -- without superuser. The database itself was created by the image from
