@@ -14,6 +14,7 @@ dist/
 
 # Local dev TLS material copied out of the Postgres container (see
 # `just db-cert`). Never commit these — they are per-developer self-signed.
+scripts/dev/.ca.crt
 scripts/dev/.server.crt
 scripts/dev/.server.key
 
