@@ -13,6 +13,8 @@ Existing ADRs fix the macro choices (Rust + React + single binary + Hetzner + sy
 
 ## Decision
 
+> **Scope note (2026-04-18) — see [ADR-015](./ADR-015-slice-0-local-first-scope-split.md).** Slice 0 has since been split into **0a (local-green)** and **0b (deploy-green)**. This ADR's repo tree, CI shape, migration tool, and local-dev loop all still apply; the deploy mechanism (Hetzner VMs, Caddy, systemd, backups, uptime monitor) is deferred to the 0b checkpoint. ADR-015 carries the per-item 0a/0b mapping.
+
 ### Repository layout (single monorepo)
 
 **One Git repository**, Cargo workspace for the backend, `pnpm` workspace for the frontend. No separate backend/frontend repos; the cost of a coordinated change is lower in one repo at this scale.
