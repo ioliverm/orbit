@@ -48,8 +48,14 @@ O  = Orbit Local Dev (NOT FOR PRODUCTION)
 CN = orbit-postgres-dev
 
 [v3_req]
-basicConstraints = CA:FALSE
-keyUsage         = digitalSignature, keyEncipherment
+# Self-signed cert that's also used as the trust anchor by host tools
+# (sqlx via rustls + libpq via openssl). rustls requires the root to be a
+# CA, so we mark this cert as a CA with pathlen:0 (can't issue sub-CAs).
+# keyCertSign is required so rustls accepts it as a signer of itself.
+# digitalSignature + keyEncipherment + serverAuth keep it usable as the
+# server's leaf cert.
+basicConstraints = critical, CA:TRUE, pathlen:0
+keyUsage         = critical, digitalSignature, keyEncipherment, keyCertSign
 extendedKeyUsage = serverAuth
 subjectAltName   = @alt_names
 
