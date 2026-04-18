@@ -91,7 +91,10 @@ fn run_check() -> ExitCode {
     });
 
     if violations.is_empty() {
-        println!("xtask check: OK ({} calc-crate + acquire checks passed)", calc_crates.len() + 1);
+        println!(
+            "xtask check: OK ({} calc-crate + acquire checks passed)",
+            calc_crates.len() + 1
+        );
         ExitCode::SUCCESS
     } else {
         eprintln!("xtask check: {} violation(s):", violations.len());

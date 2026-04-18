@@ -9,7 +9,9 @@ use orbit_log::{event, Level, SafeString};
 fn macro_accepts_allowlisted_field_types() {
     let tag: &'static str = "startup";
     let owned = SafeString::new("example".to_string());
-    event!(Level::Info, "booted",
+    event!(
+        Level::Info,
+        "booted",
         request_id = 42u128,
         count = 7u64,
         ok = true,
