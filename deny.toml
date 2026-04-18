@@ -1,0 +1,43 @@
+# cargo-deny configuration. Skeleton for Slice 0a; tightened in Slice 0b.
+# See ADR-013 §Dependency hygiene.
+
+[advisories]
+# Vulnerability and unmaintained-crate policy. Tightened in Slice 0b.
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "warn"
+ignore = []
+
+[licenses]
+# Permissive + MPL-2.0 allowed. Copyleft (except MPL-2.0) forbidden per ADR-013.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "Zlib",
+    "CC0-1.0",
+]
+confidence-threshold = 0.8
+exceptions = []
+
+[bans]
+# Duplicate-dependency and banned-crate policy. Tightened in Slice 0b.
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+allow = []
+deny = []
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

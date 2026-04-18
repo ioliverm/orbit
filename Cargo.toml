@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "backend/crates/orbit-core",
+    "backend/crates/orbit-crypto",
+    "backend/crates/orbit-db",
+    "backend/crates/orbit-log",
+    "backend/crates/orbit-auth",
+    "backend/crates/orbit-api",
+    "backend/crates/orbit-worker",
+    "backend/crates/orbit-tax-core",
+    "backend/crates/orbit-tax-rules",
+    "backend/crates/orbit-tax-spain",
+    "backend/crates/orbit-market-data",
+    "backend/crates/orbit-fx",
+    "backend/crates/orbit-export",
+    "backend/binaries/orbit",
+    "backend/xtask",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.82"
+license = "UNLICENSED"
+publish = false

@@ -1,0 +1,8 @@
+# CODEOWNERS — Slice 0a seed per ADR-013 §Governance + S0-07.
+# Paths requiring Ivan's review on every change.
+
+/rules/**                           @ioliverm
+/migrations/**                      @ioliverm
+.github/workflows/**                @ioliverm
+backend/crates/orbit-auth/**        @ioliverm
+backend/crates/orbit-crypto/**      @ioliverm

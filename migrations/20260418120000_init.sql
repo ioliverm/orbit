@@ -1,0 +1,4 @@
+-- Slice 0a init migration.
+-- DDL (users, sessions, audit_log, rule_sets, orbit_app + orbit_support roles,
+--      RLS policies, rule_sets UPDATE trigger) lands via the migrations task.
+-- See ADR-013 §Migration tool, ADR-014 §DDL, ADR-015 §0a scope.

@@ -1,2 +1,16 @@
 .claude/settings.local.json
 .DS_Store
+
+# Rust
+target/
+
+# Node / pnpm
+node_modules/
+dist/
+
+# Env files
+.env
+.env.local
+
+# Logs
+*.log
