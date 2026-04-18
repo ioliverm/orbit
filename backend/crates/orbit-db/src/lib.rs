@@ -16,7 +16,7 @@
 
 use std::str::FromStr;
 
-use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgSslMode};
+use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions};
 
 mod tx;
 
@@ -41,24 +41,25 @@ pub enum Error {
     Tx(#[source] sqlx::Error),
 }
 
-/// Open a TLS-verified connection pool to Postgres.
+/// Open a connection pool to Postgres using the sslmode declared in the URL.
 ///
-/// Enforces `sslmode=verify-full` unless the caller's URL already requests
-/// `verify-full` or stricter. The connection fails fast if the server rejects
-/// TLS (S0-16 companion on the client side; full enforcement still lives in
-/// `pg_hba.conf` on the server).
+/// The caller is responsible for choosing the right TLS posture:
+///   - `sslmode=verify-full` — production (0b): Let's Encrypt over real DNS,
+///     client verifies the server's certificate chain against the system
+///     trust store. This is what `.env` must use in 0b.
+///   - `sslmode=require` — local dev (0a): TLS is on the wire but the client
+///     does not verify the chain. This is the documented 0a posture in
+///     `.env.example` because rustls rejects the two-tier dev PKI under
+///     verify-full even though the chain is structurally valid.
+///   - `sslmode=disable` / `prefer` — NEVER. The backend must reject these at
+///     boot; a separate runtime config loader enforces that.
+///
+/// The connection fails fast if the server rejects the requested mode.
 ///
 /// The caller is responsible for keeping the pool alive for the process
 /// lifetime; handlers acquire scoped transactions via `Tx::for_user` (T7).
 pub async fn connect(database_url: &str) -> Result<PgPool, Error> {
-    let options = PgConnectOptions::from_str(database_url)
-        .map_err(Error::InvalidUrl)?
-        // sqlx's default for `postgres://` URLs is `Prefer`, which accepts a
-        // cleartext fallback; that is not acceptable for Orbit. Force
-        // verify-full so the client validates the server's certificate chain
-        // against the configured root store. The connection will fail fast
-        // if the server rejects TLS.
-        .ssl_mode(PgSslMode::VerifyFull);
+    let options = PgConnectOptions::from_str(database_url).map_err(Error::InvalidUrl)?;
 
     PgPoolOptions::new()
         .max_connections(16)
