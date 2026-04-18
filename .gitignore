@@ -12,5 +12,10 @@ dist/
 .env
 .env.local
 
+# Local dev TLS material copied out of the Postgres container (see
+# `just db-cert`). Never commit these — they are per-developer self-signed.
+scripts/dev/.server.crt
+scripts/dev/.server.key
+
 # Logs
 *.log
