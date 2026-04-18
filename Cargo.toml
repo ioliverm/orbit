@@ -1,5 +1,10 @@
 [workspace]
-resolver = "2"
+# Resolver v3: MSRV-aware. Picks dependency versions compatible with
+# `workspace.package.rust-version` below, so transitive pulls like
+# `cookie` → `time` don't resolve to a crate that demands a newer rustc
+# (e.g. `time` 0.3.47 requires 1.88). Cargo ≥ 1.84 supports v3; our
+# `rust-toolchain.toml` pins 1.86, which is fine.
+resolver = "3"
 members = [
     "backend/crates/orbit-core",
     "backend/crates/orbit-crypto",
@@ -28,3 +33,17 @@ publish = false
 sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono", "uuid"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "2"
+# --- Auth / crypto primitives (T7 — Slice 0a). Versions pinned to what sqlx
+# already pulls in transitively where possible, to minimize tree growth.
+# ADR-011 names the `argon2` + `rand` + `subtle` stack explicitly.
+argon2 = "0.5"
+hmac = "0.12"
+sha2 = "0.10"
+rand = "0.8"           # OsRng for CSPRNG, per ADR-011
+subtle = "2"
+cookie = "0.18"
+# base64 (not base64ct): already in the tree via other RustCrypto deps; chosen
+# over base64ct because ADR-011's 43-char base64url session IDs need
+# URL_SAFE_NO_PAD, which `base64::engine::general_purpose::URL_SAFE_NO_PAD`
+# provides directly and is the de-facto default across the ecosystem.
+base64 = "0.22"

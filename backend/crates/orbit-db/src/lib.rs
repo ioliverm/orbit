@@ -5,19 +5,22 @@
 //!   - ADR-014 §1 (authoritative DDL).
 //!   - ADR-015 (Slice 0a scope: `orbit_support` role lives in the init migration).
 //!   - Security checklist S0-16 / S0-23 (`Tx::for_user` is the only
-//!     query-handle API; owned by T7).
+//!     query-handle API).
 //!
 //! This crate intentionally ships a minimal surface in Slice 0a:
 //!
 //!   * [`connect`] — opens a TLS-verified [`PgPool`].
 //!   * [`migrate`] — runs the embedded migrations against that pool.
-//!   * [`Tx::for_user`] — declared as a stub; the real implementation lands
-//!     with the auth layer (T7) per SEC-022.
+//!   * [`Tx::for_user`] — per-user transaction that primes the
+//!     `app.user_id` GUC used by RLS policies. Defined in [`tx`].
 
 use std::str::FromStr;
 
 use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgSslMode};
-use uuid::Uuid;
+
+mod tx;
+
+pub use tx::Tx;
 
 /// Errors produced by this crate.
 #[derive(Debug, thiserror::Error)]
@@ -31,6 +34,11 @@ pub enum Error {
     /// Migration runner failed.
     #[error("migrate failed: {0}")]
     Migrate(#[source] sqlx::migrate::MigrateError),
+    /// Failed to begin a transaction or prime `app.user_id` inside it
+    /// (SEC-022 / S0-23). If this fires, handler code must NOT proceed —
+    /// the RLS policies would treat the caller as unauthenticated.
+    #[error("tx setup failed: {0}")]
+    Tx(#[source] sqlx::Error),
 }
 
 /// Open a TLS-verified connection pool to Postgres.
@@ -67,30 +75,4 @@ pub async fn migrate(pool: &PgPool) -> Result<(), Error> {
         .run(pool)
         .await
         .map_err(Error::Migrate)
-}
-
-/// A per-user transaction handle.
-///
-/// Per SEC-022 / S0-23, this is the **only** query-handle API exposed to
-/// handler code. Acquiring it runs `SET LOCAL app.user_id = $1` inside a
-/// transaction so that the RLS `tenant_isolation` policies on every
-/// user-scoped table resolve to the caller's rows.
-///
-/// The real implementation is owned by T7 (auth layer); this scaffold is a
-/// compile-time placeholder so downstream crates can reference the type.
-pub struct Tx<'a> {
-    // PhantomData keeps the lifetime attached; the real impl will hold a
-    // `sqlx::Transaction<'a, sqlx::Postgres>`.
-    _marker: std::marker::PhantomData<&'a ()>,
-}
-
-impl<'a> Tx<'a> {
-    /// Open a transaction scoped to `user_id`.
-    ///
-    /// **Not implemented in Slice 0a.** The full implementation lands with
-    /// the auth layer (T7) per SEC-022. Do not call this from Slice 0a code.
-    #[allow(clippy::missing_errors_doc)]
-    pub async fn for_user(_pool: &PgPool, _user_id: Uuid) -> Result<Tx<'a>, Error> {
-        todo!("Tx::for_user is owned by T7 (auth layer) — SEC-022")
-    }
 }

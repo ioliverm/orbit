@@ -6,7 +6,15 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Gates tests that require a live Postgres (see `src/tx.rs` integration module).
+# Off by default so `cargo test --workspace` is Postgres-free on a fresh clone.
+integration-tests = []
+
 [dependencies]
 sqlx.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
