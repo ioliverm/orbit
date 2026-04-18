@@ -18,6 +18,24 @@
 name: orbit-dev
 
 services:
+  # One-shot sidecar: generates the self-signed TLS cert into the
+  # orbit-postgres-certs named volume before the postgres service starts.
+  # Rationale: the postgres image's initdb phase starts a temporary server
+  # with the command-line `ssl=on` args, which tries to load server.crt
+  # BEFORE /docker-entrypoint-initdb.d/*.sh runs. Generating the cert in a
+  # prerequisite service (via depends_on: service_completed_successfully)
+  # guarantees it exists by the time postgres boots at all.
+  tls-init:
+    image: postgres:16.8-bookworm
+    container_name: orbit-postgres-tls-init
+    entrypoint: ["/usr/local/bin/gen-tls-cert.sh"]
+    environment:
+      TLS_DIR: /certs
+    volumes:
+      - orbit-postgres-certs:/certs
+      - ./gen-tls-cert.sh:/usr/local/bin/gen-tls-cert.sh:ro
+    restart: "no"
+
   postgres:
     # Postgres 16. TODO(0b): pin by @sha256:<digest> once we mirror the image
     # used by the deploy pipeline (ADR-013 §Dependency hygiene). The tag pin is
@@ -25,6 +43,9 @@ services:
     image: postgres:16.8-bookworm
     container_name: orbit-postgres-dev
     restart: unless-stopped
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
 
     # Bind to loopback only — no 0.0.0.0 exposure. Private-network binding is
     # a 0b concern; loopback is the 0a stand-in.
@@ -50,20 +71,18 @@ services:
       # Locale: keep the cluster in UTF-8; the app assumes it.
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C.UTF-8"
 
-    # TLS-required pg_hba.conf + ssl=on passed via command args. The `-c`
-    # overrides apply on every boot (first boot and restarts alike); the init
-    # scripts below generate the cert/key on first boot only.
-    #
-    # SSL_CERT/SSL_KEY are placed inside PGDATA by 02-tls.sh.
-    # hba_file is mounted read-only from the host.
+    # TLS-required pg_hba.conf + ssl=on passed via command args. The cert
+    # and key live in the orbit-postgres-certs named volume, pre-populated
+    # by the tls-init service (see depends_on above). hba_file is mounted
+    # read-only from the host.
     command:
       - "postgres"
       - "-c"
       - "ssl=on"
       - "-c"
-      - "ssl_cert_file=/var/lib/postgresql/data/server.crt"
+      - "ssl_cert_file=/etc/postgresql/certs/server.crt"
       - "-c"
-      - "ssl_key_file=/var/lib/postgresql/data/server.key"
+      - "ssl_key_file=/etc/postgresql/certs/server.key"
       - "-c"
       - "hba_file=/etc/postgresql/pg_hba.conf"
       - "-c"
@@ -77,18 +96,19 @@ services:
 
     volumes:
       - orbit-postgres-data:/var/lib/postgresql/data
+      # Cert volume prepared by tls-init — mounted read-only.
+      - orbit-postgres-certs:/etc/postgresql/certs:ro
       # Init scripts run on first boot only (when PGDATA is empty). Numeric
       # prefixes determine execution order. Shell scripts run as the postgres
       # user.
       #
-      # We mount the two `.sh` scripts individually (not the whole pg_init/
+      # We mount the `.sh` script individually (not the whole pg_init/
       # directory). Rationale: 01-roles.sql contains `${VAR}` placeholders
       # rendered by 00-render-roles.sh; if the postgres image saw it as a
       # `.sql` file in /docker-entrypoint-initdb.d/, it would psql it
       # directly and create roles with LITERAL `${...}` passwords. Mounting
       # 01-roles.sql under a non-initdb path avoids that.
       - ./pg_init/00-render-roles.sh:/docker-entrypoint-initdb.d/00-render-roles.sh:ro
-      - ./pg_init/02-tls.sh:/docker-entrypoint-initdb.d/02-tls.sh:ro
       - ./pg_init/01-roles.sql:/opt/orbit/init/01-roles.sql:ro
       # TLS-required pg_hba — mounted read-only; not in PGDATA so it survives
       # volume resets consistently.
@@ -116,3 +136,5 @@ services:
 volumes:
   orbit-postgres-data:
     name: orbit-postgres-data
+  orbit-postgres-certs:
+    name: orbit-postgres-certs

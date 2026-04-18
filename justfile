@@ -70,7 +70,7 @@ db-reset:
 # Copy the server's self-signed cert to scripts/dev/.server.crt so host
 # tools (psql, sqlx) can use sslmode=verify-full. Git-ignored.
 db-cert:
-    docker cp orbit-postgres-dev:/var/lib/postgresql/data/server.crt scripts/dev/.server.crt
+    docker cp orbit-postgres-dev:/etc/postgresql/certs/server.crt scripts/dev/.server.crt
     @chmod 644 scripts/dev/.server.crt
     @echo "[db-cert] Wrote scripts/dev/.server.crt"
 
