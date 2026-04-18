@@ -80,8 +80,8 @@ CREATE TABLE users (
 );
 -- No RLS on users: the row is keyed by id and accessed only by the owning request.
 -- Application enforces identity via the session lookup.
-
-CREATE UNIQUE INDEX users_email_key ON users (lower(email));
+-- The CITEXT UNIQUE constraint above already yields a case-insensitive unique
+-- index (auto-named `users_email_key`); no explicit lower(email) index needed.
 
 -- SESSIONS ------------------------------------------------------------------
 CREATE TABLE sessions (

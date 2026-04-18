@@ -56,7 +56,8 @@ CREATE TABLE users (
 -- Application enforces identity via the session lookup; a leaked `SELECT * FROM users`
 -- would be bad but orbit_app will be restricted to SELECT by id only via a view.
 
-CREATE UNIQUE INDEX users_email_key ON users (lower(email));
+-- CITEXT NOT NULL UNIQUE above already creates `users_email_key` with
+-- case-insensitive semantics; no explicit lower(email) index needed.
 
 -- SESSIONS ---------------------------------------------------------------
 CREATE TABLE sessions (
