@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Exports</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="sell-now.html">Sell-now <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="scenario-modeler.html">Escenarios <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link sidebar__link--active" href="export.html" aria-current="page">Exports <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group" style="margin-top:auto;"><div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="#">Perfil y residencia</a>
+      <a class="sidebar__link" href="#">Facturación</a>
+      <a class="sidebar__link" href="#">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Cumplimiento / <strong>Exports</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--primary btn--sm">Nueva exportación</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+      <div class="page-title">
+        <div>
+          <h1>Exports</h1>
+          <div class="page-title__meta">Documentos que has generado. Cada uno lleva una traceability ID que coincide con la entrada de audit-log. Retención por defecto: 7 años (prescripción AEAT).</div>
+        </div>
+      </div>
+
+      <table class="tbl" style="margin-bottom: var(--space-8);">
+        <thead>
+          <tr>
+            <th scope="col">Fecha</th>
+            <th scope="col">Origen</th>
+            <th scope="col">Formato</th>
+            <th scope="col">Idioma</th>
+            <th scope="col">Rule set</th>
+            <th scope="col">Traceability ID</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">2026-04-18 10:42</th>
+            <td>Sell-now · 3.420 sh</td>
+            <td>PDF</td>
+            <td>ES</td>
+            <td><span class="chip"><span class="chip__dot"></span>es-2026.1.0</span></td>
+            <td class="mono-num" style="font-size: var(--text-xs);">e2b1-c74d-8a9f</td>
+            <td class="row" style="gap: var(--space-2);"><button class="btn btn--ghost btn--sm">Descargar</button></td>
+          </tr>
+          <tr>
+            <th scope="row">2026-04-15 18:02</th>
+            <td>Escenario · IPO + lockup sell-through</td>
+            <td>PDF + CSV</td>
+            <td>ES + EN</td>
+            <td><span class="chip"><span class="chip__dot"></span>es-2026.1.0</span></td>
+            <td class="mono-num" style="font-size: var(--text-xs);">c1a0-9fbd-0023</td>
+            <td class="row" style="gap: var(--space-2);"><button class="btn btn--ghost btn--sm">Descargar</button></td>
+          </tr>
+          <tr>
+            <th scope="row">2025-12-10 14:33</th>
+            <td>Modelo 720 worksheet 2025</td>
+            <td>PDF</td>
+            <td>ES</td>
+            <td><span class="chip chip--superseded"><span class="chip__dot"></span>es-2025.2.0</span></td>
+            <td class="mono-num" style="font-size: var(--text-xs);">7d03-1a82-b560</td>
+            <td class="row" style="gap: var(--space-2);">
+              <button class="btn btn--ghost btn--sm">Descargar</button>
+              <button class="btn btn--secondary btn--sm">Recomputar bajo reglas actuales</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <aside class="alert alert--warning" style="margin-bottom: var(--space-8);">
+        <strong>Un export bajo reglas superadas — qué significa</strong>
+        <p>El documento marcado <span class="chip chip--superseded"><span class="chip__dot"></span>es-2025.2.0</span> se calculó con un rule set que ha sido superado por <span class="chip"><span class="chip__dot"></span>es-2026.1.0</span>. Los números del PDF son válidos como fueron emitidos (replicables byte a byte). "Recomputar bajo reglas actuales" crea un nuevo documento con un nuevo traceability ID; el original se conserva.</p>
+      </aside>
+
+    </main>
+
+    <footer class="disclaimer">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="disclaimer__meta">
+        <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+        <button class="btn btn--ghost btn--sm">Ver trazabilidad</button>
+      </span>
+    </footer>
+  </div>
+</div>
+
+<!-- Export dialog (shown by default for preview; click backdrop to hide) -->
+<div class="modal-backdrop" id="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 id="export-title">Exportar PDF · Sell-now (3.420 acciones)</h2>
+      <p class="muted" style="font-size: var(--text-sm); margin-top: var(--space-1);">El documento llevará la traceability ID, la versión del rule set, y la fecha de guía AEAT. Revisa antes de generar.</p>
+    </div>
+
+    <div class="modal__body">
+      <div class="field">
+        <label>Alcance</label>
+        <div class="row">
+          <label class="row" style="gap: 6px;"><input type="radio" name="scope" checked /> Este cálculo</label>
+          <label class="row" style="gap: 6px;"><input type="radio" name="scope" /> Con sensibilidad completa</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Formato</label>
+        <div class="row">
+          <label class="row" style="gap: 6px;"><input type="checkbox" checked /> PDF</label>
+          <label class="row" style="gap: 6px;"><input type="checkbox" /> CSV (datos + fórmulas)</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Idioma</label>
+        <div class="row">
+          <label class="row" style="gap: 6px;"><input type="radio" name="lang" checked /> Español</label>
+          <label class="row" style="gap: 6px;"><input type="radio" name="lang" /> English</label>
+          <label class="row" style="gap: 6px;"><input type="radio" name="lang" /> ES + EN (paralelo)</label>
+        </div>
+        <p class="field__hint">Por defecto español — pensado para tu gestor.</p>
+      </div>
+
+      <hr class="divider" />
+
+      <div class="field">
+        <label class="row" style="gap: 8px; align-items: flex-start;">
+          <input type="checkbox" id="disclaimer-confirm" style="margin-top: 3px;" />
+          <span style="font-size: var(--text-sm);">Entiendo que este documento <strong>no es asesoramiento fiscal ni financiero</strong>, que Orbit <strong>no presenta</strong> ni el Modelo 100 ni el 720, y que lo revisaré con mi asesor antes de actuar.</span>
+        </label>
+      </div>
+
+      <div class="muted" style="font-size: var(--text-xs); background: var(--color-surface-sunken); padding: var(--space-3); border-radius: var(--radius-sm);">
+        <div>Pie que se imprimirá en cada página del PDF:</div>
+        <div class="mono-num" style="margin-top: var(--space-1);">
+          Orbit calculation export<br>
+          Traceability ID: e2b1-c74d-8a9f-...<br>
+          Rule set: es-2026.1.0 (AEAT guidance 2026-03-15)<br>
+          Engine: orbit-engine v0.4.2<br>
+          Inputs hash: sha256:9f3c…e1b2<br>
+          Result hash: sha256:7a04…c92d<br>
+          ECB FX: 2026-04-17, 1 EUR = 1,0823 USD<br>
+          <br>
+          Esto no es asesoramiento fiscal ni financiero.<br>
+          This is not tax or financial advice.
+        </div>
+      </div>
+    </div>
+
+    <div class="modal__footer">
+      <button class="btn btn--ghost" onclick="document.getElementById('export-dialog').style.display='none'">Cancelar</button>
+      <button class="btn btn--primary" id="export-go" disabled>Generar y descargar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Only enable the primary action when the disclaimer is acknowledged.
+  const cb = document.getElementById('disclaimer-confirm');
+  const btn = document.getElementById('export-go');
+  if (cb && btn) {
+    cb.addEventListener('change', () => { btn.disabled = !cb.checked; });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Tu residencia fiscal</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  residency-setup.html — Slice 1 AC 4.1 (residency step).
+
+  Reachable via:
+   - /signup/residency (wizard state 4) — first-time, required before /signup/first-grant
+   - /app/account/profile (Slice 1 AC 4.1.7) — edit later; creates a NEW
+     residency_periods row and closes the prior (to_date = today).
+
+  Data-model mapping (ADR-014 DDL + ADR-005):
+    jurisdiction      = 'ES'
+    sub_jurisdiction  = ISO-3166-2 code (ES-MD, ES-PV, ES-NA, ...)
+    regime_flags      = array; may include 'beckham_law', 'foral_pais_vasco', 'foral_navarra'
+    from_date         = today
+    to_date           = NULL
+
+  What ships in Slice 1 vs later:
+   - v1 supports territorio común. País Vasco + Navarra appear with the
+     "(no soportado en v1)" suffix; selection is allowed and stored but
+     no tax-calc block renders because no tax calcs exist in Slice 1 (AC-4.1.3).
+   - Beckham = Sí stored; no block in Slice 1 (AC-4.1.4).
+   - Art. 7.p posture lives in Slice 2 (Art. 7.p trip entry); note the
+     information-only sub-section at the bottom.
+
+  Tax vocabulary stays in Spanish even in EN locale (G-12).
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="auth-shell">
+  <header class="auth-shell__topbar">
+    <div class="auth-shell__brand">ORB<span>IT</span></div>
+    <div class="row gap-2">
+      <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma">ES · EN</button>
+      <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+    </div>
+  </header>
+
+  <main id="main" class="auth-shell__main">
+    <div class="auth-stack">
+
+      <section class="auth-card auth-card--wide" aria-labelledby="r-title">
+        <div class="stepper">
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Cuenta</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Verificar email</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Aviso</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--active"><span class="stepper__dot">4</span>Residencia</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">5</span>Tu primer grant</span>
+        </div>
+
+        <h1 id="r-title" class="auth-card__title">Tu residencia fiscal</h1>
+        <p class="auth-card__sub">
+          Orbit necesita saber dónde tributas antes de modelar tus grants. Guardaremos esta información como un período de residencia con fecha de inicio <strong>hoy</strong>. Si te mudas, crearás un período nuevo en Cuenta → Perfil; el anterior se cerrará automáticamente.
+        </p>
+
+        <form class="stack gap-5" action="/api/v1/residency" method="post" novalidate>
+
+          <!-- Autonomía -->
+          <div class="field">
+            <label for="r-autonomia">Autonomía (territorio común o foral)</label>
+            <select class="select" id="r-autonomia" name="subJurisdiction" required>
+              <optgroup label="Territorio común (soportado)">
+                <option value="">— selecciona —</option>
+                <option value="ES-AN">Andalucía</option>
+                <option value="ES-AR">Aragón</option>
+                <option value="ES-AS">Asturias</option>
+                <option value="ES-IB">Baleares</option>
+                <option value="ES-CN">Canarias</option>
+                <option value="ES-CB">Cantabria</option>
+                <option value="ES-CM">Castilla-La Mancha</option>
+                <option value="ES-CL">Castilla y León</option>
+                <option value="ES-CT">Cataluña</option>
+                <option value="ES-CE">Ceuta</option>
+                <option value="ES-EX">Extremadura</option>
+                <option value="ES-GA">Galicia</option>
+                <option value="ES-RI">La Rioja</option>
+                <option value="ES-MD" selected>Comunidad de Madrid</option>
+                <option value="ES-ML">Melilla</option>
+                <option value="ES-MC">Murcia</option>
+                <option value="ES-VC">Comunidad Valenciana</option>
+              </optgroup>
+              <optgroup label="Régimen foral (no soportado en v1)">
+                <option value="ES-NA">Navarra (no soportado en v1)</option>
+                <option value="ES-PV">País Vasco (no soportado en v1)</option>
+              </optgroup>
+            </select>
+            <p class="field__hint">La autonomía determina los tramos autonómicos de IRPF. Territorio común usa los tramos estatales + los autonómicos combinados. Los regímenes forales no están soportados para cálculos fiscales en v1.</p>
+          </div>
+
+          <!-- Beckham flag -->
+          <fieldset class="field">
+            <legend>Régimen de impatriados (Beckham)</legend>
+            <div class="choice-group" role="radiogroup" aria-describedby="beckham-hint">
+              <label class="choice"><input type="radio" name="beckham" value="no" checked /><span>No</span></label>
+              <label class="choice"><input type="radio" name="beckham" value="si" /><span>Sí, estoy bajo el régimen</span></label>
+            </div>
+            <p class="field__hint" id="beckham-hint">
+              Si aplicas el régimen especial de impatriados (Ley Beckham), v1 <strong>no calcula</strong> tu IRPF bajo ese régimen — tributas al 24 % sobre rentas españolas hasta 600.000 € y el tratamiento de grants difiere. Guardaremos tu respuesta; en las pantallas de cálculo verás un bloque que te redirige a tu asesor fiscal.
+            </p>
+          </fieldset>
+
+          <!-- Primary currency -->
+          <fieldset class="field">
+            <legend>Moneda principal</legend>
+            <div class="choice-group" role="radiogroup" aria-describedby="currency-hint">
+              <label class="choice"><input type="radio" name="primaryCurrency" value="EUR" checked /><span>EUR (€)</span></label>
+              <label class="choice"><input type="radio" name="primaryCurrency" value="USD" /><span>USD ($)</span></label>
+            </div>
+            <p class="field__hint" id="currency-hint">
+              Afecta a cómo se muestran los valores en tu dashboard. En Slice 1 <strong>no hay conversión a EUR</strong> — los grants en USD se muestran en USD hasta que se active el seguimiento fiscal (Slice 3). Dashboard en EUR llegará cuando llegue el pipeline FX.
+            </p>
+          </fieldset>
+
+          <!-- Art. 7.p posture (informational; no form field in Slice 1) -->
+          <aside class="alert alert--info">
+            <strong>Art. 7.p (trabajo en el extranjero) — informativo</strong>
+            <p>Si trabajas parte del año en el extranjero para una entidad no residente, puedes acogerte a la exención del Art. 7.p (hasta 60.100 €/año). En Orbit, los viajes cualificados se introducen en <strong>Cumplimiento → Viajes Art. 7.p</strong> (disponible en Slice 2). No te pedimos nada aquí; sólo queremos que sepas dónde vive esa opción.</p>
+          </aside>
+
+          <!-- Foral warning (only if foral selected; here we show the "preview" of what would appear) -->
+          <aside class="alert alert--warning">
+            <strong>Si seleccionas País Vasco o Navarra</strong>
+            <p>Guardaremos tu selección con el flag <span class="mono">foral_pais_vasco</span> o <span class="mono">foral_navarra</span>. Tu cartera y tu calendario de vesting funcionan normalmente. Cuando Orbit empiece a calcular impuestos (Slice 4), verás un bloque que los cálculos fiscales están desactivados para regímenes forales en v1 y te redirige a tu asesor fiscal.</p>
+          </aside>
+
+          <div class="row row--between">
+            <a class="back-link" href="signup.html">← Atrás</a>
+            <button class="btn btn--primary" type="submit">Guardar residencia y continuar</button>
+          </div>
+        </form>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="disclaimer" role="contentinfo">
+    <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+  </footer>
+</div>
+</body>
+</html>

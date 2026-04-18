@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Sell-now</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link sidebar__link--active" href="sell-now.html" aria-current="page">Sell-now <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="scenario-modeler.html">Escenarios <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="export.html">Exports <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group" style="margin-top:auto;"><div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="#">Perfil y residencia</a>
+      <a class="sidebar__link" href="#">Facturación</a>
+      <a class="sidebar__link" href="#">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Decisiones / <strong>Sell-now</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm">ES · EN</button>
+        <button class="btn btn--secondary btn--sm">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+      <div class="page-title">
+        <div>
+          <h1>Sell-now — estimación</h1>
+          <div class="page-title__meta">Calcula qué llegaría a tu cuenta española si vendieras hoy. No es una orden de venta ni una recomendación.</div>
+        </div>
+        <div class="row">
+          <button class="btn btn--ghost btn--sm">Restablecer</button>
+          <button class="btn btn--primary btn--sm">Exportar PDF</button>
+        </div>
+      </div>
+
+      <!-- Live quote strip -->
+      <div class="livestrip" role="status" aria-live="polite" style="margin-bottom: var(--space-6);">
+        <div class="livestrip__item">
+          <span class="livestrip__label">Cotización ACME</span>
+          <span class="livestrip__value">$48,00</span>
+          <span class="livestrip__meta">Finnhub · delay 15 min · 10:27 CET</span>
+        </div>
+        <div class="livestrip__item">
+          <span class="livestrip__label">Rango intradía</span>
+          <span class="livestrip__value">$47,20 — $48,60</span>
+          <span class="livestrip__meta">banda de precio aplicada al cálculo</span>
+        </div>
+        <div class="livestrip__item">
+          <span class="livestrip__label">ECB EUR/USD</span>
+          <span class="livestrip__value">1,0823</span>
+          <span class="livestrip__meta">publicado 2026-04-17 · spread aplicado 1,5 %</span>
+        </div>
+        <div class="spacer"></div>
+        <!-- D-4: live-update status line. The aria-live region is visible *and*
+             announced by screen readers; there is no explicit "Calculate" button. -->
+        <span class="recalc-status recalc-status--done" role="status" aria-live="polite" aria-atomic="true">
+          <span class="recalc-status__dot" aria-hidden="true"></span>
+          Actualizado a las 10:27
+        </span>
+        <button class="btn btn--ghost btn--sm">Sobreescribir precio / FX</button>
+      </div>
+
+      <div class="split">
+        <!-- Inputs -->
+        <section class="stack" aria-label="Lotes a vender">
+          <h2 style="margin-bottom: var(--space-1);">Lotes a vender</h2>
+          <p class="muted" style="font-size: var(--text-sm);">Selecciona acciones de tus grants. El cálculo se actualiza automáticamente.</p>
+
+          <div class="card" style="padding: 0;">
+            <div style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+              <strong style="font-size: var(--text-sm);">Lote 1 — RSU (Refresh 2024-09)</strong>
+              <button class="btn btn--ghost btn--sm" aria-label="Eliminar lote 1">Eliminar</button>
+            </div>
+            <div style="padding: var(--space-4); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+              <div class="field">
+                <label for="lot1-type">Instrumento</label>
+                <select class="select" id="lot1-type"><option>RSU</option><option>ESPP</option><option>NSO same-day</option></select>
+              </div>
+              <div class="field">
+                <label for="lot1-shares">Acciones</label>
+                <input class="input num" id="lot1-shares" inputmode="numeric" value="3.000" />
+              </div>
+              <div class="field" style="grid-column: 1 / -1;">
+                <p class="field__hint">Base (FMV-at-vest): <span class="mono-num">$31,20</span> · vested disponible: <span class="mono-num">12.500</span></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 0;">
+            <div style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+              <strong style="font-size: var(--text-sm);">Lote 2 — ESPP (2025-H2)</strong>
+              <button class="btn btn--ghost btn--sm">Eliminar</button>
+            </div>
+            <div style="padding: var(--space-4); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+              <div class="field">
+                <label for="lot2-type">Instrumento</label>
+                <select class="select" id="lot2-type"><option selected>ESPP</option></select>
+              </div>
+              <div class="field">
+                <label for="lot2-shares">Acciones</label>
+                <input class="input num" id="lot2-shares" inputmode="numeric" value="420" />
+              </div>
+              <div class="field" style="grid-column: 1 / -1;">
+                <p class="field__hint">Base (FMV-at-purchase): <span class="mono-num">$34,00</span> · descuento ya tributado como rendimiento del trabajo en compra.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 0;">
+            <div style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
+              <strong style="font-size: var(--text-sm);">Lote 3 — NSO same-day (Initial 2022-03)</strong>
+              <button class="btn btn--ghost btn--sm">Eliminar</button>
+            </div>
+            <div style="padding: var(--space-4); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+              <div class="field">
+                <label for="lot3-type">Instrumento</label>
+                <select class="select" id="lot3-type"><option selected>NSO same-day</option></select>
+              </div>
+              <div class="field">
+                <label for="lot3-shares">Acciones</label>
+                <input class="input num" id="lot3-shares" inputmode="numeric" value="1.000" />
+              </div>
+              <div class="field">
+                <label for="lot3-strike">Strike (USD)</label>
+                <input class="input num" id="lot3-strike" inputmode="decimal" value="8,00" />
+              </div>
+              <div class="field">
+                <p class="field__hint" style="padding-top: var(--space-5);">Bargain element = (FMV − strike) × acciones</p>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn--secondary">+ Añadir otro lote</button>
+
+          <details style="margin-top: var(--space-4);">
+            <summary style="cursor: pointer; font-size: var(--text-sm); color: var(--color-accent); font-weight: 500;">Sobreescrituras avanzadas (precio, FX spread, comisiones, retención US, transferencia)</summary>
+            <div class="stack" style="margin-top: var(--space-4);">
+              <div class="field">
+                <label for="ov-price">Precio por acción (USD) — si dejas en blanco se usa la cotización retrasada 15 min.</label>
+                <input class="input num" id="ov-price" placeholder="48,00" />
+              </div>
+              <div class="field">
+                <label for="ov-spread">FX spread (%) — por defecto 1,5 %</label>
+                <input class="input num" id="ov-spread" placeholder="1,5" />
+              </div>
+              <div class="field">
+                <label for="ov-fees">Comisiones broker US (USD o %)</label>
+                <input class="input num" id="ov-fees" placeholder="0,00" />
+              </div>
+              <div class="field">
+                <label for="ov-withh">Retención US (USD o %)</label>
+                <input class="input num" id="ov-withh" placeholder="0,00" />
+                <p class="field__hint">W-8BEN + convenio EE.UU.–España: normalmente sin retención US sobre ganancia patrimonial para residentes fiscales españoles. El salario RSU ya se retuvo en el vest.</p>
+              </div>
+              <div class="field">
+                <label for="ov-transfer">Comisión de transferencia (EUR)</label>
+                <input class="input num" id="ov-transfer" placeholder="0,00" />
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <!-- Outputs -->
+        <section class="stack" aria-label="Resultados del cálculo">
+
+          <!-- Headline: Pattern C -->
+          <div class="headline" role="region" aria-label="Neto final estimado">
+            <div class="headline__label">Neto en tu cuenta española</div>
+            <div class="headline__range">
+              <span class="headline__low">€98.400</span>
+              <span class="headline__sep">—</span>
+              <span class="headline__high">€112.600</span>
+            </div>
+            <div class="headline__central">Estimación central <span class="mono-num">€105.500</span> · amplitud del rango <span class="mono-num">€14.200</span> (±6,7 %)</div>
+            <div class="range" style="--range-min:0%; --range-max:100%; --range-central:50%;" role="img" aria-label="Rango: 98.400 a 112.600 euros; central 105.500">
+              <div class="range__rail" aria-hidden="true">
+                <div class="range__band"></div>
+                <div class="range__dot"></div>
+              </div>
+            </div>
+            <div class="headline__drivers">
+              Movido por: <strong>precio ACME ±1,5 %</strong> (intradía) · <strong>FX spread 0 – 3 %</strong> · <strong>impuesto español estimado</strong>
+            </div>
+          </div>
+
+          <!-- Intermediate cards (Pattern B) -->
+          <div class="stack">
+            <article class="card">
+              <div class="card__label">1 — Ingresos brutos USD</div>
+              <div class="row row--between" style="align-items: baseline;">
+                <div class="card__value" style="font-size: var(--text-lg);">$213.600,00</div>
+                <div class="muted" style="font-size: var(--text-sm);">3.420 acciones × $48,00 <span class="mono-num">+$40.000 bargain</span></div>
+              </div>
+              <button class="formula__toggle" aria-expanded="false" aria-controls="f1">Ver fórmula y trazabilidad ▾</button>
+              <div class="formula" id="f1">
+                <code>RSU:   3.000 × $48,00 = $144.000,00</code>
+                <code>ESPP:    420 × $48,00 = $20.160,00</code>
+                <code>NSO same-day: 1.000 × $48,00 = $48.000,00 (sell) + bargain $40.000</code>
+                <code>Total bruto USD = $213.600,00 (sell) · elemento bargain $40.000 (rendimiento trabajo)</code>
+                <div class="formula__ruleset">Rule set es-2026.1.0 · AEAT 15 mar 2026</div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card__label">2 — Tras comisiones US y retenciones</div>
+              <div class="row row--between" style="align-items: baseline;">
+                <div class="card__value" style="font-size: var(--text-lg);">$213.600,00</div>
+                <div class="muted" style="font-size: var(--text-sm);">comisiones $0 · retención US $0 <span class="badge badge--override">por defecto</span></div>
+              </div>
+              <div class="range" style="--range-min:8%; --range-max:100%; --range-central:55%; margin-top: var(--space-3);" role="img" aria-label="Rango EUR por spread FX 0-3%: 191.700 a 213.200; central 204.900">
+                <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+                <div class="range__labels">
+                  <span class="range__bound">€191.700 <span class="subtle">(spread 3 %)</span></span>
+                  <span class="range__bound range__bound--central">central €204.900</span>
+                  <span class="range__bound">€213.200 <span class="subtle">(spread 0 %)</span></span>
+                </div>
+                <div class="range__driver">EUR al cambio ECB 1,0823, spread 0 — 3 %</div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card__label">3 — Impuesto español estimado</div>
+              <div class="row row--between" style="align-items: baseline;">
+                <div class="card__value" style="font-size: var(--text-lg);">−€99.400 — −€100.600</div>
+                <div class="muted" style="font-size: var(--text-sm);">central <span class="mono-num">−€99.900</span></div>
+              </div>
+              <div class="range" style="--range-min:35%; --range-max:45%; --range-central:40%; margin-top: var(--space-3);" role="img" aria-label="Rango impuesto: 99400 a 100600; central 99900">
+                <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+              </div>
+              <hr class="divider" />
+              <table class="tbl" style="border: none;">
+                <tbody>
+                  <tr><th scope="row">Bargain NSO (rendimiento trabajo, IRPF marginal 47 %)</th><td class="num">−€17.340,00</td></tr>
+                  <tr><th scope="row">Ganancia RSU (ahorro-base)</th><td class="num">−€9.360,00</td></tr>
+                  <tr><th scope="row">Ganancia ESPP (ahorro-base)</th><td class="num">−€1.240,00</td></tr>
+                  <tr><th scope="row">Ganancia NSO (≈ 0 por same-day)</th><td class="num">—</td></tr>
+                  <tr style="font-weight: 600;"><th scope="row">Total estimación fiscal ES</th><td class="num">−€27.940,00</td></tr>
+                </tbody>
+              </table>
+              <p class="muted" style="font-size: var(--text-xs); margin-top: var(--space-2);">El rango del headline incluye además la incertidumbre de precio (±1,5 % intradía) que mueve la base imponible. Tipo marginal aplicado a la autonomía de Madrid, 2026.</p>
+              <button class="formula__toggle" aria-expanded="false" aria-controls="f3">Ver fórmula y tramos ahorro-base ▾</button>
+              <div class="formula" id="f3">
+                <code>RSU gain = (48,00 − 31,20) × 3.000 = $50.400 USD → €46.562</code>
+                <code>ESPP gain = (48,00 − 34,00) × 420 = $5.880 USD → €5.432</code>
+                <code>Ahorro base: 19% en los primeros 6.000 € · 21% 6.000 — 50.000 € · 23% 50.000 — 200.000 €</code>
+                <code>NSO bargain = (48,00 − 8,00) × 1.000 = $40.000 USD → €36.938 (rendimiento trabajo)</code>
+                <code>NSO bargain IRPF ≈ 47% marginal (estatal + Madrid 2026) ≈ €17.340</code>
+                <div class="formula__ruleset">Rule set es-2026.1.0 · AEAT 15 mar 2026 · autonomía ES-MD</div>
+              </div>
+            </article>
+          </div>
+
+          <!-- Sensitivity -->
+          <section class="sens" aria-label="Análisis de sensibilidad">
+            <div class="sens__head">Sensibilidad — qué mueve el neto final</div>
+            <table class="sens__tbl">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Driver</th>
+                  <th class="num">−25 %</th>
+                  <th class="num">−10 %</th>
+                  <th class="num">Central</th>
+                  <th class="num">+10 %</th>
+                  <th class="num">+25 %</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row" style="text-align:left; font-weight:500;">Precio ACME</th>
+                  <td class="down-heavy">€76.100</td>
+                  <td class="down">€94.200</td>
+                  <td class="central">€105.500</td>
+                  <td class="up">€116.800</td>
+                  <td class="up-heavy">€134.900</td>
+                </tr>
+                <tr>
+                  <th scope="row" style="text-align:left; font-weight:500;">FX spread (EUR/USD)</th>
+                  <td class="down">€99.500</td>
+                  <td class="down">€103.000</td>
+                  <td class="central">€105.500</td>
+                  <td class="up">€107.900</td>
+                  <td class="up">€111.300</td>
+                </tr>
+                <tr>
+                  <th scope="row" style="text-align:left; font-weight:500;">Tipo marginal IRPF (bargain NSO)</th>
+                  <td class="up">€108.300</td>
+                  <td class="up">€106.700</td>
+                  <td class="central">€105.500</td>
+                  <td class="down">€104.100</td>
+                  <td class="down">€101.600</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <!-- Passive banner -->
+          <aside class="alert alert--warning" role="note">
+            <strong>Aviso Modelo 720 / 721</strong>
+            <p>Si tu saldo total en valores de EE.UU. superó los €50.000 en algún punto del año pasado, es posible que debas declarar Modelo 720. Si tienes activos virtuales relevantes puede aplicar Modelo 721. Orbit no presenta estos modelos.</p>
+          </aside>
+
+        </section>
+      </div>
+    </main>
+
+    <footer class="disclaimer">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja. El sell-now es una estimación de lo que llegaría a tu cuenta; no es una orden ni una recomendación.</span>
+      <span class="disclaimer__meta">
+        <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+        <button class="btn btn--ghost btn--sm">Ver trazabilidad</button>
+      </span>
+    </footer>
+  </div>
+</div>
+
+<script>
+  // Disclosure for formula panels; falls back to always-shown without JS (hidden attr stripped).
+  document.querySelectorAll('.formula__toggle').forEach(btn => {
+    const id = btn.getAttribute('aria-controls');
+    const panel = id && document.getElementById(id);
+    if (!panel) return;
+    btn.setAttribute('aria-expanded', 'false');
+    panel.hidden = true;
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!open));
+      panel.hidden = open;
+    });
+  });
+</script>
+</body>
+</html>

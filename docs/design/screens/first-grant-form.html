@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Tu primer grant</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  first-grant-form.html — Slice 1 AC 4.2 (first-grant form).
+
+  Maps to ADR-014 `grants` DDL + vesting-derivation algorithm. The form is
+  engineered so that validated input feeds derive_vesting_events() without
+  additional transformation.
+
+  Field → column:
+   instrument                   -> grants.instrument  (rsu | nso | espp | iso_mapped_to_nso)
+   grant_date                   -> grants.grant_date
+   share_count                  -> grants.share_count
+   strike_amount / strike_currency -> grants.strike_amount / strike_currency  (required iff nso/iso)
+   vesting_start                -> grants.vesting_start
+   vesting template             -> expands to:
+      vesting_total_months, cliff_months, vesting_cadence
+   double_trigger                -> grants.double_trigger (RSU only, AC-4.2.4)
+   liquidity_event_date (optional) -> grants.liquidity_event_date
+   employer_name                -> grants.employer_name  (≤256 chars, SEC-163)
+   ticker (optional)            -> grants.ticker  (regex [A-Z0-9.\-]{1,8})
+
+  Validation (inline, no partial save):
+   - cliff_months <= vesting_total_months           (AC-4.2.6; DDL constraint)
+   - share_count > 0                                (AC-4.2.7)
+   - strike required iff NSO/ISO                   (AC-4.2.8; DDL constraint)
+   - grant_date > today+1 → non-blocking warning    (AC-4.2.9)
+
+  Live vesting preview (AC-4.2.5) renders on the right pane. Backend and
+  frontend share a property-test fixture for the derivation (ADR-014 §2).
+
+  "Tengo varios grants" link (AC-4.2.11) dismisses the form; CSV import is
+  Slice 2, so the destination is the empty dashboard with a "Añadir grant" CTA.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="auth-shell">
+  <header class="auth-shell__topbar">
+    <div class="auth-shell__brand">ORB<span>IT</span></div>
+    <div class="row gap-2">
+      <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma">ES · EN</button>
+      <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+    </div>
+  </header>
+
+  <main id="main" class="auth-shell__main">
+    <div class="auth-stack">
+
+      <section class="auth-card auth-card--wide" aria-labelledby="g-title">
+        <div class="stepper">
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Cuenta</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Verificar email</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Aviso</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Residencia</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--active"><span class="stepper__dot">5</span>Tu primer grant</span>
+        </div>
+
+        <h1 id="g-title" class="auth-card__title">Tu primer grant</h1>
+        <p class="auth-card__sub">Introduce un grant manualmente. El calendario de vesting se dibuja a la derecha conforme escribes. Si tienes varios grants, puedes saltar este paso y usar el importador CSV más adelante.</p>
+
+        <form class="split" action="/api/v1/grants" method="post" novalidate>
+
+          <!-- LEFT column — inputs -->
+          <div class="stack gap-4">
+
+            <!-- Instrument -->
+            <fieldset class="field">
+              <legend>Tipo de instrumento</legend>
+              <div class="form-grid">
+                <label class="choice-card">
+                  <input type="radio" name="instrument" value="rsu" checked />
+                  <span class="choice-card__body">
+                    <span class="choice-card__title">RSU</span>
+                    <span class="choice-card__hint">Restricted Stock Units. Tributan como rendimiento del trabajo al vestear.</span>
+                  </span>
+                </label>
+                <label class="choice-card">
+                  <input type="radio" name="instrument" value="nso" />
+                  <span class="choice-card__body">
+                    <span class="choice-card__title">NSO</span>
+                    <span class="choice-card__hint">Non-qualified Stock Options. Bargain element como rendimiento del trabajo al ejercer.</span>
+                  </span>
+                </label>
+                <label class="choice-card">
+                  <input type="radio" name="instrument" value="espp" />
+                  <span class="choice-card__body">
+                    <span class="choice-card__title">ESPP</span>
+                    <span class="choice-card__hint">Employee Stock Purchase Plan. El descuento tributa como rendimiento del trabajo en la compra.</span>
+                  </span>
+                </label>
+                <label class="choice-card">
+                  <input type="radio" name="instrument" value="iso_mapped_to_nso" />
+                  <span class="choice-card__body">
+                    <span class="choice-card__title">ISO</span>
+                    <span class="choice-card__hint">Se tratan como NSO a efectos fiscales españoles en v1.</span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            <!-- Employer + ticker -->
+            <div class="form-grid">
+              <div class="field">
+                <label for="employer">Empleador</label>
+                <input class="input" id="employer" name="employer_name" maxlength="256" value="Acme Inc." required />
+              </div>
+              <div class="field">
+                <label for="ticker">Ticker <span class="muted text-xs">(opcional)</span></label>
+                <input class="input mono" id="ticker" name="ticker" pattern="[A-Z0-9.\-]{1,8}" maxlength="8" placeholder="ACME" />
+                <p class="field__hint">Obligatorio antes de usar sell-now (Slice 5). En pre-IPO puedes dejarlo vacío.</p>
+              </div>
+            </div>
+
+            <!-- Grant date + shares -->
+            <div class="form-grid">
+              <div class="field">
+                <label for="grant-date">Fecha del grant</label>
+                <input class="input" id="grant-date" name="grant_date" type="date" value="2024-09-15" required />
+                <p class="field__hint">Fechas futuras mostrarán un aviso no bloqueante.</p>
+              </div>
+              <div class="field">
+                <label for="shares">Número de acciones</label>
+                <input class="input num" id="shares" name="share_count" inputmode="numeric" value="30.000" required aria-describedby="shares-hint" />
+                <p class="field__hint" id="shares-hint">Entero; aceptamos fracciones hasta 4 decimales para casos de ESPP / post-split.</p>
+              </div>
+            </div>
+
+            <!-- Strike (conditional on NSO/ISO) -->
+            <div class="form-grid" aria-hidden="true">
+              <div class="field">
+                <label for="strike">Strike (USD) <span class="muted text-xs">sólo NSO / ISO</span></label>
+                <input class="input num" id="strike" name="strike_amount" inputmode="decimal" placeholder="8,00" disabled />
+                <p class="field__hint">Obligatorio si seleccionas NSO o ISO. Oculto para RSU / ESPP.</p>
+              </div>
+              <div class="field">
+                <label for="strike-ccy">Moneda del strike</label>
+                <select class="select" id="strike-ccy" name="strike_currency" disabled>
+                  <option value="USD" selected>USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Vesting -->
+            <div class="form-grid">
+              <div class="field">
+                <label for="vesting-start">Inicio del vesting</label>
+                <input class="input" id="vesting-start" name="vesting_start" type="date" value="2024-09-15" required />
+              </div>
+              <div class="field">
+                <label for="vesting-template">Calendario de vesting</label>
+                <select class="select" id="vesting-template" name="vesting_template">
+                  <option value="4y-1y-monthly" selected>4 años · cliff 1 año · mensual</option>
+                  <option value="4y-1y-quarterly">4 años · cliff 1 año · trimestral</option>
+                  <option value="3y-0-monthly">3 años · sin cliff · mensual</option>
+                  <option value="custom">Personalizado…</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Custom fields, shown only when template=custom -->
+            <div class="form-grid" aria-hidden="true">
+              <div class="field">
+                <label for="vesting-months">Meses totales</label>
+                <input class="input num" id="vesting-months" name="vesting_total_months" type="number" min="1" max="240" placeholder="48" disabled />
+              </div>
+              <div class="field">
+                <label for="cliff-months">Cliff (meses)</label>
+                <input class="input num" id="cliff-months" name="cliff_months" type="number" min="0" placeholder="12" disabled />
+                <p class="field__hint">Debe ser menor o igual a los meses totales (AC-4.2.6).</p>
+              </div>
+              <div class="field">
+                <label for="cadence">Cadencia</label>
+                <select class="select" id="cadence" name="vesting_cadence" disabled>
+                  <option value="monthly">Mensual</option>
+                  <option value="quarterly">Trimestral</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Double-trigger toggle (RSU only) -->
+            <fieldset class="field">
+              <legend>Double-trigger (sólo RSU)</legend>
+              <label class="choice">
+                <input type="checkbox" name="double_trigger" value="true" checked />
+                <span>Este grant requiere un evento de liquidez (IPO, adquisición o tender offer) además del tiempo para considerarse totalmente vesting.</span>
+              </label>
+              <div class="field mt-3">
+                <label for="liquidity-date">Fecha del evento de liquidez <span class="muted text-xs">(opcional)</span></label>
+                <input class="input" id="liquidity-date" name="liquidity_event_date" type="date" />
+                <p class="field__hint">Déjalo vacío si aún no ha ocurrido. El timeline mostrará las acciones time-vested con trama de rayas hasta que el evento se cumpla.</p>
+              </div>
+            </fieldset>
+
+            <div class="row row--between">
+              <a class="back-link" href="#" aria-label="Saltar y usar CSV más adelante">← Tengo varios grants — importaré desde Carta o Shareworks después</a>
+              <button class="btn btn--primary" type="submit">Guardar grant</button>
+            </div>
+          </div>
+
+          <!-- RIGHT column — live vesting preview -->
+          <aside class="stack gap-3" aria-label="Vista previa del vesting">
+            <div class="section-divider">Vista previa del vesting</div>
+
+            <div class="card">
+              <div class="card__label">Acciones totales</div>
+              <div class="card__value">30.000</div>
+              <div class="card__meta muted">4 años · cliff 1 año · mensual · double-trigger</div>
+            </div>
+
+            <!-- Simplified timeline preview — cumulative curve with dashed overlay for awaiting-liquidity -->
+            <div class="card">
+              <div class="card__label mb-2">Calendario estimado</div>
+
+              <div class="vesting">
+                <div class="vesting__row">
+                  <div class="vesting__label">
+                    Cliff (mes 12) <span class="vesting__label-meta">2025-09-15 · 7.500 sh</span>
+                  </div>
+                  <div class="vesting__bar" aria-label="25% acumulado">
+                    <div class="sparkline__fill sparkline__fill--pending" style="width: 25%;"></div>
+                  </div>
+                  <div class="vesting__count">7.500 / 30.000</div>
+                </div>
+                <div class="vesting__row">
+                  <div class="vesting__label">
+                    Mes 24 <span class="vesting__label-meta">2026-09-15 · 15.000 sh</span>
+                  </div>
+                  <div class="vesting__bar" aria-label="50% acumulado">
+                    <div class="sparkline__fill sparkline__fill--pending" style="width: 50%;"></div>
+                  </div>
+                  <div class="vesting__count">15.000 / 30.000</div>
+                </div>
+                <div class="vesting__row">
+                  <div class="vesting__label">
+                    Mes 36 <span class="vesting__label-meta">2027-09-15 · 22.500 sh</span>
+                  </div>
+                  <div class="vesting__bar" aria-label="75% acumulado">
+                    <div class="sparkline__fill sparkline__fill--pending" style="width: 75%;"></div>
+                  </div>
+                  <div class="vesting__count">22.500 / 30.000</div>
+                </div>
+                <div class="vesting__row">
+                  <div class="vesting__label">
+                    Mes 48 <span class="vesting__label-meta">2028-09-15 · 30.000 sh</span>
+                  </div>
+                  <div class="vesting__bar" aria-label="100% acumulado">
+                    <div class="sparkline__fill sparkline__fill--pending" style="width: 100%;"></div>
+                  </div>
+                  <div class="vesting__count">30.000 / 30.000</div>
+                </div>
+              </div>
+
+              <p class="muted text-xs mt-3">
+                La trama rayada indica acciones <strong>time-vested pendientes de evento de liquidez</strong>. Ingresos imponibles hasta la fecha: <span class="mono">0 acciones</span>. Cuando registres la fecha de la IPO / adquisición / tender offer, el relleno pasará a sólido.
+              </p>
+            </div>
+
+            <div class="alert alert--info">
+              <strong>Sobre el algoritmo</strong>
+              <p class="text-xs">La previsualización usa exactamente la misma función que la backend (<span class="mono">derive_vesting_events</span>, ADR-014 §2). Si no coinciden, el test de fixture compartido falla.</p>
+            </div>
+          </aside>
+        </form>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="disclaimer" role="contentinfo">
+    <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+  </footer>
+</div>
+</body>
+</html>

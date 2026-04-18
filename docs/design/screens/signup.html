@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Crear cuenta</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  signup.html — Multi-step signup wizard (ADR-014 §3).
+
+  This single reference file shows all five wizard states side-by-side. A real
+  implementation ships each state on its own URL per ADR-009 Routing map:
+    /signup                   -> password
+    /signup/verify-email      -> AwaitingEmailVerify
+    /signup/disclaimer        -> DisclaimerPending
+    /signup/residency         -> ResidencyPending  (see residency-setup.html)
+    /signup/first-grant       -> FirstGrantPending (see first-grant-form.html)
+
+  No sidebar on auth pages — the authenticated shell begins at /app/*.
+
+  CSP note: no inline style, no inline script, no onclick. Disclosure widgets on
+  this page are HTML <details>, which work without JS.
+
+  Onboarding-gate flow (ADR-014 §3):
+  An axum middleware on every /api/v1/* endpoint except /auth/*, /consent/*,
+  /residency returns 403 with `{ code: "onboarding.required", stage: "..." }`
+  for any user who tries to jump ahead. On a direct-URL load of /app/*, the SPA
+  router reads /auth/me, sees the missing onboardingStage, and redirects to the
+  matching /signup/<stage>. A full reload of /signup/<stage> always re-hydrates
+  from /auth/me — no client-only wizard state.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="auth-shell">
+  <header class="auth-shell__topbar">
+    <div class="auth-shell__brand">ORB<span>IT</span></div>
+    <div class="row gap-2">
+      <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma">ES · EN</button>
+      <a class="btn btn--secondary btn--sm" href="signin.html">Iniciar sesión</a>
+    </div>
+  </header>
+
+  <main id="main" class="auth-shell__main">
+    <div class="auth-stack">
+
+      <!-- STATE 1 — email + password -->
+      <section class="auth-card auth-card--wide" aria-labelledby="s1-title">
+        <div class="stepper" aria-label="Progreso del registro">
+          <span class="stepper__item stepper__item--active"><span class="stepper__dot">1</span>Cuenta</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">2</span>Verificar email</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">3</span>Aviso</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">4</span>Residencia</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">5</span>Tu primer grant</span>
+        </div>
+
+        <div class="stack gap-2">
+          <h1 id="s1-title" class="auth-card__title">Crea tu cuenta</h1>
+          <p class="auth-card__sub">Orbit es una herramienta de apoyo a la decisión, no asesoramiento fiscal. Aceptarás el aviso completo en el paso 3.</p>
+        </div>
+
+        <form class="stack gap-4" action="/api/v1/auth/signup" method="post" novalidate>
+          <div class="form-grid form-grid--1">
+            <div class="field">
+              <label for="email">Correo electrónico</label>
+              <input class="input" id="email" name="email" type="email" autocomplete="email" required />
+              <p class="field__hint">Usaremos esta dirección para verificarte y para avisos de seguridad.</p>
+            </div>
+
+            <div class="field">
+              <label for="password">Contraseña</label>
+              <input class="input" id="password" name="password" type="password" autocomplete="new-password" minlength="12" required aria-describedby="pw-hint" />
+              <p class="field__hint" id="pw-hint">Mínimo 12 caracteres. Comprobamos contra bases de datos públicas de contraseñas filtradas (HIBP k-anonymity).</p>
+            </div>
+          </div>
+
+          <!-- CAPTCHA: SEC-161. On signup, always shown. On signin, after 3 failures. -->
+          <div class="captcha-slot" role="group" aria-label="Comprobación CAPTCHA">
+            [hCaptcha / Cloudflare Turnstile widget — EU endpoint]
+          </div>
+
+          <div class="row row--between">
+            <a class="back-link" href="signin.html">← Ya tengo cuenta</a>
+            <button class="btn btn--primary" type="submit">Continuar</button>
+          </div>
+        </form>
+
+        <div class="auth-card__footer">
+          Al crear una cuenta aceptas nuestra <a href="#">Política de privacidad</a>. Sólo usamos cookies esenciales; no necesitas aceptar analíticas.
+        </div>
+      </section>
+
+      <!-- STATE 2 — awaiting email verification -->
+      <section class="auth-card auth-card--wide" aria-labelledby="s2-title">
+        <div class="stepper">
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Cuenta</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--active"><span class="stepper__dot">2</span>Verificar email</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">3</span>Aviso</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">4</span>Residencia</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">5</span>Tu primer grant</span>
+        </div>
+
+        <h2 id="s2-title" class="auth-card__title">Revisa tu correo</h2>
+        <p class="auth-card__sub">
+          Hemos enviado un enlace a <strong>maria.o@example.com</strong>. Ábrelo desde el mismo dispositivo
+          o pégalo en este navegador para continuar. El enlace caduca en <strong>24 horas</strong>.
+        </p>
+
+        <div class="email-preview" aria-label="Vista previa del correo enviado">
+<div class="email-preview__header">De: Orbit &lt;noreply@orbit.tld&gt;  ·  Asunto: Verifica tu cuenta en Orbit</div>
+Hola,
+
+Pulsa este enlace para activar tu cuenta de Orbit:
+
+  https://app.orbit.tld/signup/verify-email?token=&hellip;
+
+Si no has solicitado esta cuenta, ignora este correo.
+
+— El equipo de Orbit
+        </div>
+
+        <div class="row row--between row--wrap gap-3">
+          <span class="badge badge--stale" aria-live="polite">Esperando verificación…</span>
+          <div class="row gap-2">
+            <button class="btn btn--ghost btn--sm" type="button">Reenviar enlace</button>
+            <button class="btn btn--secondary btn--sm" type="button">Cambiar de correo</button>
+          </div>
+        </div>
+
+        <div class="auth-card__footer">
+          <strong>SEC-162:</strong> no puedes guardar un grant ni entrar en la app hasta verificar tu email.
+        </div>
+      </section>
+
+      <!-- STATE 3 — disclaimer modal embedded as wizard step (UX §8 layer 1) -->
+      <section class="auth-card auth-card--wide" aria-labelledby="s3-title">
+        <div class="stepper">
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Cuenta</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Verificar email</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--active"><span class="stepper__dot">3</span>Aviso</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">4</span>Residencia</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">5</span>Tu primer grant</span>
+        </div>
+
+        <h2 id="s3-title" class="auth-card__title">Antes de continuar — lo que Orbit es y no es</h2>
+
+        <div class="alert alert--info">
+          <strong>Orbit no es asesoramiento fiscal ni financiero.</strong>
+          <p>
+            Orbit <strong>calcula, visualiza y exporta</strong>. No te dice qué hacer ni te da recomendaciones. Para actuar sobre estos números, consulta con tu asesor fiscal o tu gestor. Orbit no está registrado en CNMV ni presta servicios regulados.
+          </p>
+          <p class="muted text-sm">
+            <em>Orbit is not tax or financial advice. It calculates, visualizes, and exports; it does not tell you what to do. Before acting on these numbers, consult your tax advisor. Orbit is not CNMV-registered and does not provide regulated services.</em>
+          </p>
+        </div>
+
+        <ul class="list-indent text-sm muted mt-2">
+          <li>Los cálculos llevan la versión del rule set y la fecha de guía AEAT de referencia.</li>
+          <li>Cada export lleva una traceability ID que enlaza con tu audit-log.</li>
+          <li>v1 no soporta País Vasco, Navarra ni el régimen de impatriados (Beckham) para cálculos fiscales.</li>
+          <li>v1 no presenta ningún modelo: ni 100, ni 720, ni 721.</li>
+        </ul>
+
+        <form class="stack gap-3" action="/api/v1/consent/disclaimer" method="post" novalidate>
+          <label class="choice">
+            <input type="checkbox" required id="accept-disclaimer" />
+            <span>He leído y entiendo que <strong>Orbit no es asesoramiento fiscal ni financiero</strong>. Acepto continuar con ese entendimiento.</span>
+          </label>
+          <input type="hidden" name="version" value="v1-2026-04" />
+          <div class="row row--between">
+            <a class="back-link" href="signin.html">← Salir</a>
+            <button class="btn btn--primary" type="submit">Aceptar y continuar</button>
+          </div>
+        </form>
+
+        <div class="auth-card__footer">
+          La aceptación queda registrada en el audit-log (<span class="mono">dsr.consent.disclaimer_accepted</span>, versión <span class="mono">v1-2026-04</span>). No volveremos a mostrarte este aviso en cada sesión; verás un recordatorio en el pie de página de todos los cálculos.
+        </div>
+      </section>
+
+      <!-- STATE 4 — pointer to residency-setup.html -->
+      <section class="auth-card auth-card--wide" aria-labelledby="s4-title">
+        <div class="stepper">
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Cuenta</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Verificar email</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Aviso</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--active"><span class="stepper__dot">4</span>Residencia</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item"><span class="stepper__dot">5</span>Tu primer grant</span>
+        </div>
+
+        <h2 id="s4-title" class="auth-card__title">Paso 4 — Tu residencia fiscal</h2>
+        <p class="auth-card__sub">
+          Necesitamos tu autonomía antes que tus grants: de ella depende qué puede y qué no puede calcular Orbit (territorio común sí; foral, no en v1).
+        </p>
+        <a class="btn btn--primary" href="residency-setup.html">Abrir el paso de residencia →</a>
+      </section>
+
+      <!-- STATE 5 — pointer to first-grant-form.html -->
+      <section class="auth-card auth-card--wide" aria-labelledby="s5-title">
+        <div class="stepper">
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Cuenta</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Verificar email</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Aviso</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--done"><span class="stepper__dot">✓</span>Residencia</span>
+          <span class="stepper__sep"></span>
+          <span class="stepper__item stepper__item--active"><span class="stepper__dot">5</span>Tu primer grant</span>
+        </div>
+
+        <h2 id="s5-title" class="auth-card__title">Paso 5 — Añade tu primer grant</h2>
+        <p class="auth-card__sub">
+          Este último paso rellena tu cartera. Si tienes muchos grants, puedes saltarlo y usarás el importador CSV más adelante (disponible en Slice 2).
+        </p>
+        <div class="row gap-2">
+          <a class="btn btn--primary" href="first-grant-form.html">Introducir grant manualmente</a>
+          <button class="btn btn--ghost" type="button">Tengo varios grants — importaré desde Carta o Shareworks después</button>
+        </div>
+      </section>
+
+      <!-- Behaviour note (not a rendered UI block; documentation for the implementor) -->
+      <section class="auth-card auth-card--wide">
+        <h2 class="auth-card__title">Comportamiento de la "onboarding-gate" (ADR-014 §3)</h2>
+        <div class="stack gap-2 text-sm muted">
+          <p><strong>Carga directa de URL:</strong> si un usuario escribe <span class="mono">/app/dashboard</span> antes de terminar el wizard, la API devuelve <span class="mono">403 { code: "onboarding.required", stage: "disclaimer" }</span>. El router de la SPA lee ese <span class="mono">stage</span> y redirige a <span class="mono">/signup/&lt;stage&gt;</span>. No se renderiza el shell de <span class="mono">/app</span> en ningún momento.</p>
+          <p><strong>Recarga a mitad de wizard:</strong> la URL es la fuente de verdad. Un F5 en <span class="mono">/signup/residency</span> rehidrata contra <span class="mono">/auth/me</span> y vuelve a pintar el formulario. Si el servidor ya tiene <span class="mono">residency_periods</span> para este usuario (AC-4.1.7), el formulario se pre-rellena con los valores actuales y el paso siguiente se habilita.</p>
+          <p><strong>Volver atrás en el navegador:</strong> cada paso es una URL distinta, así que el botón "Atrás" funciona como se espera. Los pasos ya completados (✓) son re-visitables sin efectos colaterales — los POST son idempotentes (ADR-014 §3 Idempotency).</p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="disclaimer" role="contentinfo">
+    <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    <!-- No rule-set chip here: Slice 0/1 has no calculations (C-3). -->
+  </footer>
+
+  <!-- Cookie banner: SEC-127 — informational only in v1 (essential cookies). -->
+  <aside class="cookie-banner" role="note" aria-label="Aviso de cookies">
+    <div class="stack gap-1 text-sm">
+      <strong>Cookies esenciales únicamente</strong>
+      <span class="muted">Usamos sólo las cookies imprescindibles para la sesión, el idioma y la protección CSRF. No hay analíticas ni terceros. Puedes continuar sin aceptar nada.</span>
+    </div>
+    <button class="btn btn--ghost btn--sm mt-auto" type="button">Entendido</button>
+  </aside>
+</div>
+</body>
+</html>

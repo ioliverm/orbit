@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Sesiones activas</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  session-management.html — "Active sessions" panel (SEC-010).
+
+  Backend ships in Slice 1 (ADR-011 §What Slice 1 actually ships: revoke and
+  list endpoints exist). UI ships in Slice 2–3 per C-7 resolution — added here
+  now so the security-critical surface is designed before the code starts.
+
+  Data: rows from `sessions` table. Each row carries:
+   - user_agent (≤512 chars, SEC-188)
+   - ip_hash (HMAC-SHA256 per SEC-054; the user NEVER sees the raw IP)
+   - created_at, last_used_at
+   - revoked_at, revoke_reason (none shown for active sessions; revoked rows
+     are filtered out of this view)
+
+  Trust-critical UX rules:
+   - The "current session" row is highlighted and has no "Cerrar esta sesión"
+     button — revoking your current session while on this page is a footgun;
+     instead, a "Cerrar todas las demás sesiones" action exists.
+   - IP is NEVER displayed in cleartext. A coarse geo hint ("Madrid, ES — según
+     la IP") is computed server-side from the hashed IP's pivot lookup (raw IP
+     is only in Caddy's 7-day access log per SEC-054).
+   - A new-device-signin email is sent when a session is created from an
+     (ip_hash, user_agent) never seen for this user — email preview shown below.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard-slice-1.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="#">Sell-now <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Escenarios <span class="sidebar__pill">próx.</span></a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Exports <span class="sidebar__pill">próx.</span></a>
+    </nav>
+    <nav class="sidebar__group mt-auto"><div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="residency-setup.html">Perfil y residencia</a>
+      <a class="sidebar__link sidebar__link--active" href="session-management.html" aria-current="page">Sesiones activas</a>
+      <a class="sidebar__link" href="dsr-self-service.html">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Cuenta / <strong>Sesiones activas</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="account-split">
+        <!-- Account sub-menu -->
+        <nav class="account-menu" aria-label="Ajustes de la cuenta">
+          <a class="account-menu__link" href="residency-setup.html">Perfil y residencia</a>
+          <a class="account-menu__link" href="#">Contraseña</a>
+          <a class="account-menu__link" href="#">Segundo factor (MFA) <span class="muted text-xs">próx.</span></a>
+          <a class="account-menu__link account-menu__link--active" href="session-management.html">Sesiones activas</a>
+          <a class="account-menu__link" href="dsr-self-service.html">Datos y privacidad</a>
+          <a class="account-menu__link" href="#">Facturación</a>
+        </nav>
+
+        <section class="account-panel">
+          <header class="stack gap-2">
+            <h1>Sesiones activas</h1>
+            <p class="muted text-sm">
+              Cada inicio de sesión crea una entrada aquí. Los tokens de sesión se rotan automáticamente cada pocos minutos; si revocas una sesión, ese dispositivo necesitará volver a iniciar sesión para acceder. Nunca mostramos tu dirección IP en claro — sólo una pista aproximada de ubicación.
+            </p>
+          </header>
+
+          <div class="card card--flush">
+            <!-- Current session — cannot revoke self -->
+            <div class="session-row session-row--current" aria-label="Sesión actual">
+              <div class="session-row__icon" aria-hidden="true">●</div>
+              <div class="session-row__meta">
+                <span class="session-row__title">Firefox 128 · macOS — <strong>sesión actual</strong></span>
+                <span class="session-row__hint">Madrid, ES (aprox.) · iniciada 18 abr 2026 09:12 CET · actividad hace 2 min</span>
+              </div>
+              <button class="btn btn--ghost btn--sm" type="button" disabled>Esta sesión</button>
+            </div>
+
+            <div class="session-row">
+              <div class="session-row__icon" aria-hidden="true">↻</div>
+              <div class="session-row__meta">
+                <span class="session-row__title">Safari iOS 17 · iPhone</span>
+                <span class="session-row__hint">Madrid, ES (aprox.) · iniciada 17 abr 2026 22:04 CET · actividad hace 11 h</span>
+              </div>
+              <button class="btn btn--ghost btn--sm" type="button">Cerrar esta sesión</button>
+            </div>
+
+            <div class="session-row">
+              <div class="session-row__icon" aria-hidden="true">↻</div>
+              <div class="session-row__meta">
+                <span class="session-row__title">Chrome 128 · Windows 11</span>
+                <span class="session-row__hint">Lisboa, PT (aprox.) · iniciada 12 abr 2026 14:30 CET · actividad hace 6 días</span>
+              </div>
+              <button class="btn btn--ghost btn--sm" type="button">Cerrar esta sesión</button>
+            </div>
+          </div>
+
+          <div class="row row--between">
+            <span class="muted text-sm">3 sesiones activas. Las sesiones inactivas más de 30 minutos se renuevan automáticamente si el refresh token sigue vigente (7 días máx.).</span>
+            <button class="btn btn--danger btn--sm" type="button">Cerrar todas las demás sesiones</button>
+          </div>
+
+          <hr class="divider" />
+
+          <!-- New-device email preview -->
+          <section class="stack gap-3">
+            <h2>Aviso "nuevo dispositivo" — vista previa</h2>
+            <p class="muted text-sm">
+              Cuando detectamos un inicio de sesión desde una combinación <span class="mono">(ip_hash, user-agent)</span> nunca vista para ti, te enviamos este correo. El correo contiene un resumen del user-agent pero <strong>no</strong> contiene la IP en claro (SEC-010 · SEC-054).
+            </p>
+            <div class="email-preview" aria-label="Vista previa del correo de nuevo dispositivo">
+<div class="email-preview__header">De: Orbit &lt;noreply@orbit.tld&gt;  ·  Asunto: Nuevo inicio de sesión en Orbit</div>
+Hola María,
+
+Hemos detectado un inicio de sesión en tu cuenta desde un dispositivo nuevo:
+
+  · Navegador:  Chrome 128
+  · Sistema:    Windows 11
+  · Ubicación:  Lisboa, PT (aproximada)
+  · Cuándo:     12 abr 2026 14:30 CET
+
+Si has sido tú, no necesitas hacer nada.
+
+Si NO reconoces este inicio de sesión, cambia tu contraseña ahora:
+
+  https://app.orbit.tld/signin/forgot
+
+Y revoca la sesión sospechosa en tu panel de cuenta:
+
+  https://app.orbit.tld/app/account/sessions
+
+— El equipo de Orbit (Orbit no te pedirá nunca tu contraseña por correo.)
+            </div>
+          </section>
+
+          <aside class="alert alert--info">
+            <strong>Detección de reutilización de refresh-token</strong>
+            <p class="text-sm">Si un atacante se apodera de un refresh token y lo usa tras haberlo hecho el cliente legítimo, Orbit detecta la reutilización y revoca toda la "familia" de sesiones (ADR-011 §Refresh rotation). Si eso te ocurre, verás aquí cero sesiones y tendrás que volver a iniciar sesión — es una señal de algo raro, no un error.</p>
+          </aside>
+
+        </section>
+      </div>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

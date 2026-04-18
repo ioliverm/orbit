@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Datos y privacidad</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  dsr-self-service.html — Data-Subject Rights (DSR) self-service.
+
+  Traces to SEC-123 (all four rights) and US-011 (v1 US acceptance criteria).
+  UI ships in Slice 7 per v1-slice-plan. Designed now so security-engineer +
+  implementation-engineer have a reference copy and flow.
+
+  Four actions:
+   1. ACCESS / PORTABILITY — "Export my data" (US-011 AC #1)
+      Target: 7-day self-service SLA; 30-day hard SLA (GDPR Art. 12(3)).
+      Mechanism: kicks a background job; the archive (ZIP, machine-readable
+      JSON + CSV) is written to object storage; user gets an email with a
+      one-time download link when ready.
+
+   2. RECTIFICATION — most fields are editable directly in Profile;
+      this panel surfaces a form for "things that aren't simple edits"
+      (US-011 AC #3). Writes an audit-log entry with the actor + timestamp.
+
+   3. ERASURE — two-step confirm (US-011 AC #2):
+      step 1: radio consent + typed email confirmation
+      step 2: final "Borrar mi cuenta" click
+      → 30-day soft-delete grace (sign-in blocked; recovery possible)
+      → hard-delete cascade (ADR-005)
+      → audit_log + calculations rows pseudonymized to tombstone UUID (SEC-043)
+
+   4. RESTRICTION — a flag that suspends calc/export while data retained
+      (US-011 AC #4). One-click toggle; reversible.
+
+   Slice 1: the "Export my data" and "Delete my account" buttons route to a
+   "próximamente" page (AC §11). This file is the handoff for Slice 7.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard-slice-1.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="#">Sell-now <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Escenarios <span class="sidebar__pill">próx.</span></a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Exports <span class="sidebar__pill">próx.</span></a>
+    </nav>
+    <nav class="sidebar__group mt-auto"><div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="residency-setup.html">Perfil y residencia</a>
+      <a class="sidebar__link" href="session-management.html">Sesiones activas</a>
+      <a class="sidebar__link sidebar__link--active" href="dsr-self-service.html" aria-current="page">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Cuenta / <strong>Datos y privacidad</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="account-split">
+        <nav class="account-menu" aria-label="Ajustes de la cuenta">
+          <a class="account-menu__link" href="residency-setup.html">Perfil y residencia</a>
+          <a class="account-menu__link" href="#">Contraseña</a>
+          <a class="account-menu__link" href="#">Segundo factor (MFA) <span class="muted text-xs">próx.</span></a>
+          <a class="account-menu__link" href="session-management.html">Sesiones activas</a>
+          <a class="account-menu__link account-menu__link--active" href="dsr-self-service.html">Datos y privacidad</a>
+          <a class="account-menu__link" href="#">Facturación</a>
+        </nav>
+
+        <section class="account-panel">
+          <header class="stack gap-2">
+            <h1>Datos y privacidad</h1>
+            <p class="muted text-sm">
+              Tus derechos bajo GDPR y la LOPDGDD española, disponibles sin tener que mandarnos un correo. Todas las acciones quedan registradas en tu audit-log.
+            </p>
+          </header>
+
+          <!-- 1. ACCESS / PORTABILITY -->
+          <section class="stack gap-3" aria-labelledby="dsr-export-title">
+            <div class="section-divider">1. Acceso y portabilidad</div>
+            <h2 id="dsr-export-title">Exportar mis datos</h2>
+            <p class="muted text-sm">
+              Descarga una copia completa, legible por máquina (ZIP con JSON + CSV) de todos tus datos en Orbit: grants, vesting, escenarios, cálculos, exports, entradas de audit-log y metadatos de cuenta. Generaremos el archivo en segundo plano; te enviaremos un enlace de descarga cuando esté listo.
+            </p>
+
+            <div class="grid grid--2">
+              <article class="card">
+                <div class="card__label">SLA objetivo (auto-servicio)</div>
+                <div class="card__value">7 días</div>
+                <div class="card__meta muted">GDPR Art. 12(3): 30 días máximo</div>
+              </article>
+              <article class="card">
+                <div class="card__label">Última solicitud</div>
+                <div class="card__value text-sm">Nunca</div>
+                <div class="card__meta muted">Puedes pedir una nueva cuando quieras.</div>
+              </article>
+            </div>
+
+            <form action="/api/v1/dsr/export" method="post">
+              <button class="btn btn--primary" type="submit">Generar archivo de exportación</button>
+            </form>
+          </section>
+
+          <hr class="divider" />
+
+          <!-- 2. RECTIFICATION -->
+          <section class="stack gap-3" aria-labelledby="dsr-rect-title">
+            <div class="section-divider">2. Rectificación</div>
+            <h2 id="dsr-rect-title">Corregir datos</h2>
+            <p class="muted text-sm">
+              La mayoría de campos son editables directamente en <a href="residency-setup.html">Perfil</a> o en la vista de cada grant. Si necesitas corregir algo que no tiene un formulario propio (por ejemplo, tu dirección de correo tras un cambio de proveedor o un registro en el audit-log), usa este formulario.
+            </p>
+
+            <form class="stack gap-3" action="/api/v1/dsr/rectification" method="post">
+              <div class="field">
+                <label for="rect-text">Detalla la corrección solicitada</label>
+                <textarea class="textarea" id="rect-text" name="body" rows="5" maxlength="2048" required></textarea>
+                <p class="field__hint">Registraremos tu petición en el audit-log (<span class="mono">dsr.rectification.requested</span>). SLA de respuesta: 30 días máximo.</p>
+              </div>
+              <div>
+                <button class="btn btn--secondary" type="submit">Enviar petición de rectificación</button>
+              </div>
+            </form>
+          </section>
+
+          <hr class="divider" />
+
+          <!-- 3. RESTRICTION -->
+          <section class="stack gap-3" aria-labelledby="dsr-restrict-title">
+            <div class="section-divider">3. Restricción del tratamiento</div>
+            <h2 id="dsr-restrict-title">Pausar cálculos y exportaciones</h2>
+            <p class="muted text-sm">
+              Cuando la restricción está activa, Orbit <strong>retiene</strong> tus datos pero <strong>no los procesa</strong>: no se ejecutan cálculos, no se generan exports, y las pantallas de cálculo muestran un bloque "procesamiento restringido". Puedes levantarla cuando quieras.
+            </p>
+
+            <form class="row gap-3" action="/api/v1/dsr/restriction" method="post">
+              <label class="choice">
+                <input type="checkbox" name="active" value="true" />
+                <span>Activar la restricción del tratamiento</span>
+              </label>
+              <button class="btn btn--ghost" type="submit">Aplicar</button>
+            </form>
+          </section>
+
+          <hr class="divider" />
+
+          <!-- 4. ERASURE (two-step) -->
+          <section class="stack gap-3" aria-labelledby="dsr-erase-title">
+            <div class="section-divider">4. Supresión (borrado de cuenta)</div>
+            <h2 id="dsr-erase-title">Borrar mi cuenta</h2>
+            <p class="muted text-sm">
+              Al confirmar, tu cuenta entra en un <strong>período de gracia de 30 días</strong> durante el cual el inicio de sesión queda bloqueado pero podemos restaurar los datos si te arrepientes. Pasados los 30 días, se ejecuta un borrado en cascada: todas tus filas <span class="mono">[RLS]</span> se eliminan, los exports en object storage se borran, y las filas en <span class="mono">audit_log</span> y <span class="mono">calculations</span> se pseudonimizan a un UUID-tombstone (SEC-043). Los rule sets, por ser contenido regulatorio versionado, no se tocan.
+            </p>
+
+            <div class="danger-confirm">
+              <strong>Confirmación en dos pasos</strong>
+              <p class="text-sm muted">Este flujo exige dos confirmaciones explícitas para evitar borrados accidentales (US-011 AC #2).</p>
+
+              <form class="stack gap-3" action="/api/v1/dsr/erasure" method="post">
+                <label class="choice">
+                  <input type="checkbox" required />
+                  <span>Entiendo que pasados 30 días el borrado es <strong>irreversible</strong> y que mi audit-log queda pseudonimizado (no eliminado) durante 6 años más por obligación de prescripción AEAT.</span>
+                </label>
+
+                <div class="field">
+                  <label for="confirm-email">Escribe tu correo para confirmar</label>
+                  <input class="input" id="confirm-email" name="confirmEmail" type="email" placeholder="maria.o@example.com" required />
+                </div>
+
+                <div>
+                  <button class="btn btn--danger" type="submit">Borrar mi cuenta</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <hr class="divider" />
+
+          <!-- Retention summary (SEC-124 transparency) -->
+          <section class="stack gap-3">
+            <div class="section-divider">Qué se retiene y qué se borra</div>
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th scope="col">Categoría</th>
+                  <th scope="col">Durante la cuenta activa</th>
+                  <th scope="col">Tras el borrado (30d grace + hard-delete)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Grants, escenarios, cálculos, vesting events, trips Art. 7.p</th>
+                  <td>Retenido</td>
+                  <td>Borrado en cascada</td>
+                </tr>
+                <tr>
+                  <th scope="row">Exports (PDF / CSV) en object storage</th>
+                  <td>Retenido 7 años (prescripción AEAT, ADR-008)</td>
+                  <td>Borrados</td>
+                </tr>
+                <tr>
+                  <th scope="row">Audit log (<span class="mono">audit_log</span>)</th>
+                  <td>Retenido 6 años, acceso restringido</td>
+                  <td>Pseudonimizado a UUID-tombstone (user_id reemplazado)</td>
+                </tr>
+                <tr>
+                  <th scope="row">Cálculos con stamp de rule-set (reproducibilidad)</th>
+                  <td>Retenido</td>
+                  <td>Pseudonimizado; content hashes conservados</td>
+                </tr>
+                <tr>
+                  <th scope="row">Logs del email provider (bounces, etc.)</th>
+                  <td>Retenidos por el proveedor</td>
+                  <td>Borrados en la siguiente rotación</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="muted text-xs">Consulta la <a href="#">Política de privacidad</a> completa para fundamento jurídico, sub-procesadores, y procedimiento de reclamación ante AEPD.</p>
+          </section>
+
+        </section>
+      </div>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

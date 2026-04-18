@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Exportar (confirmación)</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  export-confirm-modal.html — the trigger dialog shown before any export.
+
+  Supplements export.html: the existing file shows the exports list view +
+  an embedded dialog. This file focuses on the dialog as a standalone
+  reference, with the updated copy required by:
+
+   - ADR-008 (export traceability ID + stamping scheme)
+   - SEC-163 (PDF content validation; no user input echoed into the PDF without
+     server-side sanitization)
+   - The "PDF includes identifying info" warning — a new line-item per the
+     security-review read of ADR-008: the PDF footer carries the user's
+     email (US-009 AC #1) and any export may be forwarded to a gestor, who
+     legitimately sees it but is NOT an Orbit user. The user must actively
+     consent that this document identifies them, before it leaves Orbit.
+
+  Two dialog states rendered side-by-side:
+   A. Primary button DISABLED until the disclaimer checkbox is ticked
+      (enforced in code; no inline onclick to flip it — the implementor wires
+      this with a proper event listener loaded as a separate JS module).
+   B. All checks met, primary button enabled.
+
+  CSP note: no inline script, no inline style, no onclick. The two states
+  below are static renderings of both positions for handoff.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="sell-now.html">Sell-now <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="scenario-modeler.html">Escenarios <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link sidebar__link--active" href="export.html" aria-current="page">Exports <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group mt-auto"><div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="residency-setup.html">Perfil y residencia</a>
+      <a class="sidebar__link" href="session-management.html">Sesiones activas</a>
+      <a class="sidebar__link" href="dsr-self-service.html">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Cumplimiento / <strong>Exportar</strong></div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="page-title">
+        <div>
+          <h1>Diálogo de exportación — referencia</h1>
+          <div class="page-title__meta">Dos estados: (A) disclaimer pendiente; (B) listo para generar. Mismo modal, diferente momento.</div>
+        </div>
+      </div>
+
+      <div class="grid grid--2 mb-8">
+
+        <!-- STATE A — disclaimer NOT yet confirmed -->
+        <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="a-title">
+          <div class="modal">
+            <div class="modal__header">
+              <h2 id="a-title">Exportar PDF · Sell-now (3.420 acciones)</h2>
+              <p class="muted text-sm mt-1">
+                El documento llevará una <strong>traceability ID única</strong>, la versión del rule set usado, y la fecha de guía AEAT — todo impreso en el pie y replicado en los metadatos XMP del PDF.
+              </p>
+            </div>
+
+            <div class="modal__body">
+              <div class="field">
+                <label>Alcance</label>
+                <div class="choice-group">
+                  <label class="choice"><input type="radio" name="a-scope" checked /><span>Este cálculo</span></label>
+                  <label class="choice"><input type="radio" name="a-scope" /><span>Con tabla de sensibilidad completa</span></label>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Formato</label>
+                <div class="choice-group">
+                  <label class="choice"><input type="checkbox" checked /><span>PDF</span></label>
+                  <label class="choice"><input type="checkbox" /><span>CSV (datos + fórmulas)</span></label>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Idioma</label>
+                <div class="choice-group">
+                  <label class="choice"><input type="radio" name="a-lang" checked /><span>Español</span></label>
+                  <label class="choice"><input type="radio" name="a-lang" /><span>ES + EN (paralelo)</span></label>
+                </div>
+                <p class="field__hint">Por defecto español — pensado para tu gestor (D-10). El idioma sólo-EN no se ofrece en v1 (gestor es hispanohablante).</p>
+              </div>
+
+              <hr class="divider" />
+
+              <!-- "PDF includes identifying info" warning — NEW -->
+              <div class="alert alert--warning">
+                <strong>Este documento te identifica</strong>
+                <p class="text-sm">
+                  El PDF lleva tu <strong>correo electrónico</strong> en el pie de cada página (US-009 AC #1) más una traceability ID que enlaza con tu audit-log. Si lo compartes con tu gestor, estás compartiendo esa identidad. Si lo envías a terceros que no deberían verla, considera exportar el CSV (sin pie de identificación) o redactarla a mano después.
+                </p>
+              </div>
+
+              <div class="field">
+                <label class="choice">
+                  <input type="checkbox" id="a-accept" />
+                  <span>Entiendo que este documento <strong>no es asesoramiento fiscal ni financiero</strong>, que Orbit <strong>no presenta</strong> ni el Modelo 100, 720 ni 721, que el PDF contiene mis datos de identificación, y que lo revisaré con mi asesor antes de actuar.</span>
+                </label>
+              </div>
+
+              <div class="email-preview" aria-label="Pie que se imprimirá en cada página">
+<div class="email-preview__header">Pie del PDF · impreso en cada página + XMP metadata</div>
+Orbit calculation export
+Usuario:         maria.o@example.com
+Generado:        2026-04-18 10:42 CET
+Traceability ID: e2b1-c74d-8a9f-03e1
+Rule set:        es-2026.1.0 (AEAT guidance 2026-03-15)
+Engine:          orbit-engine v0.4.2
+Inputs hash:     sha256:9f3c…e1b2
+Result hash:     sha256:7a04…c92d
+ECB FX:          2026-04-17, 1 EUR = 1,0823 USD
+
+Esto no es asesoramiento fiscal ni financiero.
+This is not tax or financial advice.
+              </div>
+            </div>
+
+            <div class="modal__footer">
+              <button class="btn btn--ghost" type="button">Cancelar</button>
+              <!-- Disabled until the disclaimer checkbox above is ticked.
+                   The implementor MUST wire this via a loaded JS module, not inline onclick. -->
+              <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Generar y descargar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE B — disclaimer confirmed, primary action active -->
+        <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="b-title">
+          <div class="modal">
+            <div class="modal__header">
+              <h2 id="b-title">Exportar PDF · Sell-now (3.420 acciones)</h2>
+              <p class="muted text-sm mt-1">Listo para generar.</p>
+            </div>
+
+            <div class="modal__body">
+              <div class="field">
+                <label>Alcance</label>
+                <div class="choice-group">
+                  <label class="choice"><input type="radio" name="b-scope" checked /><span>Este cálculo</span></label>
+                  <label class="choice"><input type="radio" name="b-scope" /><span>Con tabla de sensibilidad completa</span></label>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Formato</label>
+                <div class="choice-group">
+                  <label class="choice"><input type="checkbox" checked /><span>PDF</span></label>
+                  <label class="choice"><input type="checkbox" checked /><span>CSV (datos + fórmulas)</span></label>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Idioma</label>
+                <div class="choice-group">
+                  <label class="choice"><input type="radio" name="b-lang" /><span>Español</span></label>
+                  <label class="choice"><input type="radio" name="b-lang" checked /><span>ES + EN (paralelo)</span></label>
+                </div>
+              </div>
+
+              <hr class="divider" />
+
+              <div class="alert alert--info">
+                <strong>Confirmación completada</strong>
+                <p class="text-sm">Se asignará una <strong>nueva traceability ID</strong> (p.ej. <span class="mono">7f40-22b1-e88c-0044</span>) al pulsar "Generar". El PDF quedará en tu lista de exports (<a href="export.html">Cumplimiento → Exports</a>) por 7 años (prescripción AEAT).</p>
+              </div>
+
+              <div class="field">
+                <label class="choice">
+                  <input type="checkbox" checked />
+                  <span>Entiendo que este documento <strong>no es asesoramiento fiscal ni financiero</strong>, que Orbit <strong>no presenta</strong> ni el Modelo 100, 720 ni 721, que el PDF contiene mis datos de identificación, y que lo revisaré con mi asesor antes de actuar.</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="modal__footer">
+              <button class="btn btn--ghost" type="button">Cancelar</button>
+              <button class="btn btn--primary" type="submit">Generar y descargar</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="disclaimer__meta">
+        <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+      </span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Grant Refresh 2024-09</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard.html">Dashboard</a>
+      <a class="sidebar__link sidebar__link--active" href="grant-detail.html" aria-current="page">Grants</a>
+      <a class="sidebar__link" href="#vesting">Vesting</a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="sell-now.html">Sell-now <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="scenario-modeler.html">Escenarios <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="export.html">Exports <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group" style="margin-top:auto;"><div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="#">Perfil y residencia</a>
+      <a class="sidebar__link" href="#">Facturación</a>
+      <a class="sidebar__link" href="#">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Cartera / Grants / <strong>Refresh 2024-09</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm">Editar</button>
+        <button class="btn btn--danger btn--sm">Eliminar</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+      <div class="page-title">
+        <div>
+          <h1>Refresh 2024-09 — RSU (double-trigger)</h1>
+          <div class="page-title__meta">Acme Inc · concedida 2024-09-15 · 30.000 acciones · vesting 4 años, mensual, sin cliff · liquidity event: IPO 2025-02 ✓</div>
+        </div>
+      </div>
+
+      <!-- Summary tiles -->
+      <div class="grid grid--3" style="margin-bottom: var(--space-8);">
+        <article class="card">
+          <div class="card__label">Acciones totales</div>
+          <div class="card__value">30.000</div>
+          <div class="card__meta">concedidas 2024-09-15</div>
+        </article>
+        <article class="card">
+          <div class="card__label">Vested (tiempo + liquidity ✓)</div>
+          <div class="card__value">12.500</div>
+          <div class="card__meta">41,7 % · +417 sh próximo mes</div>
+        </article>
+        <article class="card">
+          <div class="card__label">Valor papel actual</div>
+          <div class="card__value">€520.400</div>
+          <div class="card__meta">$48,00 · ECB 1,0823 · banda €508.200 — €532.600</div>
+        </article>
+      </div>
+
+      <!-- Vesting timeline -->
+      <div id="vesting" class="section-head">
+        <div class="section-head__title">
+          <h2>Calendario de vesting</h2>
+          <div class="section-head__sub">Acumulado mensual. Acciones que cumplen las dos condiciones (tiempo + liquidez) en sólido; RSU con sólo tiempo cumplido aparecen con trama.</div>
+        </div>
+        <div class="row">
+          <button class="btn btn--ghost btn--sm">Curva</button>
+          <button class="btn btn--ghost btn--sm">Gantt</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: var(--space-8);">
+        <div class="vesting">
+          <div class="vesting__row">
+            <div class="vesting__label">2025 Q3 <span class="vesting__label-meta">1.875 acciones · liquidez ✓</span></div>
+            <div class="vesting__bar"><div class="vesting__fill" style="width: 25%;"></div></div>
+            <div class="vesting__count">1.875</div>
+          </div>
+          <div class="vesting__row">
+            <div class="vesting__label">2025 Q4 <span class="vesting__label-meta">1.875 acciones · liquidez ✓</span></div>
+            <div class="vesting__bar"><div class="vesting__fill" style="width: 50%;"></div></div>
+            <div class="vesting__count">3.750</div>
+          </div>
+          <div class="vesting__row">
+            <div class="vesting__label">2026 Q1 <span class="vesting__label-meta">1.875 · liquidez ✓</span></div>
+            <div class="vesting__bar"><div class="vesting__fill" style="width: 75%;"></div></div>
+            <div class="vesting__count">5.625</div>
+          </div>
+          <div class="vesting__row">
+            <div class="vesting__label">2026 Q2 <span class="vesting__label-meta">1.875 · liquidez ✓ parcial</span></div>
+            <div class="vesting__bar"><div class="vesting__fill" style="width: 100%;"></div></div>
+            <div class="vesting__count">7.500 vested hoy</div>
+          </div>
+          <div class="vesting__row">
+            <div class="vesting__label">2026 Q3 <span class="vesting__label-meta">proyectado, si continúa empleo</span></div>
+            <div class="vesting__bar"><div class="vesting__fill vesting__fill--pending" style="width: 50%;"></div></div>
+            <div class="vesting__count muted">+5.625 proyectado</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Double-trigger state notice -->
+      <aside class="alert alert--info" style="margin-bottom: var(--space-8);">
+        <strong>RSU double-trigger — cómo se muestra</strong>
+        <p>Antes del IPO (feb 2025), las acciones con sólo time-vesting se mostraban con trama diagonal — visualmente vested pero <em>no</em> tributables. Hoy la liquidity-gate está cumplida; todas las acciones time-vested son además liquidity-vested y contarán como rendimiento del trabajo en el vest.</p>
+      </aside>
+
+      <!-- Derived tax events -->
+      <div class="section-head">
+        <div class="section-head__title">
+          <h2>Eventos fiscales derivados</h2>
+          <div class="section-head__sub">Lo que este grant ha generado ya o generará bajo supuestos por defecto. Cada cifra es expandible.</div>
+        </div>
+      </div>
+
+      <table class="tbl" style="margin-bottom: var(--space-6);">
+        <thead>
+          <tr>
+            <th scope="col">Fecha</th>
+            <th scope="col">Evento</th>
+            <th scope="col" class="num">Acciones</th>
+            <th scope="col" class="num">FMV / acción</th>
+            <th scope="col" class="num">Renta trabajo (EUR, rango ±10 %)</th>
+            <th scope="col">Rule set</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">2025-02-14</th>
+            <td>Liquidity trigger (IPO)</td>
+            <td class="num">3.750</td>
+            <td class="num">$37,00</td>
+            <td class="num">€128.100 (€115.300 — €140.900)</td>
+            <td><span class="chip"><span class="chip__dot"></span>es-2025.2.0</span></td>
+          </tr>
+          <tr>
+            <th scope="row">2025-Q2 → Q4</th>
+            <td>Vesting mensual post-IPO</td>
+            <td class="num">3.750</td>
+            <td class="num">$41,20</td>
+            <td class="num">€142.800 (€128.500 — €157.100)</td>
+            <td><span class="chip"><span class="chip__dot"></span>es-2025.2.0</span></td>
+          </tr>
+          <tr>
+            <th scope="row">2026-01 → hoy</th>
+            <td>Vesting mensual</td>
+            <td class="num">5.000</td>
+            <td class="num">$46,80</td>
+            <td class="num">€216.200 (€194.600 — €237.800)</td>
+            <td><span class="chip"><span class="chip__dot"></span>es-2026.1.0</span></td>
+          </tr>
+          <tr>
+            <th scope="row">2026-05 → 2028-09</th>
+            <td>Vesting proyectado (restante)</td>
+            <td class="num">17.500</td>
+            <td class="num">$48,00 (asumido)</td>
+            <td class="num">€776.800 (±25 %)</td>
+            <td><span class="chip"><span class="chip__dot"></span>es-2026.1.0</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="muted" style="font-size: var(--text-sm); margin-bottom: var(--space-8);">Los eventos pasados muestran rango ±10 % reflejando la incertidumbre de FX en el momento del vest; los proyectados usan ±25 % porque el precio futuro es materialmente más incierto. Haz clic en cualquier fila para ver la fórmula, los insumos y la versión de las reglas aplicada.</p>
+
+      <!-- Inline formula preview -->
+      <div class="card">
+        <div class="card__label">Fórmula para vesting mensual 2026-04</div>
+        <div class="formula" style="margin-top: var(--space-2);">
+          <code>shares_vested_this_month = 30.000 / 48 meses = 625</code>
+          <code>fmv = $46,80 (cotización de cierre 2026-04-15)</code>
+          <code>work_income_usd = 625 × $46,80 = $29.250,00</code>
+          <code>fx = ECB 2026-04-15, 1 EUR = 1,0845 USD → €26.970,03</code>
+          <code>art_7p_exempt = 0 (este mes sin días trabajados en el extranjero)</code>
+          <code>irpf_marginal_es-MD_2026 ≈ 47 % → retención / impuesto ≈ €12.676,00</code>
+          <div class="formula__ruleset">Rule set es-2026.1.0 · AEAT 15 mar 2026 · autonomía ES-MD (Comunidad de Madrid)</div>
+        </div>
+      </div>
+
+    </main>
+
+    <footer class="disclaimer">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="disclaimer__meta">
+        <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+        <button class="btn btn--ghost btn--sm">Ver trazabilidad</button>
+      </span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

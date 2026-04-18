@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Dashboard (Slice 1)</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  dashboard-slice-1.html — the Slice-1 variant of the dashboard.
+
+  Deliberate diff vs. dashboard.html (which remains as the "Slice 3+ target"):
+   - No EUR conversion anywhere       (C-4, AC-5.2.2)
+   - No Modelo 720 banner              (AC-5.1.2, AC-5.3; Slice 3)
+   - No "Valor papel total" tile       (needs FX → Slice 3)
+   - No "Impuesto estimado 2026" tile  (needs tax engine → Slice 4)
+   - No rule-set chip in the footer   (C-3; Slice 4 first tax calc)
+   - Currency suffix always explicit ("$8.00 USD") even when native
+   - Paid entries in the sidebar route to "próximamente" stubs in Slice 1
+     (AC §11 tester note)
+
+  Kept vs. dashboard.html:
+   - Sidebar IA unchanged
+   - Disclaimer footer (text only, no chip)
+   - Grants as tiles (not the big data table — that arrives when tax math does)
+
+  Two tile states rendered side-by-side: the "awaiting liquidity event"
+  dashed-fill pattern (US-003 AC #2 / AC-6.1.4) and the "fully vested"
+  pattern — both using the tile component.
+
+  Empty state shown at the bottom (AC-5.1.1) as a reference for first-boot.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+
+    <nav class="sidebar__group" aria-label="Cartera">
+      <div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link sidebar__link--active" href="dashboard-slice-1.html" aria-current="page">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Decisiones">
+      <div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="#">Sell-now <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Escenarios <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Cumplimiento">
+      <div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Exports <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group mt-auto" aria-label="Cuenta">
+      <div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="residency-setup.html">Perfil y residencia</a>
+      <a class="sidebar__link" href="session-management.html">Sesiones activas</a>
+      <a class="sidebar__link" href="dsr-self-service.html">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs"><strong>Dashboard</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma (ES / EN)">ES · EN</button>
+        <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+      <div class="page-title">
+        <div>
+          <h1>Tu cartera</h1>
+          <div class="page-title__meta">2 grants · residencia: Comunidad de Madrid · moneda principal EUR</div>
+        </div>
+        <div class="row gap-2">
+          <a class="btn btn--primary btn--sm" href="first-grant-form.html">Añadir grant</a>
+        </div>
+      </div>
+
+      <!--
+        INTENTIONALLY ABSENT IN SLICE 1 (see AC-5.3):
+          - Modelo 720 passive banner
+          - Paper-gains EUR tile
+          - Impuesto estimado tile
+          - Rule-set chip in footer
+          - Scenario / Sell-now CTAs
+      -->
+
+      <!-- Multi-grant tile grid (C-4: native currency only, no EUR) -->
+      <section aria-label="Grants">
+        <div class="grid grid--2 mb-8">
+
+          <!-- Tile 1: double-trigger RSU, pre-IPO, "awaiting liquidity event" -->
+          <article class="grant-tile">
+            <div class="grant-tile__header">
+              <div class="stack gap-1">
+                <span class="grant-tile__title">Acme Inc.</span>
+                <span class="grant-tile__instrument">RSU · double-trigger</span>
+              </div>
+              <a class="btn btn--ghost btn--sm" href="grant-detail.html">Detalle</a>
+            </div>
+
+            <div class="grant-tile__body">
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Acciones</span>
+                <span class="grant-tile__cell-value">30.000</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Fecha del grant</span>
+                <span class="grant-tile__cell-value">2024-09-15</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Time-vested</span>
+                <span class="grant-tile__cell-value">12.500</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Estado</span>
+                <span class="grant-tile__cell-value text-sm">
+                  <span class="badge badge--stale">Pendiente de liquidez</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="stack gap-1 mt-2">
+              <span class="grant-tile__cell-label">Progreso (tiempo)</span>
+              <div class="sparkline" aria-label="41.7% time-vested, pendiente de liquidity">
+                <div class="sparkline__fill sparkline__fill--pending" style="width: 41.7%;"></div>
+              </div>
+              <span class="muted text-xs">Ingresos imponibles hasta la fecha: <span class="mono">0 acciones</span></span>
+            </div>
+          </article>
+
+          <!-- Tile 2: NSO, vested -->
+          <article class="grant-tile">
+            <div class="grant-tile__header">
+              <div class="stack gap-1">
+                <span class="grant-tile__title">Acme Inc.</span>
+                <span class="grant-tile__instrument">NSO · 4yr · cliff 1yr</span>
+              </div>
+              <a class="btn btn--ghost btn--sm" href="grant-detail.html">Detalle</a>
+            </div>
+
+            <div class="grant-tile__body">
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Acciones</span>
+                <span class="grant-tile__cell-value">10.000</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Fecha del grant</span>
+                <span class="grant-tile__cell-value">2022-03-01</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Vested</span>
+                <span class="grant-tile__cell-value">10.000</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Strike</span>
+                <span class="grant-tile__cell-value mono">$8,00 USD</span>
+              </div>
+            </div>
+
+            <div class="stack gap-1 mt-2">
+              <span class="grant-tile__cell-label">Progreso</span>
+              <div class="sparkline" aria-label="100% vested">
+                <div class="sparkline__fill" style="width: 100%;"></div>
+              </div>
+              <span class="muted text-xs">Totalmente vested · sin evento de liquidez pendiente</span>
+            </div>
+          </article>
+
+        </div>
+
+        <div class="row">
+          <a class="btn btn--secondary btn--sm" href="first-grant-form.html">Añadir otro grant</a>
+          <span class="spacer"></span>
+          <span class="muted text-xs">Conversión a EUR disponible al activar seguimiento fiscal <span class="mono">(Slice 3)</span></span>
+        </div>
+      </section>
+
+      <hr class="divider mt-8" />
+
+      <!-- Empty-state reference (rendered here for handoff; real dashboard shows one or the other) -->
+      <section aria-label="Estado vacío (referencia)" class="mt-6">
+        <div class="section-head">
+          <div class="section-head__title">
+            <h2>Estado vacío — referencia</h2>
+            <div class="section-head__sub">Lo que un usuario recién verificado ve justo después del wizard si ha saltado el paso 5.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stack gap-3">
+            <h3>Tu cartera está vacía</h3>
+            <p class="muted text-sm">Un <strong>grant</strong> es una concesión de equity — las acciones o las opciones que te asigna tu empleador. Orbit no las tiene todavía; añade la primera para empezar a ver tu calendario de vesting.</p>
+            <div>
+              <a class="btn btn--primary" href="first-grant-form.html">Añadir grant</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <!-- Slice 1 footer: text only. NO rule-set chip (C-3). NO Ver trazabilidad button. -->
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

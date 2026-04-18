@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Patrones de incertidumbre</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  .pattern-demo {
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    margin-bottom: var(--space-4);
+  }
+  .pattern-demo__meta {
+    display: flex; align-items: center; gap: var(--space-3);
+    font-size: var(--text-xs); color: var(--color-fg-subtle);
+    margin-bottom: var(--space-3);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .pattern-demo__label {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--color-accent); color: #fff; font-weight: 600; font-size: 11px;
+  }
+  .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-top: var(--space-4); font-size: var(--text-sm); }
+  @media (max-width: 640px) { .pros-cons { grid-template-columns: 1fr; } }
+  .pros-cons__pane h4 { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-fg-muted); margin-bottom: var(--space-1); }
+  .pros-cons ul { margin: 0; padding-left: var(--space-4); color: var(--color-fg-muted); }
+  .recommendation {
+    border-left: 3px solid var(--color-accent);
+    background: var(--color-accent-subtle);
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-sm);
+    margin-top: var(--space-3);
+  }
+  .recommendation strong { color: var(--color-accent); }
+
+  /* Pattern A inline */
+  .pattern-a__line { display: flex; justify-content: space-between; align-items: baseline; padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
+  .pattern-a__line:last-child { border-bottom: none; }
+  .pattern-a__label { color: var(--color-fg-muted); }
+  .pattern-a__val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--color-fg); }
+  .pattern-a__range { color: var(--color-fg-subtle); font-size: var(--text-xs); margin-left: var(--space-2); }
+
+  /* Pattern B card */
+  .pattern-b { display: grid; gap: var(--space-3); }
+  .pattern-b__label { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-fg-muted); font-weight: 500; }
+  .pattern-b__central {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+    font-size: var(--text-xl); font-weight: 600; color: var(--color-fg);
+    letter-spacing: -0.01em;
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="sell-now.html">Sell-now <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="scenario-modeler.html">Escenarios <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Referencia</div>
+      <a class="sidebar__link sidebar__link--active" href="uncertainty-patterns.html" aria-current="page">Patrones de incertidumbre</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Referencia / <strong>Patrones de incertidumbre</strong></div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="page-title">
+        <div>
+          <h1>Cómo mostramos un número con su incertidumbre</h1>
+          <div class="page-title__meta">Tres tratamientos para el mismo dato. El problema de diseño más distintivo del producto — cada número fiscal lleva un rango, y el rango no debe leerse como una nota al pie.</div>
+        </div>
+      </div>
+
+      <!-- Pattern A -->
+      <section aria-labelledby="pA">
+        <div class="pattern-demo__meta">
+          <span class="pattern-demo__label">A</span>
+          <span>Patrón inline — rango entre paréntesis</span>
+        </div>
+        <div class="pattern-demo">
+          <table class="tbl" style="border: none;">
+            <thead>
+              <tr>
+                <th scope="col">Concepto</th>
+                <th scope="col" class="num">Valor (EUR)</th>
+                <th scope="col" class="num">Rango (driver)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">IRPF rendimiento trabajo (vest)</th>
+                <td class="num">€42.318,50</td>
+                <td class="num" style="color: var(--color-fg-subtle); font-size: var(--text-xs);">€37.280 — €47.450 <span style="color: var(--color-fg-subtle);">(±10 % precio IPO)</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Ganancia patrimonial venta lockup</th>
+                <td class="num">€9.360,00</td>
+                <td class="num" style="color: var(--color-fg-subtle); font-size: var(--text-xs);">€7.100 — €11.900 <span style="color: var(--color-fg-subtle);">(±10 % precio lockup)</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Net proceeds total</th>
+                <td class="num">€105.500,00</td>
+                <td class="num" style="color: var(--color-fg-subtle); font-size: var(--text-xs);">€94.200 — €116.800 <span style="color: var(--color-fg-subtle);">(±10 % precio IPO)</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pros-cons">
+            <div class="pros-cons__pane">
+              <h4>Pros</h4>
+              <ul>
+                <li>Compacto — cabe en tablas densas.</li>
+                <li>Familiar: lee como una nota en una hoja de cálculo.</li>
+                <li>No rompe el flujo del layout.</li>
+              </ul>
+            </div>
+            <div class="pros-cons__pane">
+              <h4>Contras</h4>
+              <ul>
+                <li>El rango se lee como "metadato" — la gente lo ignora.</li>
+                <li>El número central gana jerarquía visual y la incertidumbre desaparece.</li>
+                <li>Contradice el espíritu de §7.4 ("nunca un estimador puntual desnudo").</li>
+              </ul>
+            </div>
+          </div>
+          <div class="recommendation">
+            <strong>Usar para:</strong> celdas tabulares densas, detalles de segundo nivel (por grant, por línea de sensibilidad sub-tabla). <strong>No usar para el número principal de la pantalla.</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pattern B -->
+      <section aria-labelledby="pB" style="margin-top: var(--space-10);">
+        <div class="pattern-demo__meta">
+          <span class="pattern-demo__label">B</span>
+          <span>Patrón barra — rango visual con punto central</span>
+        </div>
+        <div class="pattern-demo" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+          <div class="pattern-b">
+            <div class="pattern-b__label">IRPF rendimiento del trabajo (vest)</div>
+            <div class="pattern-b__central">€42.318,50</div>
+            <div class="range" style="--range-min:20%; --range-max:80%; --range-central:50%;">
+              <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+              <div class="range__labels">
+                <span class="range__bound">€37.280</span>
+                <span class="range__bound">€47.450</span>
+              </div>
+              <div class="range__driver">±10 % precio IPO</div>
+            </div>
+          </div>
+
+          <div class="pattern-b">
+            <div class="pattern-b__label">Ganancia patrimonial — ahorro base</div>
+            <div class="pattern-b__central">€9.360,00</div>
+            <div class="range" style="--range-min:18%; --range-max:72%; --range-central:45%;">
+              <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+              <div class="range__labels">
+                <span class="range__bound">€7.100</span>
+                <span class="range__bound">€11.900</span>
+              </div>
+              <div class="range__driver">±10 % precio lockup</div>
+            </div>
+          </div>
+        </div>
+        <div class="pros-cons">
+          <div class="pros-cons__pane">
+            <h4>Pros</h4>
+            <ul>
+              <li>La banda es visualmente fuerte — imposible pasar por alto.</li>
+              <li>El central sigue siendo el lectura principal, pero contextualizado.</li>
+              <li>El driver tiene nombre — el usuario sabe <em>qué</em> moverlo.</li>
+            </ul>
+          </div>
+          <div class="pros-cons__pane">
+            <h4>Contras</h4>
+            <ul>
+              <li>Consume espacio vertical — no cabe en tablas apretadas.</li>
+              <li>Barra asimétrica puede confundir si min y max no están a igual distancia del central.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="recommendation">
+          <strong>Usar para:</strong> números de bloque / tarjeta en dashboard y subresultados del escenario (work-income, cap gains, fees). El driver nombrado es donde la sofisticación de Persona B se paga.
+        </div>
+      </section>
+
+      <!-- Pattern C -->
+      <section aria-labelledby="pC" style="margin-top: var(--space-10);">
+        <div class="pattern-demo__meta">
+          <span class="pattern-demo__label">C</span>
+          <span>Patrón headline — el rango es el titular</span>
+        </div>
+        <div class="pattern-demo">
+          <div class="headline" style="margin-top: 0;">
+            <div class="headline__label">Neto en tu cuenta española (venta hipotética hoy)</div>
+            <div class="headline__range">
+              <span class="headline__low">€98.400</span>
+              <span class="headline__sep">—</span>
+              <span class="headline__high">€112.600</span>
+            </div>
+            <div class="headline__central">Estimación central <span class="mono-num">€105.500</span> · amplitud <span class="mono-num">€14.200</span> (±6,7 %)</div>
+            <div class="range" style="--range-min:0%; --range-max:100%; --range-central:50%;">
+              <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+            </div>
+            <div class="headline__drivers">Movido por: <strong>precio ACME ±1,5 %</strong> (intradía) · <strong>FX spread 0 – 3 %</strong> · <strong>impuesto español estimado</strong></div>
+          </div>
+
+          <div class="pros-cons">
+            <div class="pros-cons__pane">
+              <h4>Pros</h4>
+              <ul>
+                <li>Imposible de leer como estimador puntual — el titular <em>es</em> el rango.</li>
+                <li>Cumple §7.4 en su forma más fuerte: honesto por construcción.</li>
+                <li>La tipografía jerarquiza el rango sobre el central, no al revés.</li>
+                <li>El usuario internaliza que el "número" es inherentemente incierto antes de actuar.</li>
+              </ul>
+            </div>
+            <div class="pros-cons__pane">
+              <h4>Contras</h4>
+              <ul>
+                <li>Alto peso visual — usado repetidamente en una página, agota.</li>
+                <li>Necesita espacio — no funciona en 4 columnas de dashboard.</li>
+                <li>Riesgo de alarmar: un rango de €14.200 leído por primera vez puede parecer "Orbit no sabe".</li>
+              </ul>
+            </div>
+          </div>
+          <div class="recommendation">
+            <strong>Usar para:</strong> exactamente <em>un</em> número por pantalla — el número de decisión. En sell-now, "neto final EUR". En escenario, "net proceeds después de impuestos". No lo uses para tarjetas laterales o sub-totales.
+          </div>
+        </div>
+      </section>
+
+      <!-- Overall recommendation -->
+      <section style="margin-top: var(--space-10);">
+        <h2 style="margin-bottom: var(--space-3);">Recomendación</h2>
+        <p class="muted" style="margin-bottom: var(--space-4); max-width: 68ch;">Híbrido por zona de pantalla. El usuario obtiene una pista visual sobre qué número debe ponderar: el titular con rango-primero es el que mueve la decisión; las barras son los drivers; los paréntesis inline son el detalle de apoyo. Los tres coexisten sin competir si cada uno respeta su zona.</p>
+
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th scope="col">Zona</th>
+              <th scope="col">Patrón</th>
+              <th scope="col">Ejemplo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Titular / número de decisión (1 por pantalla)</th>
+              <td>C — headline range-first</td>
+              <td>"Neto en tu cuenta española" en sell-now · "Net proceeds" en escenario</td>
+            </tr>
+            <tr>
+              <th scope="row">Tarjetas / sub-resultados (3–6 por pantalla)</th>
+              <td>B — barra con punto central</td>
+              <td>IRPF rendimiento trabajo, ganancia ahorro-base, comisiones, impuesto estimado</td>
+            </tr>
+            <tr>
+              <th scope="row">Tablas densas / sub-tablas de sensibilidad</th>
+              <td>A — inline paréntesis</td>
+              <td>Lista de grants, eventos fiscales derivados, pivot de sensibilidad one-at-a-time</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Expanded formula example -->
+      <section style="margin-top: var(--space-10);">
+        <h2 style="margin-bottom: var(--space-3);">La interacción "Ver fórmula"</h2>
+        <p class="muted" style="max-width: 68ch; margin-bottom: var(--space-4);">Cada número en los tres patrones es un botón (o focusable) que abre un panel inline — no un tooltip — con fórmula, sustitución con los insumos reales, conversión FX y rule set aplicado.</p>
+
+        <div class="card">
+          <div class="pattern-b__label">IRPF rendimiento del trabajo (vest)</div>
+          <div class="pattern-b__central">€42.318,50</div>
+          <button class="formula__toggle" aria-expanded="true" aria-controls="fx-demo">Ver fórmula y trazabilidad ▾</button>
+          <div class="formula" id="fx-demo">
+            <code>work_income_gross = shares_vested × fmv_at_vest</code>
+            <code>= 3.750 × $37,00 = $138.750,00</code>
+            <code>fx = ECB 2025-02-14, 1 EUR = 1,0823 USD → €128.196,53</code>
+            <code>art_7p_exempt = 42 / 252 días hábiles × min(total, €60.100) = €9.800,00</code>
+            <code>taxable_base = €128.196,53 − €9.800,00 = €118.396,53</code>
+            <code>irpf = tramos_estatales(ES-MD 2026) ≈ 47 % marginal → €42.318,50</code>
+            <div class="formula__ruleset">Rule set es-2026.1.0 · AEAT 15 mar 2026 · autonomía ES-MD · engine v0.4.2</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="disclaimer">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="disclaimer__meta">
+        <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+        <button class="btn btn--ghost btn--sm">Ver trazabilidad</button>
+      </span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

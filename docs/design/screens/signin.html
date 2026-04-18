@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Iniciar sesión</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  signin.html — reference for /signin, /signin (after 3 failures → CAPTCHA),
+  and the MFA-challenge sub-state (scaffolded, not reachable in Slice 1).
+
+  CSP note: no inline style, no inline script.
+
+  Key security-driven copy decisions:
+   - SEC-004 generic error: every invalid-credentials case returns
+     "Credenciales inválidas. Comprueba tu correo y contraseña."
+     (same copy for unknown user, wrong password, locked account).
+   - SEC-161: CAPTCHA slot after 3 consecutive failures.
+   - SEC-003: rate-limit error distinguishable to a legit user via its own
+     copy ("Demasiados intentos — espera unos minutos") and a cooldown hint,
+     without revealing whether the limit was hit per-account or per-IP.
+
+  UX→security tension: see proposal §13 conflict C1 — "did my signup work?"
+  after a generic-error signin. Mitigation below: on the /signin screen there
+  is a persistent "¿No recibiste el email de verificación? Reenviar" link.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="auth-shell">
+  <header class="auth-shell__topbar">
+    <div class="auth-shell__brand">ORB<span>IT</span></div>
+    <div class="row gap-2">
+      <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma">ES · EN</button>
+      <a class="btn btn--secondary btn--sm" href="signup.html">Crear cuenta</a>
+    </div>
+  </header>
+
+  <main id="main" class="auth-shell__main">
+    <div class="auth-stack">
+
+      <!-- STATE A — default signin form -->
+      <section class="auth-card" aria-labelledby="a-title">
+        <h1 id="a-title" class="auth-card__title">Inicia sesión</h1>
+        <p class="auth-card__sub">Bienvenido de nuevo. Orbit no guarda tus cálculos en tu dispositivo — todo viaja por HTTPS hasta nuestra base de datos en la UE.</p>
+
+        <form class="stack gap-4" action="/api/v1/auth/signin" method="post" novalidate>
+          <div class="field">
+            <label for="a-email">Correo electrónico</label>
+            <input class="input" id="a-email" name="email" type="email" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <div class="row row--between">
+              <label for="a-password">Contraseña</label>
+              <a class="back-link text-xs" href="password-reset.html">¿Has olvidado tu contraseña?</a>
+            </div>
+            <input class="input" id="a-password" name="password" type="password" autocomplete="current-password" required />
+          </div>
+
+          <label class="choice">
+            <input type="checkbox" name="remember" />
+            <span>Mantener la sesión iniciada en este dispositivo <span class="muted text-xs">(7 días · se cerrará al cambiar la contraseña)</span></span>
+          </label>
+
+          <button class="btn btn--primary" type="submit">Iniciar sesión</button>
+        </form>
+
+        <div class="auth-card__footer">
+          <div class="stack gap-2 text-sm">
+            <span>¿Todavía no tienes cuenta? <a href="signup.html">Regístrate</a></span>
+            <span class="muted">¿No recibiste el correo de verificación? <a href="#">Reenviar enlace</a></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- STATE B — signin with generic error (SEC-004) -->
+      <section class="auth-card" aria-labelledby="b-title">
+        <h2 id="b-title" class="auth-card__title">Inicia sesión <span class="muted text-xs">(estado B — error genérico)</span></h2>
+
+        <div class="alert alert--danger" role="alert">
+          <strong>Credenciales inválidas</strong>
+          <p>Comprueba tu correo y contraseña e inténtalo de nuevo. <span class="muted text-xs">Si acabas de registrarte, asegúrate de haber verificado tu email.</span></p>
+        </div>
+
+        <form class="stack gap-4" action="/api/v1/auth/signin" method="post" novalidate>
+          <div class="field">
+            <label for="b-email">Correo electrónico</label>
+            <input class="input input--error" id="b-email" name="email" type="email" autocomplete="email" value="maria.o@example.com" aria-invalid="true" aria-describedby="b-err" required />
+          </div>
+          <div class="field">
+            <label for="b-password">Contraseña</label>
+            <input class="input input--error" id="b-password" name="password" type="password" autocomplete="current-password" aria-invalid="true" aria-describedby="b-err" required />
+            <p id="b-err" class="field__error" role="alert">Credenciales inválidas.</p>
+          </div>
+          <button class="btn btn--primary" type="submit">Reintentar</button>
+        </form>
+      </section>
+
+      <!-- STATE C — signin after 3 failures: CAPTCHA slot (SEC-161) -->
+      <section class="auth-card" aria-labelledby="c-title">
+        <h2 id="c-title" class="auth-card__title">Inicia sesión <span class="muted text-xs">(estado C — tras 3 fallos)</span></h2>
+
+        <div class="alert alert--warning" role="alert">
+          <strong>Comprobación adicional</strong>
+          <p>Hemos detectado varios intentos fallidos en esta cuenta. Resuelve la comprobación antes de continuar.</p>
+        </div>
+
+        <form class="stack gap-4" action="/api/v1/auth/signin" method="post" novalidate>
+          <div class="field">
+            <label for="c-email">Correo electrónico</label>
+            <input class="input" id="c-email" name="email" type="email" autocomplete="email" value="maria.o@example.com" required />
+          </div>
+          <div class="field">
+            <label for="c-password">Contraseña</label>
+            <input class="input" id="c-password" name="password" type="password" autocomplete="current-password" required />
+          </div>
+
+          <div class="captcha-slot" role="group" aria-label="Comprobación CAPTCHA">
+            [hCaptcha / Turnstile — aparece a partir del 3.er intento fallido]
+          </div>
+
+          <button class="btn btn--primary" type="submit">Iniciar sesión</button>
+        </form>
+      </section>
+
+      <!-- STATE D — rate-limit hit (SEC-003). Distinguishable copy, no enumeration. -->
+      <section class="auth-card" aria-labelledby="d-title">
+        <h2 id="d-title" class="auth-card__title">Inicia sesión <span class="muted text-xs">(estado D — rate-limit)</span></h2>
+
+        <div class="alert alert--warning" role="alert">
+          <strong>Demasiados intentos</strong>
+          <p>Por tu seguridad, hemos pausado los inicios de sesión para esta combinación durante unos minutos. Inténtalo de nuevo en <strong>~8&nbsp;min</strong>. Si no reconoces esta actividad, puedes <a href="password-reset.html">restablecer tu contraseña</a>.</p>
+          <p class="muted text-xs">El texto no revela si el límite se alcanzó por cuenta o por IP (SEC-003 · no user enumeration).</p>
+        </div>
+
+        <form class="stack gap-4" aria-disabled="true">
+          <div class="field">
+            <label for="d-email">Correo electrónico</label>
+            <input class="input" id="d-email" type="email" value="maria.o@example.com" disabled />
+          </div>
+          <div class="field">
+            <label for="d-password">Contraseña</label>
+            <input class="input" id="d-password" type="password" disabled />
+          </div>
+          <button class="btn btn--primary" type="submit" disabled>Reintentar en 8 min</button>
+        </form>
+      </section>
+
+      <!-- STATE E — MFA challenge (scaffolded per ADR-011; not reachable Slice 1) -->
+      <section class="auth-card" aria-labelledby="e-title">
+        <h2 id="e-title" class="auth-card__title">Segundo factor <span class="muted text-xs">(estado E — v1.1, scaffolded)</span></h2>
+
+        <p class="auth-card__sub">Tu contraseña es correcta. Introduce el código de 6 dígitos de tu app de autenticación (Google Authenticator, 1Password, etc.).</p>
+
+        <form class="stack gap-4" action="/api/v1/auth/mfa/challenge" method="post" novalidate>
+          <div class="field">
+            <label for="e-totp">Código de 6 dígitos</label>
+            <input class="input num mono" id="e-totp" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required />
+            <p class="field__hint">Cambia cada 30 segundos. Si no tienes la app a mano, usa un <a href="#">código de recuperación</a>.</p>
+          </div>
+
+          <div class="row row--between">
+            <a class="back-link" href="signin.html">← Cancelar</a>
+            <button class="btn btn--primary" type="submit">Verificar</button>
+          </div>
+        </form>
+
+        <div class="auth-card__footer">
+          <span class="muted text-xs">
+            MFA enrolment se envía en Slice 7. El contrato de API (<span class="mono">/auth/mfa/*</span>) existe en Slice 1 pero devuelve <span class="mono">501</span>.
+          </span>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="disclaimer" role="contentinfo">
+    <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+  </footer>
+</div>
+</body>
+</html>

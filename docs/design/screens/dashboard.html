@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Dashboard</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+
+    <nav class="sidebar__group" aria-label="Cartera">
+      <div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link sidebar__link--active" href="dashboard.html" aria-current="page">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Decisiones">
+      <div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="sell-now.html">Sell-now <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="scenario-modeler.html">Escenarios <span class="sidebar__pill">paid</span></a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Cumplimiento">
+      <div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="export.html">Exports <span class="sidebar__pill">paid</span></a>
+    </nav>
+
+    <nav class="sidebar__group" style="margin-top: auto;" aria-label="Cuenta">
+      <div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="#">Perfil y residencia</a>
+      <a class="sidebar__link" href="#">Facturación</a>
+      <a class="sidebar__link" href="#">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs"><strong>Dashboard</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma (ES / EN)">ES · EN</button>
+        <button class="btn btn--secondary btn--sm">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+      <div class="page-title">
+        <div>
+          <h1>Cartera — 18 abril 2026</h1>
+          <div class="page-title__meta">3 grants activos · empleador: Acme Inc (NASDAQ: ACME, IPO 2025-02) · residencia: Comunidad de Madrid</div>
+        </div>
+        <div class="row">
+          <button class="btn btn--secondary btn--sm">Añadir grant</button>
+          <button class="btn btn--primary btn--sm">Importar CSV</button>
+        </div>
+      </div>
+
+      <!-- Modelo 720 passive banner -->
+      <aside class="alert alert--warning" role="region" aria-label="Alerta Modelo 720" style="margin-bottom: var(--space-6);">
+        <strong>Modelo 720 — cerca del umbral</strong>
+        <p>Tu valor en activos extranjeros (categoría: valores) es aprox. <strong>€48.500</strong> al FX de hoy; la franja de sensibilidad a ±5 % FX es <strong>€46.100 — €50.900</strong>. El umbral de declaración son €50.000 por categoría.</p>
+        <a class="alert__cta" href="#">Ver hoja de trabajo (paid)</a>
+      </aside>
+
+      <!-- Tiles -->
+      <div class="grid grid--3" style="margin-bottom: var(--space-8);">
+        <article class="card">
+          <div class="card__label">Valor papel total</div>
+          <div class="card__value">€387.500,00</div>
+          <div class="card__meta"><span class="card__delta card__delta--pos">+ €14.200 (3,8 %)</span> vs. ayer</div>
+          <div class="card__meta subtle" style="margin-top: var(--space-2);">Precio ACME $48,00 · delay 15 min · ECB 1,0823</div>
+        </article>
+
+        <article class="card">
+          <div class="card__label">Vested disponible</div>
+          <div class="card__value">24.500 sh</div>
+          <div class="card__meta">≈ €187.200,00 al precio actual</div>
+          <div class="card__meta subtle" style="margin-top: var(--space-2);">+5.500 sh en los próximos 90 días</div>
+        </article>
+
+        <article class="card">
+          <div class="card__label">Impuesto estimado 2026 <span title="Rango de sensibilidad ±10% precio IPO" style="cursor:help;color:var(--color-fg-subtle);">ⓘ</span></div>
+          <div class="card__value">€38.400 — €46.900</div>
+          <div class="card__meta">central <span class="mono-num">€42.318,50</span> · driver principal: precio IPO</div>
+          <div class="card__meta subtle" style="margin-top: var(--space-2);">
+            <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+          </div>
+        </article>
+      </div>
+
+      <!-- Grants table -->
+      <div class="section-head">
+        <div class="section-head__title">
+          <h2>Grants</h2>
+          <div class="section-head__sub">Lo que posees, por instrumento. Haz clic en una fila para ver detalle, vesting y fórmulas.</div>
+        </div>
+        <button class="btn btn--ghost btn--sm">Ordenar por fecha</button>
+      </div>
+
+      <table class="tbl" style="margin-bottom: var(--space-8);">
+        <thead>
+          <tr>
+            <th scope="col">Grant</th>
+            <th scope="col">Instrumento</th>
+            <th scope="col" class="num">Acciones</th>
+            <th scope="col" class="num">Vested</th>
+            <th scope="col" class="num">Strike</th>
+            <th scope="col" class="num">Valor papel (EUR)</th>
+            <th scope="col">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Initial 2022-03</th>
+            <td>NSO</td>
+            <td class="num">90.000</td>
+            <td class="num">90.000</td>
+            <td class="num">$8,00</td>
+            <td class="num">€3.328.000,00</td>
+            <td><span class="badge badge--fresh">Totalmente vested</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Refresh 2024-09</th>
+            <td>RSU (double-trigger)</td>
+            <td class="num">30.000</td>
+            <td class="num">12.500</td>
+            <td class="num">—</td>
+            <td class="num">€520.400,00</td>
+            <td><span class="badge badge--fresh">IPO + time-vested</span></td>
+          </tr>
+          <tr>
+            <th scope="row">ESPP 2025-H2</th>
+            <td>ESPP</td>
+            <td class="num">420</td>
+            <td class="num">420</td>
+            <td class="num">$34,00</td>
+            <td class="num">€18.650,00</td>
+            <td><span class="badge badge--fresh">Comprado 2025-12-15</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Vesting preview -->
+      <div class="section-head">
+        <div class="section-head__title">
+          <h2>Próximos 12 meses de vesting</h2>
+          <div class="section-head__sub">Sólo time-vesting. Los RSU double-trigger ya pasaron la liquidity-gate (IPO 2025-02).</div>
+        </div>
+        <a href="grant-detail.html" class="btn btn--ghost btn--sm">Ver calendario completo →</a>
+      </div>
+
+      <div class="card">
+        <div class="vesting">
+          <div class="vesting__row">
+            <div class="vesting__label">
+              Refresh 2024-09 <span class="vesting__label-meta">RSU, mensual, liquidity ✓</span>
+            </div>
+            <div class="vesting__bar" aria-label="41.7 % vested">
+              <div class="vesting__fill" style="width: 41.7%;"></div>
+            </div>
+            <div class="vesting__count">12.500 / 30.000</div>
+          </div>
+          <div class="vesting__row">
+            <div class="vesting__label">
+              Initial 2022-03 <span class="vesting__label-meta">NSO, 4yr/1yr cliff, completado</span>
+            </div>
+            <div class="vesting__bar" aria-label="100 % vested">
+              <div class="vesting__fill" style="width: 100%;"></div>
+            </div>
+            <div class="vesting__count">90.000 / 90.000</div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="disclaimer__meta">
+        <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+        <button class="btn btn--ghost btn--sm">Ver trazabilidad</button>
+      </span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

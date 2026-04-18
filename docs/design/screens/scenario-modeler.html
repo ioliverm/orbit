@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Escenario</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="sell-now.html">Sell-now <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link sidebar__link--active" href="scenario-modeler.html" aria-current="page">Escenarios <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group"><div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="#">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="#">Modelo 720 <span class="sidebar__pill">paid</span></a>
+      <a class="sidebar__link" href="export.html">Exports <span class="sidebar__pill">paid</span></a>
+    </nav>
+    <nav class="sidebar__group" style="margin-top:auto;"><div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="#">Perfil y residencia</a>
+      <a class="sidebar__link" href="#">Facturación</a>
+      <a class="sidebar__link" href="#">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Decisiones / Escenarios / <strong>IPO + lockup sell-through</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm">Duplicar</button>
+        <button class="btn btn--ghost btn--sm">Recomputar bajo reglas actuales</button>
+        <button class="btn btn--secondary btn--sm">Guardar</button>
+        <button class="btn btn--primary btn--sm">Exportar PDF</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+      <div class="page-title">
+        <div>
+          <h1>IPO + lockup sell-through</h1>
+          <div class="page-title__meta">Escenario: IPO en sept 2026, vender 30 % al lockup, mantener el resto. Último cálculo: hoy 09:14.</div>
+        </div>
+        <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+      </div>
+
+      <!-- D-6 mobile banner: informative, NON-blocking. Decorative only. -->
+      <aside class="alert alert--info mb-6" role="note">
+        <strong>Esta pantalla funciona mejor en un ordenador</strong>
+        <p class="text-sm">El modelador combina un formulario denso con una tabla de sensibilidad. En móvil sigue siendo usable, pero te costará menos desde un portátil.</p>
+      </aside>
+
+      <div class="split">
+        <!-- Inputs column -->
+        <section class="stack" aria-label="Hipótesis del escenario">
+          <h2 style="margin-bottom: var(--space-1);">Hipótesis</h2>
+          <div class="field">
+            <label for="s-name">Nombre del escenario</label>
+            <input class="input" id="s-name" value="IPO + lockup sell-through" />
+          </div>
+          <div class="field">
+            <label for="s-ipo-date">Fecha IPO</label>
+            <input class="input" id="s-ipo-date" type="date" value="2026-09-15" />
+          </div>
+          <div class="field">
+            <label for="s-ipo-price">Precio IPO (USD)</label>
+            <input class="input num" id="s-ipo-price" value="42,00" />
+            <p class="field__hint">Se muestra banda automática ±10 %. Puedes añadir una banda ±25 % personalizada.</p>
+          </div>
+          <div class="field">
+            <label for="s-lockup">Duración lockup (días)</label>
+            <input class="input num" id="s-lockup" value="180" />
+          </div>
+          <div class="field">
+            <label for="s-sell-pct">Vender al lockup (%)</label>
+            <input class="input num" id="s-sell-pct" value="30" />
+          </div>
+          <div class="field">
+            <label for="s-fx">Spread FX (%)</label>
+            <input class="input num" id="s-fx" value="1,5" />
+          </div>
+
+          <hr class="divider" />
+
+          <h3>Art. 7.p aplicable</h3>
+          <div class="field">
+            <label for="s-art7p">Días trabajados en el extranjero 2026</label>
+            <input class="input num" id="s-art7p" value="42" />
+            <p class="field__hint">Cargados desde "Viajes Art. 7.p". Exento pro-rata, tope €60.100/año.</p>
+          </div>
+
+        </section>
+
+        <!-- Outputs column -->
+        <section class="stack" aria-label="Resultados">
+
+          <!-- Headline (Pattern C) -->
+          <div class="headline">
+            <div class="headline__label">Neto después de impuestos (2026–2027 agregado)</div>
+            <div class="headline__range">
+              <span class="headline__low">€412.800</span>
+              <span class="headline__sep">—</span>
+              <span class="headline__high">€524.100</span>
+            </div>
+            <div class="headline__central">Estimación central <span class="mono-num">€468.400</span> · amplitud <span class="mono-num">€111.300</span> (±11,9 %)</div>
+            <div class="range" style="--range-min:0%; --range-max:100%; --range-central:50%;">
+              <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+            </div>
+            <div class="headline__drivers">Movido por: <strong>precio IPO ±10 %</strong> · <strong>FX spread 0 – 3 %</strong> · <strong>ventana holding</strong></div>
+          </div>
+
+          <!-- Three sub-cards (Pattern B for each) -->
+          <article class="card">
+            <div class="card__label">Rendimiento del trabajo — vest / exercise trigger</div>
+            <div class="row row--between">
+              <div class="card__value" style="font-size: var(--text-lg);">€168.200</div>
+              <div class="muted" style="font-size: var(--text-sm);">central · RSU double-trigger libera en IPO</div>
+            </div>
+            <div class="range" style="--range-min:30%; --range-max:70%; --range-central:50%; margin-top: var(--space-3);">
+              <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+              <div class="range__labels">
+                <span class="range__bound">€151.400</span>
+                <span class="range__bound">€185.000</span>
+              </div>
+              <div class="range__driver">±10 % precio IPO · menos Art. 7.p exento (€9.800 central)</div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card__label">Ganancia patrimonial — ahorro base (venta al lockup, 30 %)</div>
+            <div class="row row--between">
+              <div class="card__value" style="font-size: var(--text-lg);">€48.600</div>
+              <div class="muted" style="font-size: var(--text-sm);">central · ahorro base tramos 19/21/23/27</div>
+            </div>
+            <div class="range" style="--range-min:24%; --range-max:60%; --range-central:40%; margin-top: var(--space-3);">
+              <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+              <div class="range__labels">
+                <span class="range__bound">€36.900</span>
+                <span class="range__bound">€62.800</span>
+              </div>
+              <div class="range__driver">±10 % precio en ventana de lockup (6 meses)</div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card__label">Neto acciones retenidas (70 %) — valor papel al post-lockup</div>
+            <div class="row row--between">
+              <div class="card__value" style="font-size: var(--text-lg);">€287.000</div>
+              <div class="muted" style="font-size: var(--text-sm);">central · paper, sin evento fiscal hasta venta futura</div>
+            </div>
+            <div class="range" style="--range-min:15%; --range-max:85%; --range-central:45%; margin-top: var(--space-3);">
+              <div class="range__rail" aria-hidden="true"><div class="range__band"></div><div class="range__dot"></div></div>
+              <div class="range__labels">
+                <span class="range__bound">€207.800</span>
+                <span class="range__bound">€372.600</span>
+              </div>
+              <div class="range__driver">±25 % precio post-lockup (amplio, sin estabilización)</div>
+            </div>
+          </article>
+
+          <!-- Sensitivity -->
+          <section class="sens" aria-label="Sensibilidad one-at-a-time">
+            <div class="sens__head">Sensibilidad — cada driver por separado, sobre el neto agregado</div>
+            <table class="sens__tbl">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Driver</th>
+                  <th class="num">−25 %</th>
+                  <th class="num">−10 %</th>
+                  <th class="num">Central</th>
+                  <th class="num">+10 %</th>
+                  <th class="num">+25 %</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row" style="text-align:left; font-weight:500;">Precio IPO</th>
+                  <td class="down-heavy">€342.600</td>
+                  <td class="down">€413.500</td>
+                  <td class="central">€468.400</td>
+                  <td class="up">€523.300</td>
+                  <td class="up-heavy">€594.200</td>
+                </tr>
+                <tr>
+                  <th scope="row" style="text-align:left; font-weight:500;">FX (spread aplicado)</th>
+                  <td class="down">€441.700</td>
+                  <td class="down">€457.500</td>
+                  <td class="central">€468.400</td>
+                  <td class="up">€479.300</td>
+                  <td class="up">€495.100</td>
+                </tr>
+                <tr>
+                  <th scope="row" style="text-align:left; font-weight:500;">Ventana holding (precio post-lockup)</th>
+                  <td class="down">€411.200</td>
+                  <td class="down">€439.400</td>
+                  <td class="central">€468.400</td>
+                  <td class="up">€497.500</td>
+                  <td class="up">€525.700</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <!-- Modelo 720 conditional alert -->
+          <aside class="alert alert--warning">
+            <strong>Modelo 720 — umbral cruzado bajo estas hipótesis</strong>
+            <p>Bajo el precio IPO central, tu valor en valores extranjeros cruzaría el umbral de €50.000 durante el año del escenario. Considera generar la hoja de trabajo al exportar.</p>
+            <a class="alert__cta" href="#">Generar hoja Modelo 720 (PDF)</a>
+          </aside>
+
+        </section>
+      </div>
+    </main>
+
+    <footer class="disclaimer">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="disclaimer__meta">
+        <span class="chip"><span class="chip__dot" aria-hidden="true"></span>AEAT 15 mar 2026 <span class="chip__version">es-2026.1.0</span></span>
+        <button class="btn btn--ghost btn--sm">Ver trazabilidad</button>
+      </span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>
