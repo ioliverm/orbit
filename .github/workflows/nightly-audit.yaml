@@ -1,0 +1,90 @@
+# Orbit — nightly security audit on main.
+#
+# S0-02 (SEC-140): nightly scheduled run of cargo-audit on `main`.
+# Plus Trivy fs scan and GitHub dependency-review — belt-and-braces,
+# cheap in CI minutes, loud if a new CVE drops overnight.
+#
+# All actions pinned to commit SHA (S0-05 / SEC-144).
+
+name: nightly-audit
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 04:00 UTC every day
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-audit
+  cancel-in-progress: false
+
+jobs:
+  cargo-audit:
+    name: cargo-audit (main)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write # so we can file an issue on a new advisory
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      - name: rustsec/audit-check
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy-fs:
+    name: trivy fs (main)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # to upload SARIF to code scanning
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # v0.30.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0" # upload SARIF even on findings; policy gates are in ci.yaml
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.28.9
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs-nightly
+
+  dependency-review:
+    name: dependency-review (main HEAD)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 2
+
+      # The dependency-review-action is designed for PR events; on schedule we
+      # diff HEAD against HEAD~1 so we still surface any change that crept in
+      # via a force-push or merge landing overnight.
+      - name: dependency-review
+        uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+        with:
+          base-ref: HEAD~1
+          head-ref: HEAD
+          fail-on-severity: high

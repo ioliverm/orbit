@@ -1,43 +1,132 @@
-# cargo-deny configuration. Skeleton for Slice 0a; tightened in Slice 0b.
-# See ADR-013 §Dependency hygiene.
+# cargo-deny configuration — Slice 0a.
+#
+# Backs security-checklist item S0-02 (advisories, bans, licenses, sources).
+# Invoked from .github/workflows/ci.yaml's `backend-audit` job.
+# See also ADR-013 §Dependency hygiene.
+#
+# Policy summary:
+#   - Advisories: deny known-vulnerable crates; warn on unmaintained/yanked.
+#   - Licenses:   explicit allowlist; GPL/AGPL/LGPL families are denied.
+#   - Sources:    only crates.io. No git sources in Slice 0a.
+#   - Bans:       warn on duplicate versions; no skip-list by default.
+#
+# This file is tightened in Slice 0b (deny-instead-of-warn on unmaintained,
+# confidence-threshold bump to 0.93, and the duplicate-version allow-list
+# once the real dep graph settles).
 
+# ---------------------------------------------------------------------------
+# Advisories
+# ---------------------------------------------------------------------------
 [advisories]
-# Vulnerability and unmaintained-crate policy. Tightened in Slice 0b.
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
+
+# Hard deny on any known vulnerability. A blocker advisory must be either
+# fixed (preferred) or explicitly `ignore`-listed here with a comment
+# naming the owner and follow-up issue.
+vulnerability = "deny"
+
+# Unmaintained crates are a warn-signal in 0a; promoted to deny in 0b once
+# the graph is known-clean. Rationale: during scaffold we may pull transitive
+# deps tagged unmaintained that we will swap out in Slice 1-2.
+unmaintained = "warn"
+
+# Yanked crates are a warn so we notice without blocking; they generally
+# indicate a maintainer took action and a newer version is preferred.
 yanked = "warn"
+
+# Unsound / notice advisories — treat as warn for now; upgrade individually
+# as they appear.
+notice = "warn"
+
 ignore = []
 
+# ---------------------------------------------------------------------------
+# Licenses
+# ---------------------------------------------------------------------------
 [licenses]
-# Permissive + MPL-2.0 allowed. Copyleft (except MPL-2.0) forbidden per ADR-013.
+# SPDX identifiers. This set is the intersection of:
+#   - permissive licenses Orbit can redistribute freely,
+#   - MPL-2.0 (file-scope copyleft; compatible with our single-binary
+#     distribution per ADR-013 §Dependency hygiene),
+#   - CC0-1.0 + Unicode-DFS-2016 (data / identifier tables pulled in by
+#     common crates such as `unicode-ident`).
+#
+# The copyleft families GPL-*, AGPL-*, LGPL-* are NOT in this list and are
+# therefore effectively denied. We prefer deny over a narrow LGPL exception:
+# if a crate pulls an LGPL dep, the resolution path is to find a permissive
+# alternative; only if no alternative exists does the security-engineer
+# review and approve a case-by-case `exceptions` entry below.
 allow = [
-    "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
+    "MIT",
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "MPL-2.0",
     "Unicode-DFS-2016",
-    "Unicode-3.0",
-    "Zlib",
+    "MPL-2.0",
     "CC0-1.0",
 ]
+
+# Match the spec: confidence threshold. 0.8 is cargo-deny's default; we keep
+# it at 0a and bump to 0.93 in 0b once the full dep graph is frozen.
 confidence-threshold = 0.8
+
+# Per-crate license overrides. Empty at 0a — any entry here requires a
+# comment naming the reviewer and the upstream discussion.
 exceptions = []
 
+# Deny-by-silence: any license that is not in `allow` and not matched by an
+# `exceptions` entry fails the build. This is the shape we want; no
+# `deny = [...]` list is needed because the allowlist is exhaustive for the
+# licenses we intend to tolerate.
+
+# ---------------------------------------------------------------------------
+# Bans
+# ---------------------------------------------------------------------------
 [bans]
-# Duplicate-dependency and banned-crate policy. Tightened in Slice 0b.
+# Multiple versions of the same crate waste build time and enlarge the SBOM
+# surface. Warn in 0a so we notice; tightened to deny in 0b with a curated
+# `skip` list once the dep graph is stable.
 multiple-versions = "warn"
+
+# Wildcard version requirements (e.g. `version = "*"`) are banned outright.
+# Backs S0-04 (no `*`/`latest` ranges in manifests).
 wildcards = "deny"
+
+# Highlight the full dependency path in warnings so fix-ups are obvious.
 highlight = "all"
+
+# Crates explicitly allowed (usually empty; we use the license + advisory
+# gates instead of name-level allowlists).
 allow = []
+
+# Crates explicitly denied by name. Empty at 0a. If a crate here is ever
+# added, it needs a comment with the owner, the alternative, and the date.
 deny = []
+
+# `skip` is the list of (name, version) pairs tolerated under
+# multiple-versions = "deny". We intentionally ship 0a with an empty list,
+# per the product-owner instruction: accept the noise now, populate once
+# the dep graph stabilizes and 0b flips `multiple-versions` to deny.
 skip = []
 skip-tree = []
 
+# ---------------------------------------------------------------------------
+# Sources
+# ---------------------------------------------------------------------------
 [sources]
+# Unknown registries are forbidden. If this triggers, the fix is usually a
+# misconfigured CI environment (a private registry URL leaked in), not a
+# real dep choice.
 unknown-registry = "deny"
+
+# Git sources are forbidden in Slice 0a. If one is ever needed (e.g. a
+# pre-release patch), add its URL to `allow-git` in the same PR that pulls
+# the dep, with a comment naming the upstream release timeline.
 unknown-git = "deny"
+
+# Only crates.io. No mirrors, no vendored forks in 0a.
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = []

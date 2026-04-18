@@ -1,0 +1,308 @@
+# Orbit CI — Slice 0a.
+#
+# Covers security-checklist items:
+#   S0-01 (gitleaks PR check lives in pre-merge-gitleaks.yaml; this file is silent on it)
+#   S0-02 (cargo audit + cargo deny — `backend-audit` job)
+#   S0-03 (pnpm audit — `frontend` job, always-run step)
+#   S0-05 (actions pinned to SHA; minimum per-job `permissions:`)
+#   S0-08 (custom xtask lints — `xtask-check` job; no-op until T5 lands)
+#   S0-10 (CycloneDX SBOMs as CI artifact — `sbom` job; 0a scope. Release-store
+#          upload deferred to 0b per ADR-015.)
+#
+# See docs/security/security-checklist-slice-0.md and
+# docs/adr/ADR-015-slice-0-local-first-scope-split.md.
+#
+# Action pinning policy (S0-05, SEC-144): every `uses:` below is pinned to a
+# full commit SHA with a human-readable version comment. When bumping an
+# action, update both the SHA and the comment in the same commit.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Default token permissions = read-only. Jobs opt in to more if they need it.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Rust: format, clippy, test, check. S0-08 enforcement lives in `xtask-check`.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: backend (fmt, clippy, test, check)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust toolchain (from rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # stable (2025-10)
+        with:
+          components: rustfmt, clippy
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          shared-key: backend-ci
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test --workspace
+        run: cargo test --workspace --locked
+
+      - name: cargo check --workspace
+        run: cargo check --workspace --all-targets --locked
+
+  # ---------------------------------------------------------------------------
+  # S0-02: cargo audit + cargo deny (advisories / bans / licenses / sources).
+  # ---------------------------------------------------------------------------
+  backend-audit:
+    name: backend-audit (cargo-audit, cargo-deny)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: cargo-audit
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: cargo-deny (advisories)
+        uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
+        with:
+          command: check advisories
+          manifest-path: ./Cargo.toml
+
+      - name: cargo-deny (bans)
+        uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
+        with:
+          command: check bans
+          manifest-path: ./Cargo.toml
+
+      - name: cargo-deny (licenses)
+        uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
+        with:
+          command: check licenses
+          manifest-path: ./Cargo.toml
+
+      - name: cargo-deny (sources)
+        uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
+        with:
+          command: check sources
+          manifest-path: ./Cargo.toml
+
+  # ---------------------------------------------------------------------------
+  # Frontend: install, lint, typecheck, test. `pnpm audit` always runs (S0-03).
+  # Other steps gate on whether the package.json script exists — the frontend
+  # is stubbed in Slice 0a and T8 fills it in. `jq` introspects package.json.
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: frontend (install, lint, typecheck, test, audit)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          run_install: false
+
+      - name: Detect pnpm lockfile
+        id: lockfile
+        shell: bash
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::frontend/pnpm-lock.yaml missing — T8 lands it. Skipping install/lint/typecheck/test."
+          fi
+
+      - name: pnpm install --frozen-lockfile
+        if: steps.lockfile.outputs.present == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Detect frontend scripts
+        id: scripts
+        if: steps.lockfile.outputs.present == 'true'
+        shell: bash
+        run: |
+          has_script() {
+            jq -e --arg s "$1" '.scripts[$s] // empty' package.json >/dev/null 2>&1
+          }
+          for s in lint typecheck test; do
+            if has_script "$s"; then
+              echo "$s=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$s=false" >> "$GITHUB_OUTPUT"
+              echo "::warning::frontend/package.json has no \"$s\" script — skipping (T8 lands it)."
+            fi
+          done
+
+      - name: pnpm lint
+        if: steps.lockfile.outputs.present == 'true' && steps.scripts.outputs.lint == 'true'
+        run: pnpm lint
+
+      - name: pnpm typecheck
+        if: steps.lockfile.outputs.present == 'true' && steps.scripts.outputs.typecheck == 'true'
+        run: pnpm typecheck
+
+      - name: pnpm test
+        if: steps.lockfile.outputs.present == 'true' && steps.scripts.outputs.test == 'true'
+        run: pnpm test
+
+      # S0-03: `pnpm audit` always runs when a lockfile exists. If the
+      # frontend has not yet landed `pnpm-lock.yaml` (T8 scope), `pnpm audit`
+      # cannot resolve the dep graph — in that single narrow window we emit
+      # a loud warning instead of silently passing, and the check will be
+      # promoted to "always enforced" the moment T8 merges. The hook itself
+      # is permanently wired so this is not an ongoing exemption.
+      - name: pnpm audit --audit-level high
+        shell: bash
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm audit --audit-level high
+          else
+            echo "::warning::pnpm-lock.yaml missing — S0-03 audit skipped pending T8. The hook is wired; re-run CI once T8 lands."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # S0-08 enforcement via `cargo xtask check`. The xtask crate is scaffolded
+  # but the `check` subcommand is landed by T5. If it does not yet expose
+  # `check`, we emit a warning and pass — so this job wires the hook and can
+  # become an enforced gate the moment T5 merges.
+  # ---------------------------------------------------------------------------
+  xtask-check:
+    name: xtask-check (S0-08 custom lints)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # stable
+        with:
+          components: clippy
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          shared-key: xtask-check
+
+      # Probe for the `check` subcommand. `cargo xtask --help` lists it once
+      # T5 lands; until then we degrade to a warning.
+      - name: Detect xtask check subcommand
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo run -p xtask -- --help 2>&1 | grep -qE '^\s*check\b'; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::cargo xtask check not available yet (T5 lands it). Running as no-op."
+          fi
+
+      - name: cargo xtask check
+        if: steps.detect.outputs.present == 'true'
+        run: cargo xtask check
+
+  # ---------------------------------------------------------------------------
+  # S0-10 (0a scope): CycloneDX SBOM for cargo + frontend, uploaded as a CI
+  # artifact. Release-store upload is deferred to 0b per ADR-015.
+  # ---------------------------------------------------------------------------
+  sbom:
+    name: sbom (cyclonedx cargo + npm)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # stable
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          shared-key: sbom
+
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --locked --version ^0.5
+
+      - name: Generate backend SBOM (cargo)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sbom
+          # cargo-cyclonedx emits one bom per workspace member next to each
+          # Cargo.toml. We collect the lot under sbom/ with deterministic
+          # names so the artifact layout is stable.
+          cargo cyclonedx --format json --all
+          while IFS= read -r -d '' path; do
+            # Derive a stable name from the crate directory.
+            crate="$(basename "$(dirname "$path")")"
+            cp "$path" "sbom/sbom.backend.${crate}.cdx.json"
+          done < <(find . -name 'bom.json' -not -path './target/*' -not -path './node_modules/*' -print0)
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          run_install: false
+
+      - name: Generate frontend SBOM (cdxgen)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # cdxgen handles pnpm workspaces natively. Pin the major line.
+          npx --yes @cyclonedx/cdxgen@^11 \
+            -r \
+            -t pnpm \
+            -o sbom/sbom.frontend.cdx.json \
+            frontend || {
+              echo "::warning::cdxgen frontend SBOM failed; emitting empty marker."
+              echo '{"bomFormat":"CycloneDX","specVersion":"1.5","components":[]}' > sbom/sbom.frontend.cdx.json
+            }
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom/
+          if-no-files-found: warn
+          retention-days: 90

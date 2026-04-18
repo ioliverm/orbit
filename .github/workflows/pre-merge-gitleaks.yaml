@@ -1,0 +1,46 @@
+# Orbit — gitleaks pre-merge scan (required check).
+#
+# S0-01 (SEC-030, SEC-150): gitleaks runs as a required CI check on every PR.
+# The full-history scan in the deploy pipeline lands with Slice 0b (see
+# docs/adr/ADR-015-slice-0-local-first-scope-split.md).
+#
+# All actions pinned to commit SHA (S0-05 / SEC-144).
+
+name: pre-merge-gitleaks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required so gitleaks-action can post summaries on PRs.
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Full history on PRs so gitleaks can scan the diff range. On push
+          # to main this reduces to a HEAD scan by default, which is the
+          # intended shape for 0a.
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No GITLEAKS_LICENSE needed for public repos or personal/free tier.
+          # If the repo is moved under an org plan requiring a license, add it
+          # via `secrets.GITLEAKS_LICENSE` and reference here.

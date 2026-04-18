@@ -1,0 +1,92 @@
+# Orbit — production deploy.
+#
+# STATUS (Slice 0a): committed but DISABLED. See the `if: false` guard on
+# every job. The real deploy lands in Slice 0b.
+#
+# 0b gate: activate after Slice 0b closes. See
+# docs/adr/ADR-015-slice-0-local-first-scope-split.md.
+#
+# Why commit a disabled workflow?
+#   - Exercises the `production` GitHub Environment wiring (S0-06 partial, 0a):
+#     the environment + required reviewer are created in 0a so the workflow
+#     referring to them is not orphaned.
+#   - Makes the deploy surface code-reviewable before it ships.
+#   - Keeps the pinning and permissions policy (S0-05) in force from day one.
+#
+# All actions pinned to commit SHA (S0-05 / SEC-144).
+
+name: deploy
+
+on:
+  # No push, no pull_request, no schedule — `workflow_dispatch` only,
+  # so the workflow cannot fire by accident. On top of that, every job
+  # is additionally gated by `if: false` until Slice 0b activates it.
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'DEPLOY' to confirm (disabled until 0b)."
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build release artifact
+    # 0b gate: activate after Slice 0b closes. See docs/adr/ADR-015-slice-0-local-first-scope-split.md.
+    if: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: TODO(0b) — cargo build --release -p orbit
+        run: echo "TODO(0b)"
+      - name: TODO(0b) — pnpm install + pnpm build (frontend)
+        run: echo "TODO(0b)"
+      - name: TODO(0b) — package release.tar.gz (binary + frontend dist + migrations + rules)
+        run: echo "TODO(0b)"
+      - name: TODO(0b) — upload release artifact
+        run: echo "TODO(0b)"
+
+  migrate:
+    name: run migrations (one-shot)
+    # 0b gate: activate after Slice 0b closes. See docs/adr/ADR-015-slice-0-local-first-scope-split.md.
+    if: false
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment: production # S0-06: required reviewer gate (ioliverm)
+    permissions:
+      contents: read
+    steps:
+      - name: TODO(0b) — download release artifact
+        run: echo "TODO(0b)"
+      - name: TODO(0b) — ssh orbit migrate
+        run: echo "TODO(0b)"
+
+  deploy:
+    name: deploy (atomic symlink swap + systemctl restart)
+    # 0b gate: activate after Slice 0b closes. See docs/adr/ADR-015-slice-0-local-first-scope-split.md.
+    if: false
+    needs: [migrate]
+    runs-on: ubuntu-latest
+    environment: production # S0-06: required reviewer gate (ioliverm)
+    permissions:
+      contents: read
+    steps:
+      - name: TODO(0b) — scp release to /opt/orbit/releases/<sha>/
+        run: echo "TODO(0b)"
+      - name: TODO(0b) — ln -sfn /opt/orbit/releases/<sha> /opt/orbit/current
+        run: echo "TODO(0b)"
+      - name: TODO(0b) — systemctl restart orbit-api orbit-worker
+        run: echo "TODO(0b)"
+      - name: TODO(0b) — curl -f https://app.orbit.<tld>/api/v1/healthz (rollback on failure)
+        run: echo "TODO(0b)"
+      - name: TODO(0b) — upload frontend dist/ to Bunny.net origin + purge /index.html
+        run: echo "TODO(0b)"
