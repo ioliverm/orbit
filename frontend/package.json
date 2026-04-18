@@ -1,5 +1,57 @@
 {
   "name": "@orbit/frontend",
   "private": true,
-  "version": "0.0.0"
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@9.12.3",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "lingui:extract": "lingui extract",
+    "lingui:compile": "lingui compile",
+    "lingui:check": "lingui extract --clean && git diff --exit-code src/locales"
+  },
+  "dependencies": {
+    "@lingui/core": "4.11.4",
+    "@lingui/macro": "4.11.4",
+    "@lingui/react": "4.11.4",
+    "@tanstack/react-query": "5.59.16",
+    "lucide-react": "0.445.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-hook-form": "7.53.1",
+    "react-router-dom": "6.26.2",
+    "zod": "3.23.8",
+    "zustand": "4.5.5"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "3.9.1",
+    "@lingui/cli": "4.11.4",
+    "@lingui/vite-plugin": "4.11.4",
+    "@playwright/test": "1.47.2",
+    "@testing-library/jest-dom": "6.5.0",
+    "@testing-library/react": "16.0.1",
+    "@types/node": "20.16.10",
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.0",
+    "@typescript-eslint/eslint-plugin": "8.8.1",
+    "@typescript-eslint/parser": "8.8.1",
+    "@vitejs/plugin-react": "4.3.2",
+    "babel-plugin-macros": "3.1.0",
+    "eslint": "8.57.1",
+    "eslint-plugin-react": "7.37.1",
+    "eslint-plugin-react-hooks": "4.6.2",
+    "jsdom": "25.0.1",
+    "prettier": "3.3.3",
+    "typescript": "5.5.4",
+    "vite": "5.4.8",
+    "vitest": "2.1.2"
+  }
 }

@@ -23,3 +23,8 @@ edition = "2021"
 rust-version = "1.82"
 license = "UNLICENSED"
 publish = false
+
+[workspace.dependencies]
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono", "uuid"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"

@@ -1,0 +1,96 @@
+/* Orbit — design tokens.
+ * Copied from docs/design/screens/shared.css per ADR-013 §Packaging of the design system.
+ * Tokens-only: every CSS custom property lives here; primitives that consume them live in primitives.css.
+ * When editing: mirror the change into docs/design/style-guide.md and docs/design/screens/shared.css.
+ */
+
+/* ---------- Tokens: light ---------- */
+:root {
+  --color-surface: #f7f6f2;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #efede7;
+  --color-fg: #1a1a1f;
+  --color-fg-muted: #5a5a66;
+  --color-fg-subtle: #8a8a95;
+  --color-border: #d8d5cc;
+  --color-border-strong: #a8a499;
+  --color-accent: #2b2f6a;
+  --color-accent-hover: #1d2052;
+  --color-accent-subtle: #e6e7f0;
+  --color-positive: #2a6b3e;
+  --color-negative: #8a2a2a;
+  --color-warning: #8a6a1a;
+  --color-warning-subtle: #f1e9d2;
+  --color-band: #e6e7f0;
+
+  --font-sans: 'Inter', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 40px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --shadow-1: 0 1px 2px rgba(20, 20, 26, 0.06), 0 0 0 1px rgba(20, 20, 26, 0.04);
+  --shadow-2: 0 4px 16px rgba(20, 20, 26, 0.1), 0 0 0 1px rgba(20, 20, 26, 0.06);
+
+  --motion-fast: 120ms;
+  --motion-med: 180ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --sidebar-w: 240px;
+  --content-max: 1360px;
+}
+
+/* ---------- Tokens: dark ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: #14141a;
+    --color-surface-raised: #1c1c24;
+    --color-surface-sunken: #101016;
+    --color-fg: #ececef;
+    --color-fg-muted: #a0a0ac;
+    --color-fg-subtle: #70707c;
+    --color-border: #2e2e38;
+    --color-border-strong: #50505c;
+    --color-accent: #7a80d8;
+    --color-accent-hover: #8f95e8;
+    --color-accent-subtle: #2a2e4a;
+    --color-positive: #5ba873;
+    --color-negative: #d86a6a;
+    --color-warning: #c89a4a;
+    --color-warning-subtle: #3a3226;
+    --color-band: #2a2e4a;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
