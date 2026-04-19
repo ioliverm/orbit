@@ -2,12 +2,13 @@
 
 | Field       | Value                                                      |
 |-------------|------------------------------------------------------------|
-| Version     | 1.0                                                        |
-| Date        | 2026-04-18                                                 |
+| Version     | 1.1                                                        |
+| Date        | 2026-04-19                                                 |
 | Owner       | requirements-analyst (Ivan Oliver)                         |
-| Slice       | Slice 1 — "First portfolio" (see `v1-slice-plan.md`)       |
+| Slice       | Slice 1 — "First portfolio" (see `v1-slice-plan.md` v1.2)  |
 | Boundary    | Sign up → residency step → first grant → land on dashboard with one grant tile → view vesting timeline. **No tax math. No FX. No CSV import. No exports. No scenarios. No sell-now.** |
 | Related     | Spec US-001, US-003, US-006 (partial), US-011 (data-minimization part only); UX screens `dashboard.html` (empty + single-grant tile), `grant-detail.html` (vesting section). |
+| v1.1 update | Resync with `v1-slice-plan.md` v1.2 (2026-04-19): demo URL is localhost (deploy deferred to Slice 8); sidebar nav entries no longer show `[paid]` badges and no blurred-preview state exists (v1.2 PoC has no paid tier); Slice 1 does not ship any TOTP UI (optional TOTP lands in Slice 7). No AC body changes. |
 
 This document is implementation-ready. Every AC below is testable as-written. Where a tester needs a specific screen state, the UX reference HTML is cited by filename.
 
@@ -71,7 +72,7 @@ This document is implementation-ready. Every AC below is testable as-written. Wh
 
 - **G-26.** No grant values, no share counts, no strike prices, no autonomía selection, no Beckham flag appear in analytics event payloads. The per-event payload schema is reviewed and CI-lint-enforced (per §7.2).
 - **G-27.** Analytics are disabled by default and enabled only after explicit cookie-banner opt-in (AEPD 2023).
-- **G-28.** No PII (email, name) leaves EEA in any request path. Slice 1 uses no external services beyond Hetzner (EEA) and Bunny.net (EU-only PoPs configured).
+- **G-28.** No PII (email, name) leaves EEA in any request path. Slice 1 runs entirely on a developer machine against local Docker Compose Postgres per ADR-015 §0a (v1.1: cloud deploy deferred to Slice 8); no external services are called from Slice 1 code paths.
 - **G-29.** Logs redact email addresses (replaced by the user's UUID once known; pre-auth logs redact beyond the domain).
 
 ### 3.6 Observability
@@ -198,14 +199,14 @@ This section is load-bearing. A tester validating Slice 1 should not mark these 
 - **§7.7 FX source.** No EUR conversion in Slice 1. ECB pipeline ships in Slice 3.
 - **§7.8 Performance.** Slice 1 has no compute-heavy path. P95 targets in §7.8 are met trivially; acceptance is "page loads feel snappy" (≤2 s P75 dashboard per §7.8, validated on EU broadband from a cold CDN cache).
 - **§7.9 Security — pen-test.** Deferred to Slice 7. Slice 1 is expected to be free of the OWASP Top 10 basics via framework defaults and code review; a penetration test is not a Slice 1 gate.
-- **US-004..US-013.** Not shipped. Any UI gesture that would lead to those flows routes to a "próximamente" placeholder or to a disabled sidebar link in free tier. No partial compute.
+- **US-004..US-013.** Not shipped. Any UI gesture that would lead to those flows routes to a "próximamente" placeholder. (v1.2 note: no paid gating, so nav entries are plain placeholders — no blurred-preview state, no `[paid]` badges.)
 
 ## 10. Demo-acceptance script
 
 A single PR is merged. The reviewer runs through:
 
-1. Open `https://app.orbit.<tld>` as a brand-new user.
-2. Sign up with `test+slice1@<domain>` (see Slice 0 setup). Verify email. Log in.
+1. Open `http://localhost:<port>` as a brand-new user (the local dev stack from ADR-015 §0a; v1.1 defers any public `app.orbit.<tld>` URL to Slice 8).
+2. Sign up with `test+slice1@<domain>` (see Slice 0a setup). Verify email (retrieve the verification link from the local SMTP sink or structured-log output). Log in.
 3. See disclaimer modal. Read ES copy. Accept.
 4. Residency step: select Comunidad de Madrid. Beckham = No. Primary currency = EUR. Submit.
 5. First-grant form: RSU, 30,000 shares, grant date 2024-09-15, employer "ACME Inc.", ticker blank, template "4 años / cliff 1 año / mensual", double-trigger = Sí, liquidity event date blank. Submit.
@@ -231,7 +232,7 @@ The following are **correct** behaviours in Slice 1 and must not be written up a
 - No EUR amount appears anywhere.
 - No "you will owe X" number appears anywhere.
 - No rule-set version chip in the footer.
-- The sidebar entries "Sell-now [paid]", "Escenarios [paid]", "Modelo 720 [paid]", "Exports [paid]" render but route to a "próximamente" page (Slice 1 version) or a blurred-layout preview state (not yet — that arrives with Slice 3 paid shell; Slice 1 can simply route to a "coming in next release" stub).
+- The sidebar entries "Sell-now", "Escenarios", "Modelo 720", "Exports" render but route to a "próximamente" page. **No `[paid]` badges — v1.2 PoC has no paid tier.** No blurred-layout preview state at any slice (the UX D-9 pattern was scrapped in v1.2 along with the paid gate).
 - CSV import is not offered. The "Tengo varios grants" link dismisses the form to an empty dashboard.
 - País Vasco / Navarra selection produces no tax-calc block because there is no tax-calc surface to block.
 - Beckham = Sí produces no tax-calc block for the same reason.
@@ -239,5 +240,5 @@ The following are **correct** behaviours in Slice 1 and must not be written up a
 - No export of any kind.
 - No "recompute under current rules" action.
 - No sensitivity ranges anywhere.
-- 2FA is offered but not required (OQ-01 analyst default).
+- 2FA is **not** offered in Slice 1 at all. The Account screen has no TOTP setup UI; the ADR-011 TOTP scaffolding returns 501 per its Slice-1 shape. Optional TOTP ships in Slice 7 (v1.2 scope: optional for every user; OQ-01 mandatory-for-paid is moot since there is no paid tier).
 - "Export my data" and "Delete my account" buttons exist in Account → Data & privacy but link to a "próximamente" page; full DSR self-service ships in Slice 7.
