@@ -18,14 +18,17 @@ Decision-support web platform for Spain-tax-resident employees holding US-compan
 ## 2. Build order (do not deviate)
 
 ```
-Slice 0 (foundations) ──▶ Slice 1 (signup → grant → vesting timeline) ──▶ Slice 2 … 7
+Slice 0a (local foundations) ──▶ Slice 1 ──▶ Slice 2 ──▶ … ──▶ Slice 7 ──▶ Slice 8 (production deploy + launch)
 ```
 
-Each slice is independently shippable and demo-able. Do not start Slice 1 until every Slice-0 security-checklist item is green.
+Each slice is independently shippable and demo-able on `localhost` through Slice 7. Do not start Slice 1 until every Slice-0a checklist item is green. Slice 8 is entered only once Slice 7 is green — and no external user touches the system before Slice 8 closes.
 
-- **Slice-0 starting point**: [`security/security-checklist-slice-0.md`](security/security-checklist-slice-0.md) (30 items) + [`adr/ADR-013-repository-and-deployment-scaffold.md`](adr/ADR-013-repository-and-deployment-scaffold.md) (repo tree, CI, deploy).
+**Local-first-until-launch (decision 2026-04-19):** cloud deployment was deferred to a single concentrated final slice. Slices 0a–7 run against Docker Compose Postgres + Vite dev server on a developer machine. Every ADR-015 §0b item, plus the pen-test and legal-surface publication previously scoped to Slice 7, consolidates into **Slice 8 — Production deployment & launch gate** in `requirements/v1-slice-plan.md` v1.1.
+
+- **Slice-0a starting point**: [`security/security-checklist-slice-0.md`](security/security-checklist-slice-0.md) (30 items; 0a vs 0b column per [`adr/ADR-015-slice-0-local-first-scope-split.md`](adr/ADR-015-slice-0-local-first-scope-split.md)) + [`adr/ADR-013-repository-and-deployment-scaffold.md`](adr/ADR-013-repository-and-deployment-scaffold.md) (repo tree, CI, local dev). Only 0a items block Slice 1.
 - **Slice-1 starting point**: [`requirements/slice-1-acceptance-criteria.md`](requirements/slice-1-acceptance-criteria.md) + [`adr/ADR-014-slice-1-technical-design.md`](adr/ADR-014-slice-1-technical-design.md) + the six Slice-1 UX references (see §5).
-- **Slice 2 and beyond**: sequenced in [`requirements/v1-slice-plan.md`](requirements/v1-slice-plan.md). Do not speculate; come back when Slice 1 is green.
+- **Slice 2 and beyond**: sequenced in [`requirements/v1-slice-plan.md`](requirements/v1-slice-plan.md) v1.1. Do not speculate; come back when the prior slice is green.
+- **Slice 8 starting point** (when Slice 7 is green): the ADR-015 §0b item set + deferred commercial/legal cutovers catalogued in the Slice 8 section of `requirements/v1-slice-plan.md`.
 
 **Slice 1 boundary (verbatim)**: sign up → disclaimer → residency (autonomía + Beckham flag + primary currency) → enter one grant manually → land on a dashboard tile and a vesting timeline including the double-trigger "awaiting liquidity event" state. **Free tier, no tax math, no FX, no EUR conversion, no CSV import, no exports, no rule-set chip, no Modelo 720 banner.**
 

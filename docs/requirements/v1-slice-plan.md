@@ -2,11 +2,13 @@
 
 | Field       | Value                                                      |
 |-------------|------------------------------------------------------------|
-| Version     | 1.0                                                        |
-| Date        | 2026-04-18                                                 |
+| Version     | 1.2                                                        |
+| Date        | 2026-04-19                                                 |
 | Owner       | requirements-analyst (Ivan Oliver)                         |
-| Sources     | `docs/specs/orbit-v1-persona-b-spain.md`, ADR-001..ADR-008, `docs/design/orbit-v1-ui-proposal.md`, `docs/requirements/open-questions-resolved.md` |
+| Sources     | `docs/specs/orbit-v1-persona-b-spain.md`, ADR-001..ADR-008, ADR-015 (local-first split), `docs/design/orbit-v1-ui-proposal.md`, `docs/requirements/open-questions-resolved.md` |
 | Purpose     | Break v1 into ordered, independently shippable vertical slices. Each ends in a demo-able state. No layers; every slice crosses frontend + backend + data + ops. |
+| v1.1 change | Product owner decision 2026-04-19: defer cloud deployment to the end. Slices 1–7 build and demo against the local stack established in Slice 0a. Everything deferred from ADR-015 §0b, plus the pen-test and legal-surface publication previously in Slice 7, consolidate into a new **Slice 8 — Production deployment & launch gate**. No feature work changes. |
+| v1.2 change | Product owner decision 2026-04-19 (same day, follow-up): **this is a PoC; no Stripe, no paid tier.** The free/paid distinction is removed everywhere. Every account is the same account; every feature is available to every user. Slice 3 collapses from "Paid shell + Modelo 720 passive UX" to just "FX pipeline + Modelo 720 passive UX + dashboard EUR conversion". Billing, subscription state, VAT handling, feature-matrix screen, preview-only blurred state, and `subscriptions` table all drop out. TOTP 2FA becomes optional for every user in Slice 7 (no "mandatory for paid"). Stripe live-mode cutover and professional indemnity insurance drop out of Slice 8. |
 
 ## Principles
 
@@ -14,50 +16,60 @@
 2. **Demo-able at the boundary.** A slice is done when a real Persona-B user could open the app and experience something they could not before.
 3. **Non-goals are load-bearing.** Each slice explicitly lists what it does not ship; this is how scope creep is caught at the boundary.
 4. **Respect the ADRs.** Tech stack, cloud, data-model outline, versioning scheme, FX source, vendor, and export traceability are all decided (ADR-001..ADR-008). Slices do not re-litigate these.
-5. **Respect the free/paid boundary.** Slices 0–2 stay inside the free tier. Slice 3 is the first that requires a billing path. This matches the spec's gating strategy and lets the tool be usable without ever introducing payments.
+5. **No paid tier in the PoC (v1.2).** Every account gets every feature. No Stripe integration, no subscription state, no feature gating, no preview-only UX, no `subscriptions` table. If monetization is ever reopened, it is a post-v1 initiative with its own spec and its own slice.
+6. **Local-first, deploy last (v1.1).** Slices 0a–7 run against the local Docker Compose Postgres + Vite dev server stack from ADR-015 §0a. Cloud deployment is a single concentrated slice at the end, once the app is feature-complete and polished. No external user ever touches a Slice 0a–7 build; public launch happens only after Slice 8 closes.
 
 ## Summary table
 
-| # | Slice | One-liner | Free/Paid | T-shirt | Demo |
-|---|-------|-----------|-----------|---------|------|
-| 0 | Foundation shell | Bootable app, auth, empty dashboard, CI, observability, cookie banner. | Free | M | Log in, land on empty dashboard, log out. |
-| 1 | **First portfolio** | Sign up → residency → first grant → see vesting schedule. | Free | L | Persona B enters one grant, sees vesting timeline. Nothing else. |
-| 2 | Portfolio completeness | Multiple grants, CSV import, dashboard tiles, Art. 7.p trip entry. | Free | L | Persona B imports 10 grants from Carta, views dashboard. |
-| 3 | Paid shell + Modelo 720 alert | Billing, free-vs-paid gating, Modelo 720 passive threshold UI. | Paid (upgrade path live) | M | Free user sees paid preview-only; upgrade completes; threshold alert fires. |
-| 4 | Tax engine + autonomía + scenario modeler | First tax numbers. Rule-set versioning goes live. Ranges-and-sensitivity NFR activates. | Paid | XL | Persona B runs the IPO/lockup/hold scenario and sees net proceeds with sensitivity. |
-| 5 | Sell-now calculator (post-IPO leg) | Finnhub + ECB pipeline + US-013. | Paid | L | Persona B opens sell-now, enters lots, sees net-EUR-landing range. |
-| 6 | Exports + Modelo 720 worksheet + recompute | Gestor PDF, CSV, traceability IDs, recompute-under-current-rules. | Paid | L | Persona B exports a scenario PDF; tests recompute after a rule-set bump. |
-| 7 | GDPR DSR self-service + 2FA mandatory + pen-test | Data export, erasure, TOTP mandatory for paid, third-party pen-test. | Paid | M | User exports their data archive; deletes account; 30-day grace works. |
+| # | Slice | One-liner | T-shirt | Demo |
+|---|-------|-----------|---------|------|
+| 0a | Foundation shell (local) | Bootable local app, auth, empty dashboard, CI, observability skeleton, cookie banner. | M | Log in on `localhost`, land on empty dashboard, log out. |
+| 1 | **First portfolio** | Sign up → residency → first grant → see vesting schedule. | L | Persona B enters one grant, sees vesting timeline. Nothing else. |
+| 2 | Portfolio completeness | Multiple grants, CSV import, dashboard tiles, Art. 7.p trip entry. | L | Persona B imports 10 grants from Carta, views dashboard. |
+| 3 | FX + Modelo 720 passive UX | ECB FX pipeline, dashboard EUR conversion (paper-gains tile), Modelo 720 threshold alert, rule-set chip in footer. | M | Paper-gains tile shows EUR with bands; M720 threshold alert fires; footer chip shows ECB FX date + engine version. |
+| 4 | Tax engine + autonomía + scenario modeler | First tax numbers. Rule-set versioning goes live. Ranges-and-sensitivity NFR activates. | XL | Persona B runs the IPO/lockup/hold scenario and sees net proceeds with sensitivity. |
+| 5 | Sell-now calculator (post-IPO leg) | Finnhub (dev tier) + ECB pipeline + US-013. | L | Persona B opens sell-now, enters lots, sees net-EUR-landing range. |
+| 6 | Exports + Modelo 720 worksheet + recompute | Gestor PDF, CSV, traceability IDs, recompute-under-current-rules. | L | Persona B exports a scenario PDF; tests recompute after a rule-set bump. |
+| 7 | GDPR DSR self-service + optional 2FA | Data export, erasure, TOTP optional for all users. Internal-readiness gate. | M | User enables TOTP; exports their data archive; deletes account; 30-day grace works. |
+| 8 | **Production deployment & launch gate** | Hetzner stack, TLS/HSTS/nftables, offsite backups, MFA on live accounts, published legal surface, Finnhub commercial cutover, third-party pen-test. Everything deferred from ADR-015 §0b. | L | Deploy to `app.orbit.<tld>`; run the Slice-7 demo on production; uptime + alert route + pen-test report green. |
 
-**Launch gate = end of Slice 7.** Slices 0–5 are internal / closed-beta-acceptable. Slice 6 is needed for the gestor promise. Slice 7 is the GDPR/security bar for public paid launch.
+**Internal-readiness gate = end of Slice 7.** Orbit is feature-complete, polished, and locally testable end-to-end; still no external user.
+
+**Public launch gate = end of Slice 8.** Cloud deployment, legal surface, third-party pen-test, and commercial contracts (Finnhub commercial-tier) all green. First external user onboards after Slice 8 closes.
+
+Slices 0a–5 are internal / closed-beta-acceptable on local only. Slice 6 is needed for the gestor promise. Slice 7 raises the GDPR/security bar. Slice 8 is the production bar.
 
 ---
 
-## Slice 0 — Foundation shell
+## Slice 0a — Foundation shell (local)
 
 ### Scope one-liner
-The smallest bootable Orbit that a user can sign up to and log in to. No product features.
+The smallest bootable Orbit that a developer can sign up to and log in to **on localhost**. No product features, no cloud.
+
+> **Relationship to ADR-015.** This slice is exactly ADR-015 §0a. ADR-015 §0b — the deploy-green checkpoint — used to be the second half of Slice 0; per the 2026-04-19 product-owner decision it has been **moved to Slice 8** and no longer gates Slice 1.
 
 ### Entry state
 Empty git repo + the accepted ADRs.
 
 ### Exit state
-- A deployed app at `app.orbit.<tld>` (Hetzner, per ADR-002) reachable from an EU browser.
-- User can sign up with email + password (bcrypt/argon2id), verify email, log in, log out.
+- A locally bootable app: `docker compose up` brings up Postgres; `cargo run -p orbit -- api` starts the backend; `pnpm --filter frontend dev` starts the Vite SPA. The app is reachable at `http://localhost:<port>` only.
+- User can sign up with email + password (argon2id), verify email (local SMTP sink or log-based token retrieval is acceptable in 0a), log in, log out.
 - Landing page post-login: an empty dashboard shell with the sidebar from UX §3.1 (Portfolio / Decisions / Compliance / Account). Most links go to "próximamente" placeholders.
 - First-login disclaimer modal displays (UX §8 layer 1); acceptance is recorded in `audit_log`.
-- Persistent footer strip renders on every page. **Footer in Slice 0 shows only the "Esto no es asesoramiento fiscal ni financiero" copy** — no rule-set chip yet (see C-3 in open-questions-resolved).
+- Persistent footer strip renders on every page. **Footer in Slice 0a shows only the "Esto no es asesoramiento fiscal ni financiero" copy** — no rule-set chip yet (see C-3 in open-questions-resolved).
 - Cookie banner live (AEPD 2023, analytics opt-in default off).
 - `/healthz` and `/readyz` endpoints respond.
-- Baseline observability: structured logs shipped off-VM to Better Stack or equivalent; uptime monitor pings `/healthz`.
-- CI pipeline: `cargo test`, `cargo clippy -D warnings`, `cargo audit`, frontend `npm run build` + unit tests + `axe` a11y smoke on the sign-in page, and a smoke `curl` against a preview deploy.
-- Migrations framework in place (`orbit migrate`), `users`, `sessions`, `audit_log`, `dsr_requests` tables created per ADR-005.
-- Postgres RLS scaffolded: the `Tx::for_user(user_id)` helper is the only connection-acquisition path; CI lint rejects direct pool.acquire.
-- Locale switcher (ES/EN) works at the page-chrome level.
+- Baseline observability skeleton: structured logs via `orbit_log::event!` (JSON to stdout in 0a; off-VM shipping deferred to Slice 8). No uptime monitor yet.
+- CI pipeline: `cargo test`, `cargo clippy -D warnings`, `cargo audit`, `cargo deny`, frontend `pnpm build` + unit tests + `axe` a11y smoke on the sign-in page. `deploy.yaml` is committed but disabled (`workflow_dispatch`-only) until Slice 8.
+- Migrations framework in place (`orbit migrate`), `users`, `sessions`, `audit_log`, `dsr_requests` tables created per ADR-005. `orbit_app` + `orbit_support` Postgres roles provisioned in the init migration; `audit_log` is INSERT-only for `orbit_app` and SELECT-only for `orbit_support` (see ADR-015 §"Additional decisions").
+- Postgres RLS scaffolded and enforced: the `Tx::for_user(user_id)` helper is the only connection-acquisition path; CI lint rejects direct `pool.acquire`.
+- Response headers (CSP, X-CTO, X-Frame, Referrer, Permissions, COOP) verified against the local dev server via `curl -I`. HSTS is declared but only observable at Slice 8.
+- Locale switcher (ES/EN) works at the page-chrome level (LinguiJS per ADR-009).
 
 ### Explicit non-goals
-- No grants, no vesting, no calculations, no scenarios, no sell-now, no billing.
-- No TOTP (deferred to Slice 7 when it becomes mandatory for paid).
+- **No cloud deploy.** No Hetzner VMs, no Caddy, no TLS/HSTS end-to-end, no nftables, no Postgres private-network binding, no offsite backups, no uptime monitor, no published legal surface. All of this moves to Slice 8.
+- No grants, no vesting, no calculations, no scenarios, no sell-now. **No billing ever in v1** (v1.2 PoC scope).
+- No TOTP (deferred to Slice 7 as an optional-for-all setting).
 - No device/session management UI (backend exists, UI deferred to C-7 resolution).
 - No market-data vendor integration, no ECB FX ingestion (ADR-006/007 pipelines not yet wired).
 - No PDF/CSV export plumbing.
@@ -68,18 +80,19 @@ Empty git repo + the accepted ADRs.
 **M.** Boring but critical; the shell is where architecture mistakes cost most to retrofit.
 
 ### Dependencies
-- ADR-001, ADR-002 accepted. (Today: `Proposed`; security-engineer review is on the path.)
-- ADR-005 entity outline (for the auth tables). Full DDL is deferred to solution-architect second pass, but Slice 0 needs `users`, `sessions`, `audit_log`, `dsr_requests`.
-- Cloud account provisioned (Hetzner, Bunny.net, Storage Box, Object Storage). This is the Ivan procurement step.
+- ADR-001, ADR-002, ADR-015 accepted.
+- ADR-005 entity outline (for the auth tables). Full DDL is in ADR-014; Slice 0a ships `users`, `sessions`, `audit_log`, `dsr_requests` from that DDL.
+- No cloud account procurement in this slice (pushed to Slice 8).
 
 ### Demo script
-1. Open `https://app.orbit.<tld>` from an EU IP.
-2. Click "Regístrate", enter email + password.
-3. Verify email.
-4. Log in; see the disclaimer modal; accept.
-5. Land on the empty dashboard; see the sidebar and footer.
-6. Click the locale switcher; see UI swap ES↔EN.
-7. Log out. Log back in. Disclaimer modal is not shown again (one-time acceptance recorded).
+1. `docker compose up -d && cargo run -p orbit -- api &` and `pnpm --filter frontend dev` on a developer machine.
+2. Open `http://localhost:<port>`.
+3. Click "Regístrate", enter email + password.
+4. Verify email (retrieve the verification link from the local SMTP sink or structured-log output).
+5. Log in; see the disclaimer modal; accept.
+6. Land on the empty dashboard; see the sidebar and footer.
+7. Click the locale switcher; see UI swap ES↔EN.
+8. Log out. Log back in. Disclaimer modal is not shown again (one-time acceptance recorded).
 
 ---
 
@@ -108,7 +121,7 @@ End of Slice 0.
 - **No rule-set chip in footer** (C-3).
 - **No Modelo 720 banner** (no foreign-asset-value concept yet).
 - **No Art. 7.p** (Slice 2).
-- **No scenario modeler, no sell-now** (preview-only stubs exist in the nav but open to the free-tier blurred-layout state from UX D-9; that state is just a visual, no compute).
+- **No scenario modeler, no sell-now** (nav links exist but open to "próximamente" placeholders — no blurred preview state, since there's no paid gate to preview).
 - **No export.**
 - **No FX conversion** on the dashboard.
 
@@ -155,7 +168,7 @@ End of Slice 1.
 - Still **no tax numbers**.
 - Still **no FX conversion**.
 - Still **no Modelo 720 threshold-crossing alert** (the passive banner pattern ships in Slice 3).
-- No billing / paid tier yet.
+- No billing ever in v1 (v1.2 PoC scope).
 - No sell-now, no scenarios.
 
 ### T-shirt
@@ -168,37 +181,35 @@ End of Slice 1.
 
 ---
 
-## Slice 3 — Paid shell + Modelo 720 passive UX
+## Slice 3 — FX pipeline + Modelo 720 passive UX
 
 ### Scope one-liner
-Stripe Tax is integrated, free-vs-paid gating is live everywhere, and the Modelo 720 threshold UI (alert + worksheet stub — not the worksheet PDF yet) works.
+The ECB FX ingestion pipeline stands up, EUR conversion lights up on the dashboard, and the Modelo 720 threshold UI (alert only — not the worksheet PDF yet) works. **No billing. No Stripe. No paid/free gating. Every feature is available to every account** (v1.2 PoC scope).
 
 ### Entry state
 End of Slice 2.
 
 ### Exit state
-- **Billing** via Stripe Tax (OQ-03). Subscription upgrade flow; VAT applied per jurisdiction; invoice issued. Grace-period logic (OQ-05, 90 days read-only then soft-delete) stubbed — it only matters once users can cancel, but the subscription state machine is complete.
-- **Feature matrix screen** (US-012 AC #1) listing free vs paid.
-- **Preview-only state** on scenario modeler and sell-now screens per UX D-9 (`€•,•••` pattern). No compute yet, so the paid state is still "coming soon" — Slice 4/5 ship the actual engine.
-- **Modelo 720 threshold alert** (US-007 ACs 1, 2, 4) against the user-entered totals + the grant-side securities number. The securities number **now requires FX** — so this slice also stands up the ECB FX ingestion pipeline (ADR-007). FX is the pre-req for any EUR-denominated number.
-- **Dashboard paper-gains tile** displays gains in EUR for the first time (uses ECB FX, bands at 0% / 1.5% / 3% per UX and ADR-007).
-- **Rule-set chip in footer** on pages that now carry an FX-dependent number. **Note: no tax rule-set yet** — what the chip surfaces in Slice 3 is ECB FX date + Orbit engine version. The full tax rule-set stamping starts in Slice 4.
+- **ECB FX ingestion pipeline** per ADR-007: worker fetches the ECB eurofxref-daily.xml at ~17:00 Madrid; non-publication-day fallback walks back ≤7 days with staleness indicator; bootstrap-ingest 90-day historical on first worker startup; user overrides persisted per-calculation.
+- **`fx_rates` table populated** per ADR-005.
+- **Dashboard paper-gains tile** displays gains in EUR for the first time (uses ECB FX, bands at 0% / 1.5% / 3% per UX and ADR-007). Paper gains = (current price − grant price) × shares, converted to EUR. Current price is user-entered at this slice (Finnhub wires up in Slice 5 when it is decision-load-bearing).
+- **Modelo 720 threshold alert** (US-007 ACs 1, 2, 4) against the user-entered totals + the grant-side securities number. The securities number requires FX — that's why M720 alert rides with the FX pipeline in the same slice.
+- **Rule-set chip in footer** on pages that now carry an FX-dependent number. No tax rule-set yet — the chip surfaces ECB FX date + Orbit engine version in Slice 3. Full tax rule-set stamping starts in Slice 4.
 
 ### Explicit non-goals
-- **No tax math on the dashboard still.** Paper gains = (current price − grant price) × shares, converted to EUR. No IRPF projection.
+- **No Stripe, no billing, no subscription state, no VAT handling, no feature matrix screen, no preview-only blurred state, no `subscriptions` table.** All of this is permanently out of v1 PoC scope (v1.2 decision).
+- **No tax math on the dashboard still.** No IRPF projection.
 - **No Modelo 720 worksheet PDF export** (Slice 6).
 - **No scenarios, no sell-now compute** (Slices 4–5).
-- **No market-data vendor** yet (the dashboard paper-gains can use user-entered current price in this slice; Finnhub wires up in Slice 5 when it is decision-load-bearing).
+- **No market-data vendor** yet (current price is user-entered in this slice).
 
 ### T-shirt
-**M.** Billing is always fiddly but Stripe Tax removes the tax-compliance burden; the ECB pipeline is bounded (ADR-007 is explicit).
+**M.** The ECB pipeline is bounded (ADR-007 is explicit); M720 alert is form + threshold; paper-gains tile is a formula with band rendering.
 
 ### Dependencies
 - Slice 2 complete.
-- Stripe account, Stripe Tax enabled, webhook endpoint provisioned.
 - ADR-007 ECB pipeline.
-- `fx_rates` and `subscriptions` tables populated per ADR-005.
-- **OQ-10 procurement** — professional indemnity insurance confirmed before this slice closes (since paid-tier cap is now open).
+- `fx_rates` table populated per ADR-005.
 
 ---
 
@@ -216,7 +227,7 @@ End of Slice 3.
 - **País Vasco / Navarra block** (US-006 AC #2) displays on tax-calc screens; free-tier surfaces unchanged.
 - **Beckham block** (US-004 AC #3) displays on tax-calc screens when flag = Yes.
 - **Rule-set `es-2026.1.0`** authored as YAML, reviewed, published to `rule_sets` table. Content hash + AEAT guidance date stamped.
-- **Scenario modeler** (US-004) fully functional, paid. Sensitivity per US-010. Uncertainty patterns per UX §7 (C for headline, B for sub-totals, A for tabular).
+- **Scenario modeler** (US-004) fully functional. Sensitivity per US-010. Uncertainty patterns per UX §7 (C for headline, B for sub-totals, A for tabular).
 - **Export traceability IDs** generated on each calculation; visible on the scenario result page. Export **artefact generation** ships in Slice 6.
 - **"Recompute under current rule set"** affordance ships dormant (C-9).
 - **Modelo 720 scenario-crossing alert** (US-004 AC #4 and US-007 AC #2) now fires during scenario compute.
@@ -248,7 +259,7 @@ US-013 fully delivered: post-IPO user enters lots, sees net-EUR-landing with ban
 End of Slice 4.
 
 ### Exit state
-- **Finnhub** integration per ADR-006. 15-min cache in `market_quotes_cache`. Staleness UX wired (ADR-006 + UX §4.2).
+- **Finnhub** integration per ADR-006, **on the free/dev tier** for this slice. 15-min cache in `market_quotes_cache`. Staleness UX wired (ADR-006 + UX §4.2). Commercial-tier contract + ToS-confirmed-for-SaaS-redistribution is a Slice 8 launch-blocker (same for the Twelve Data standby contract).
 - **Sell-now screen** (US-013). All ACs.
 - **ESPP Spanish-tax calculator** (US-008), called by both scenario modeler retroactively (if needed) and sell-now at compute time.
 - **NSO same-day exercise-and-sell** bargain-element computation (US-013 AC #4).
@@ -270,8 +281,9 @@ End of Slice 4.
 
 ### Dependencies
 - Slice 4 complete.
-- Finnhub commercial-tier contract signed and ToS-confirmed for SaaS redistribution (ADR-006 launch-blocker; OQ-13 escalation).
-- Twelve Data standby contract also in place (ADR-006 resilience).
+- Finnhub free/dev API key (sufficient for this slice).
+- Finnhub commercial-tier contract signed and ToS-confirmed for SaaS redistribution (ADR-006 launch-blocker; OQ-13 escalation) — **moved to Slice 8**, since it gates real-user exposure, not local development.
+- Twelve Data standby contract also in place (ADR-006 resilience) — **moved to Slice 8** for the same reason.
 
 ---
 
@@ -306,10 +318,10 @@ End of Slice 5.
 
 ---
 
-## Slice 7 — GDPR DSR self-service + 2FA mandatory + pen-test
+## Slice 7 — GDPR DSR self-service + 2FA mandatory
 
 ### Scope one-liner
-The compliance and security bar for public paid launch.
+The code-side compliance and security bar. Internal-readiness gate. Everything that requires a production environment or a published legal surface moves to Slice 8.
 
 ### Entry state
 End of Slice 6.
@@ -317,63 +329,120 @@ End of Slice 6.
 ### Exit state
 - **US-011 ACs in full:** data export (access/portability) with 7-day self-service SLA / 30-day hard SLA. Two-step account deletion with 30-day grace. Rectification-request form. Restrict-processing action.
 - **Account → Data & privacy screen** (UX §4.5) delivers all four DSR actions.
-- **TOTP 2FA mandatory for paid users** (OQ-01 resolution at v1.1). Recovery-code flow. Opt-in for free users.
-- **Third-party pen-test** completed; findings resolved (§7.9).
-- **DPA** published for paid users. Sub-processor list published.
-- **Breach-notification runbook** exercised in tabletop (§7.2).
+- **TOTP 2FA optional for every user** (v1.2 PoC scope; OQ-01 mandatory-for-paid resolution is moot now that there is no paid tier). Recovery-code flow implemented. Users can enable, disable, and reset TOTP from the Account screen.
 - **Audit-log pseudonymization on erasure** verified (ADR-005 + security-engineer follow-up).
+- **DPA draft** written and reviewed; **sub-processor register draft** written and reviewed. Publication is Slice 8 (once the public surface exists to publish on).
+- **Breach-notification runbook draft** written; ES/EN templates drafted. Tabletop exercise is Slice 8.
 
 ### Explicit non-goals
 - No additional jurisdictions.
 - No additional personas.
 - No additional instruments.
+- **No third-party pen-test** — moved to Slice 8 because a pen-test requires the production stack (Hetzner + Caddy + nftables + real Postgres networking), not a developer laptop.
+- **No DPA publication, no sub-processor list publication, no breach-notification tabletop** — all moved to Slice 8 for the same reason (public surface + operational stack).
 
 ### T-shirt
-**M.** Mostly wiring known pieces together. The pen-test may surface work that expands this slice; budget accordingly.
+**M.** Mostly wiring known pieces together.
 
 ### Dependencies
 - Slice 6 complete.
-- Pen-test vendor engaged.
+
+---
+
+## Slice 8 — Production deployment & launch gate
+
+### Scope one-liner
+Stand up the Hetzner production stack, close every ADR-015 §0b item, complete the commercial/legal cutovers deferred from Slices 3/5/7, run the pen-test, and open to external users. No feature work.
+
+### Entry state
+End of Slice 7. Orbit runs end-to-end on a developer machine against Docker Compose Postgres + Vite dev server. Every feature is built, tested, and polished locally. No external user has touched the system.
+
+### Exit state — ADR-015 §0b closed
+- **Hetzner Cloud Falkenstein** VMs provisioned per ADR-002 (CX22 API+worker+Caddy, CX32 self-managed Postgres). At-rest encryption enabled (S0-11).
+- **Caddy TLS 1.3 + Let's Encrypt** on `app.orbit.<tld>`; HSTS observable end-to-end (S0-12, S0-13 final).
+- **nftables deny-default outbound + allowlist** on the API host (S0-15). HIBP endpoint (SEC-149) and ECB endpoint explicit allowlist entries.
+- **Postgres private-network binding** + `pg_hba.conf` TLS-required; `orbit_app` no BYPASSRLS, no superuser (S0-16 final shape). The `orbit_app` / `orbit_support` role split shipped in 0a carries through unchanged.
+- **Secrets via systemd `LoadCredential=`** on the API host (S0-19 final shape). Local `.env` no longer in the execution path.
+- **MFA enabled on every live operational account:** Hetzner, registrar, DNS / Bunny.net, email provider, Finnhub, Twelve Data (S0-20 live-account set).
+- **`deploy.yaml` workflow enabled** with full-history gitleaks (S0-01 final), production GitHub Environment with manual-review reviewers (S0-06 final), SBOM uploaded to release store (S0-10 final). Atomic symlink swap per ADR-013.
+- **Nightly `pg_basebackup` + WAL archive + `age`-encrypted to Hetzner Storage Box** (S0-26).
+- **End-to-end restore drill** performed and dated in the runbook (S0-27).
+- **Uptime monitor** (Better Stack or equivalent, EU-residency verified) pinging `/healthz`; alert route tested with a synthetic outage (S0-28).
+- **Privacy policy + sub-processor register published** on the public site (S0-29, absorbing the Slice 7 deferral).
+- **Incident-response runbook + AEPD 72-hour timer + ES/EN breach-notification templates** finalized (S0-30, absorbing the Slice 7 deferral).
+- **Breach-notification tabletop exercise** run against the published runbook (moved from Slice 7).
+
+### Exit state — commercial / legal cutovers
+- **Finnhub commercial-tier contract signed** and ToS explicitly confirmed for SaaS redistribution of delayed quotes (ADR-006 launch-blocker; OQ-13). Twelve Data standby contract also in place (ADR-006 resilience). Both moved from Slice 5.
+- **DPA published** for users (moved from Slice 7). No paid/free distinction applies since the PoC has no tier split (v1.2); whatever terms cover external usage apply to every account equally.
+- **Sub-processor list published** (moved from Slice 7; joins the S0-29 privacy policy on the same page).
+- **Third-party pen-test** completed against the production stack; findings resolved or risk-accepted with security-engineer sign-off (moved from Slice 7 because it requires real infra; §7.9).
+
+### Explicit non-goals
+- No new features. This slice is pure productionization + procurement + validation.
+- No new personas, jurisdictions, or instruments.
+- No post-launch ops tooling (auto-scaling, blue/green, canary) — out of v1 scope; the single-VM atomic-symlink model from ADR-013 is the launch shape.
+
+### T-shirt
+**L.** ~2–3 days of deploy-shaped work per ADR-015, plus external-dependency cycles that overlap: Finnhub commercial negotiation, pen-test vendor engagement and report cycle. Internal-facing work is small; external-facing work sets the calendar.
+
+### Dependencies
+- Slice 7 complete.
+- **Procurement (owner: Ivan):** Hetzner, Bunny.net, Storage Box, Object Storage, domain registrar, DNS, outbound email (Postmark EU or SES EU), Better Stack or alternative uptime monitor, pen-test vendor, Finnhub commercial-tier, Twelve Data standby.
 - AEPD breach-notification contact confirmed.
+- Security-engineer signs off the ADR-015 §0b item set against the deployed stack (the "amber" items from 0a close here).
+
+### Demo script
+1. Merge-to-main triggers `deploy.yaml` (now enabled); atomic symlink swap rolls HEAD to `app.orbit.<tld>`.
+2. Open `https://app.orbit.<tld>` from an EU IP; TLS 1.3 + HSTS verified with `curl -I` from a clean session.
+3. Run the Slice 7 demo (DSR export, account deletion with 30-day grace, optional TOTP enabled on the demo account) end-to-end against the production stack.
+4. Trigger a DSR export; confirm the archive lands in Object Storage with traceability stamped and that the download link honours the 7-day self-service SLA.
+5. `systemctl stop orbit-api` on the production host; confirm the uptime monitor alert fires on the chosen route within its configured threshold; restart; confirm resolve-notification.
+6. Perform a restore-drill from the latest `pg_basebackup` + WAL into a scratch instance; compare row counts; date the drill in the runbook.
+7. Review the pen-test report; confirm no open blockers; publish privacy policy, sub-processor list, and DPA.
 
 ---
 
 ## Dependencies graph
 
 ```
-[Slice 0: shell] → [Slice 1: first grant] → [Slice 2: portfolio fullness]
-                                                  ↓
-                                         [Slice 3: paid + FX + M720 passive]
-                                                  ↓
-                                         [Slice 4: tax engine + scenarios]
-                                                  ↓
-                                         [Slice 5: sell-now]
-                                                  ↓
-                                         [Slice 6: exports + recompute]
-                                                  ↓
-                                         [Slice 7: DSR + 2FA + pen-test]
-                                                                 ↓
-                                                           LAUNCH GATE
+[Slice 0a: local shell] → [Slice 1: first grant] → [Slice 2: portfolio fullness]
+                                                         ↓
+                                              [Slice 3: FX + M720 passive]
+                                                         ↓
+                                              [Slice 4: tax engine + scenarios]
+                                                         ↓
+                                              [Slice 5: sell-now (Finnhub dev tier)]
+                                                         ↓
+                                              [Slice 6: exports + recompute]
+                                                         ↓
+                                              [Slice 7: DSR + 2FA]  ← internal-readiness gate
+                                                         ↓
+                                              [Slice 8: production deploy + pen-test + cutovers]
+                                                         ↓
+                                                  PUBLIC LAUNCH GATE
 ```
 
-No parallelism in the critical path; this is a single-engineer v1 (ADR-001 rationale). Parallelizable items, if a second engineer ever joins:
+No parallelism in the critical path; this is a single-engineer v1 (ADR-001 rationale). Parallelizable items, if a second engineer ever joins, or that Ivan can interleave solo:
 
-- Slice 2 CSV import can run in parallel with Slice 3 billing.
+- Slice 2 CSV import can run in parallel with the Slice 3 ECB FX pipeline.
 - Slice 6 PDF generator can start during Slice 5.
-- Slice 7 pen-test engagement runs asynchronously during Slice 5/6.
+- Slice 8 pen-test vendor engagement and Finnhub commercial negotiation should start during Slice 6 or 7 because they have long external lead times; code-side Slice 8 work only begins once Slice 7 is green.
+- Slice 8 procurement (Hetzner/DNS/registrar/email/uptime) can be staged during Slice 7 without blocking Slice 7's code-side work.
 
 ## Cross-slice acceptance checks
 
 These apply to every slice from the moment they become relevant:
 
-1. **"No es asesoramiento fiscal" disclaimer**: footer on every page from Slice 0 onward; modal at signup from Slice 0 onward; export confirm from Slice 6 onward; artefact stamping from Slice 6 onward.
+1. **"No es asesoramiento fiscal" disclaimer**: footer on every page from Slice 0a onward; modal at signup from Slice 0a onward; export confirm from Slice 6 onward; artefact stamping from Slice 6 onward.
 2. **Ranges-and-sensitivity**: from Slice 4 onward, every projected tax number renders per UX §7 patterns.
-3. **GDPR**: data-minimization in analytics applies from Slice 0. DSR self-service is Slice 7.
+3. **GDPR**: data-minimization in analytics applies from Slice 0a. DSR self-service is Slice 7. **Public legal surface (privacy policy, sub-processor list, DPA) is Slice 8** — before Slice 8, there is no public surface to publish on and no external user to be covered.
 4. **Accessibility**: every slice's new screens must pass `axe` smoke in CI and keyboard-tab-order review.
 5. **i18n**: every UI string shipped in ES first; EN fallback before the slice closes.
 6. **Rule-set stamping**: every calculation from Slice 4 onward stamps `(rule_set_id, content_hash, inputs_hash, result_hash, engine_version)` per ADR-004.
-7. **EU-only data plane**: no service added inside a slice without confirming EEA-only data-path (§7.2). Particular scrutiny for Finnhub (Slice 5) and Stripe (Slice 3) as US-headquartered processors — SCCs + processor map updated.
+7. **EU-only data plane**: no service added inside a slice without confirming EEA-only data-path (§7.2). Particular scrutiny for Finnhub (Slices 5/8) as a US-headquartered processor — SCCs + processor map updated. Dev-tier Finnhub usage in Slice 5 does not ship PII (only tickers + API key); the full processor-map sign-off is a Slice 8 gate before external users onboard. Stripe is no longer in scope (v1.2 PoC: no billing, no Stripe integration).
+8. **No external user before Slice 8.** Slices 0a–7 are for the product owner's own use on `localhost` only. The moment external users (beta testers, paying customers, anyone not Ivan) need access, Slice 8 must have closed.
 
 ## Handoff
 
-> **Next:** invoke `solution-architect` with `/Users/ivan/Development/projects/orbit/docs/requirements/v1-slice-plan.md` and `/Users/ivan/Development/projects/orbit/docs/requirements/slice-1-acceptance-criteria.md` to produce the Slice 0 + Slice 1 technical design (concrete DDL for `users`, `sessions`, `audit_log`, `dsr_requests`, `grants`, `vesting_events`, `residency_periods`; the vesting-derivation algorithm; the sign-up wizard state machine; the auth cookie / session strategy). Slices 2+ can be designed lazily as each approaches.
+> **Next:** Slice 0a is in flight and largely landed against ADR-014. When Slice 0a is fully green, begin Slice 1 per `slice-1-acceptance-criteria.md` and ADR-014. Slices 2+ can be designed lazily as each approaches. Slice 8 planning (procurement + vendor engagement) can start during Slice 6–7; Slice 8 *execution* begins only once Slice 7 is green.

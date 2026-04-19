@@ -1,9 +1,33 @@
 # ADR-015: Slice 0 local-first scope split (0a / 0b)
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-04-19 — see "Amendment 2026-04-19" below)
 - **Date:** 2026-04-18
 - **Deciders:** Ivan (owner)
-- **Traces to:** ADR-013 (amends; original Slice 0 blueprint), ADR-014 (supersedes the §"Upstream ambiguities resolved unilaterally" item 7 interim mitigation path), `docs/implementation-handoff.md` §2/§6 (G-1), `docs/security/security-checklist-slice-0.md` S0-01..S0-30, `docs/requirements/v1-slice-plan.md` Slice 0.
+- **Traces to:** ADR-013 (amends; original Slice 0 blueprint), ADR-014 (supersedes the §"Upstream ambiguities resolved unilaterally" item 7 interim mitigation path), `docs/implementation-handoff.md` §2/§6 (G-1), `docs/security/security-checklist-slice-0.md` S0-01..S0-30, `docs/requirements/v1-slice-plan.md` Slice 0 / Slice 8.
+
+## Amendment 2026-04-19 — 0b deferred to Slice 8
+
+**What changed.** The product owner decided on 2026-04-19 to defer cloud deployment to the end of the v1 build, after every feature slice is complete and polished. Concretely:
+
+- **0b is no longer a "before Slice 2 or 3" checkpoint.** It becomes a self-contained final slice — **Slice 8 — Production deployment & launch gate** — authored in `docs/requirements/v1-slice-plan.md` v1.1.
+- **The per-item mapping below (0a / 0b columns) is unchanged.** Every ticked 0b item still needs to happen; only the *when* moves.
+- **The 0b trigger in the "Slice 0b trigger" section below is superseded by** the Slice 8 trigger: 0b work executes as Slice 8, begins once Slice 7 is green, and closes before any external user (free or paid) is onboarded. There is no earlier trigger.
+- **Slice 7's scope narrows** to match: third-party pen-test, DPA publication, sub-processor list publication, and breach-notification tabletop all move from Slice 7 to Slice 8 because each requires the production stack or a public surface that does not exist before Slice 8.
+- **Slice 3 Stripe** runs in test mode through Slice 7; live-mode cutover and the production webhook endpoint are a Slice 8 step.
+- **Slice 5 Finnhub** runs on the free/dev tier through Slice 7; the commercial-tier contract + ToS-confirmed-for-SaaS-redistribution is a Slice 8 launch-blocker (same for the Twelve Data standby contract).
+
+**What did not change.**
+
+- The 0a / 0b scope split itself. Every app-level control Slice 0a covered is still covered by Slice 0a; every deploy-level control 0b owned is still owned by 0b.
+- The ADR-014 §"Upstream ambiguities" item 7 supersession (the `orbit_support` role is provisioned in the 0a init migration, and the `audit_log` grants shipped in 0a are the final shape).
+- The threat-model posture — the Consequences note below about "threat envelope incomplete until 0b" still applies: the envelope is incomplete until Slice 8 closes, and the mitigation remains "no external user exposed to the stack until that gate closes."
+
+**Why this is safe.** 0a already covers every app-level control the threat model names. The deferred set is entirely deploy-level — Hetzner VMs, TLS on a public domain, nftables, offsite backups, uptime monitor, published legal surface, and the pen-test against real infra. None of it is exercised while only the product owner uses the app on `localhost`. Moving the checkpoint to the end of v1 does not change the work required; it changes when the work is scheduled, matched to the first moment the deploy-level envelope is load-bearing (i.e., when an external user is imminent).
+
+**Operational implication.** The "amber" 0b items called out in the Consequences section remain amber for longer. The security-engineer sign-off record must continue to enumerate them and re-confirm them at Slice 8 close rather than at the previously scoped "before Slice 2 or 3" checkpoint.
+
+---
+
 
 ## Context
 
@@ -74,12 +98,16 @@ Seeded from the checklist; refined where a single item splits across both checkp
 
 ### Slice 0b trigger
 
-0b closes **before any external user** (free or paid) is onboarded, and **no later than before Slice 2 or 3 ships**, whichever is sooner. Re-evaluate at the end of Slice 1 acceptance:
+> **Superseded 2026-04-19** by the amendment at the top of this ADR. 0b work executes as **Slice 8 — Production deployment & launch gate** in `docs/requirements/v1-slice-plan.md` v1.1. The original trigger text below is retained for historical context.
+
+*Original text (2026-04-18):* 0b closes **before any external user** (free or paid) is onboarded, and **no later than before Slice 2 or 3 ships**, whichever is sooner. Re-evaluate at the end of Slice 1 acceptance:
 
 - If Slice 1 demos internally only, 0b can continue in parallel with Slice 2 planning.
 - If an external user is imminent, 0b blocks onboarding.
 
 The product owner is the authority on this gate. The security-engineer signs off 0b against the deferred items listed above.
+
+*Current trigger (post-amendment):* 0b work executes as a single concentrated slice at the end of v1 (Slice 8), begins once Slice 7 is green, and closes before any external user is onboarded. The "no later than before Slice 2 or 3" condition is removed because the product owner commits not to onboard external users until Slice 8 closes.
 
 ## Consequences
 
