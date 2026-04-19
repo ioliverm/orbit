@@ -38,6 +38,7 @@ thiserror = "2"
 # ADR-011 names the `argon2` + `rand` + `subtle` stack explicitly.
 argon2 = "0.5"
 hmac = "0.12"
+sha1 = "0.10"          # HIBP k-anonymity only (ADR-011); not used for integrity.
 sha2 = "0.10"
 rand = "0.8"           # OsRng for CSPRNG, per ADR-011
 subtle = "2"
@@ -47,3 +48,25 @@ cookie = "0.18"
 # URL_SAFE_NO_PAD, which `base64::engine::general_purpose::URL_SAFE_NO_PAD`
 # provides directly and is the de-facto default across the ecosystem.
 base64 = "0.22"
+# --- Slice 1 (T9) additions.
+# chrono already pulled transitively via sqlx; promote to a workspace dep so
+# the vesting module and handlers speak the same `NaiveDate` / `DateTime` API.
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.7", features = ["macros"] }
+axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "limit", "request-id", "set-header", "timeout", "trace", "util"] }
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+bytes = "1"
+clap = { version = "4", features = ["derive", "env"] }
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+validator = { version = "0.18", features = ["derive"] }
+utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
+async-trait = "0.1"
+futures-util = "0.3"
