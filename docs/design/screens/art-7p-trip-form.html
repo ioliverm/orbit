@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Viajes Art. 7.p</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  art-7p-trip-form.html — Slice 2 §5 (AC-5.1..AC-5.3).
+
+  Route:   /app/compliance/art-7p          (list + annual-cap tracker; AC-5.1.*)
+           /app/compliance/art-7p/new      (form; AC-5.2.*)
+           /app/compliance/art-7p/:id/edit (form, pre-populated; AC-5.3.2)
+
+  Entry points:
+    - Sidebar "Cumplimiento → Viajes Art. 7.p" (was a próximamente stub in Slice 1, now live).
+    - Profile page "Art. 7.p — desplazamientos" section (link-out only; data-capture lives here).
+
+  Slice-2 scope reminder (US-005 calculation deferred to Slice 4):
+    - Trip facts + five-criterion eligibility checklist are CAPTURED.
+    - No calculation: no pro-rata, no €60 100 cap math, no overlap/domestic rejection.
+    - The chip on each list row says "Apto" / "X/5" only as a capture summary (AC-5.1.2);
+      it NEVER says "exento" / "no exento" in Slice 2 (§14 do-not-flag).
+
+  Fact fields (AC-5.2.1):
+    destination_country  ISO-3166 alpha-2 (searchable by ES name)
+    from_date            date, required
+    to_date              date, required, >= from_date (AC-5.2.4)
+    purpose_text         <=500 chars, required, non-blank
+    employer_paid        boolean, required, default No
+
+  Eligibility checklist (AC-5.2.2): five yes/no radio groups, all required
+  before save (AC-5.2.3). Labels in ES + EN; each criterion has a plain-
+  language help affordance (NOT legal text). Color is never the sole signal
+  (G-23 extended): each radio carries explicit Sí / No text.
+
+  Soft hints (non-blocking):
+    - destination_country = "ES" → advisory banner (AC-5.2.7)
+    - to_date > today + 365 → future-date warning (AC-5.2.5)
+
+  Edit-mode delete uses the Slice-1 grant-delete two-step confirm pattern
+  (modal). In this reference file both list+form states render stacked so
+  the engineer sees the shape of both.
+
+  Data minimization (G-26 extended): analytics events carry only
+  { surface: "art_7p_trip", verb: "create|update|delete" }. No destination,
+  dates, employer_paid, purpose text, or checklist answers leak to analytics.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+
+    <nav class="sidebar__group" aria-label="Cartera">
+      <div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="multi-grant-dashboard.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Decisiones">
+      <div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="#">Sell-now <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Escenarios <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Cumplimiento">
+      <div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link sidebar__link--active" href="art-7p-trip-form.html" aria-current="page">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="modelo-720-inputs.html">Modelo 720</a>
+      <a class="sidebar__link" href="#">Exports <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group mt-auto" aria-label="Cuenta">
+      <div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="residency-setup.html">Perfil y residencia</a>
+      <a class="sidebar__link" href="session-management.html">Sesiones activas</a>
+      <a class="sidebar__link" href="dsr-self-service.html">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Cumplimiento / <strong>Viajes Art. 7.p</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma (ES / EN)">ES · EN</button>
+        <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="page-title">
+        <div>
+          <h1>Viajes Art. 7.p</h1>
+          <div class="page-title__meta">
+            Registro de desplazamientos al extranjero cuyo beneficio revierte en una entidad no residente en España. En Slice 2 sólo capturamos datos; el motor fiscal evalúa la exención en Slice 4.
+          </div>
+        </div>
+        <div class="row gap-2">
+          <a class="btn btn--primary btn--sm" href="#trip-form">+ Añadir viaje</a>
+        </div>
+      </div>
+
+      <!-- trips list — fragment that renders on /app/compliance/art-7p (AC-5.1.2) -->
+      <section aria-label="Lista de viajes registrados" class="mb-8">
+        <div class="section-head">
+          <div class="section-head__title">
+            <h2>Viajes registrados</h2>
+            <div class="section-head__sub">Ordenados por fecha de inicio, más recientes primero. Haz clic en una fila para editar.</div>
+          </div>
+          <div class="row gap-2">
+            <label class="field__label text-xs" for="year-select">Año fiscal</label>
+            <select class="select" id="year-select" name="year" aria-describedby="year-hint">
+              <option value="2026" selected>2026</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card card--flush mb-4">
+          <!-- Column headers -->
+          <div class="trip-row" aria-hidden="true">
+            <div class="muted text-xs">FECHAS</div>
+            <div class="muted text-xs">DESTINO</div>
+            <div class="muted text-xs">EMPLEADOR PAGÓ</div>
+            <div class="muted text-xs">MOTIVO</div>
+            <div class="muted text-xs">CRITERIOS</div>
+          </div>
+
+          <!-- Row 1: fully-captured trip (5/5) -->
+          <div class="trip-row" tabindex="0" role="button" aria-label="Editar viaje United States 2026-03-01 al 2026-04-15">
+            <div class="trip-row__dates">2026-03-01 → 2026-04-15</div>
+            <div class="trip-row__country">🇺🇸 United States (US)</div>
+            <div><span class="badge">Sí</span></div>
+            <div class="trip-row__purpose">Kickoff with NYC team, engineering reviews</div>
+            <div><span class="pill pill--full">Apto · 5/5</span></div>
+          </div>
+
+          <!-- Row 2: partially-captured (3/5), user needs to review -->
+          <div class="trip-row" tabindex="0" role="button" aria-label="Editar viaje United Kingdom 2026-02-10 al 2026-02-14">
+            <div class="trip-row__dates">2026-02-10 → 2026-02-14</div>
+            <div class="trip-row__country">🇬🇧 United Kingdom (GB)</div>
+            <div><span class="badge">Sí</span></div>
+            <div class="trip-row__purpose">Customer on-site, London HQ</div>
+            <div><span class="pill pill--partial">Capturado · 3/5</span></div>
+          </div>
+
+          <!-- Row 3: intra-Spain (advisory; 2/5) -->
+          <div class="trip-row" tabindex="0" role="button" aria-label="Editar viaje España 2026-05-01 al 2026-05-03">
+            <div class="trip-row__dates">2026-05-01 → 2026-05-03</div>
+            <div class="trip-row__country">🇪🇸 España (ES)</div>
+            <div><span class="badge">Sí</span></div>
+            <div class="trip-row__purpose">Reunión regional en Barcelona</div>
+            <div><span class="pill pill--empty">Capturado · 2/5</span></div>
+          </div>
+        </div>
+
+        <!-- Annual-cap tracker (read-only; AC-5.1.3, AC-5.1.4) -->
+        <div class="cap-tracker" aria-label="Tope anual Art. 7.p">
+          <div class="stack gap-1">
+            <span class="card__label">Días declarados en 2026</span>
+            <span class="cap-tracker__value">48 días</span>
+            <span class="cap-tracker__meta">Suma de días de los viajes del año seleccionado, ambos extremos incluidos.</span>
+          </div>
+          <div class="stack gap-1">
+            <span class="card__label">Tope anual (referencia)</span>
+            <span class="cap-tracker__value mono">€60.100</span>
+            <span class="cap-tracker__meta">No aplicado en esta fase. El motor fiscal lo evalúa en Slice 4.</span>
+          </div>
+        </div>
+
+        <p class="muted text-xs mt-3" id="year-hint">
+          La cifra en días es un recuento de calendario; no aplica ningún cálculo de pro-rata ni de solape entre viajes (Slice 4).
+        </p>
+
+        <!-- Empty state reference (AC-5.1.1) -->
+        <div class="card mt-5">
+          <div class="card__label">Estado vacío — referencia</div>
+          <p class="muted text-sm mt-2">
+            Registra aquí los viajes profesionales al extranjero cuyo beneficio revirtió en una entidad no residente en España.
+            <br />
+            <span class="text-xs">EN · <em>Log here your professional trips abroad whose benefit accrued to a non-Spain-resident entity.</em></span>
+          </p>
+          <div class="row mt-3">
+            <a class="btn btn--primary btn--sm" href="#trip-form">+ Añadir viaje</a>
+          </div>
+        </div>
+      </section>
+
+      <hr class="divider" />
+
+      <!-- Form (new + edit use the same component) -->
+      <section id="trip-form" class="card mt-8" aria-labelledby="form-title">
+        <div class="section-head">
+          <div class="section-head__title">
+            <h2 id="form-title">Editar viaje — United States, 2026-03-01 → 2026-04-15</h2>
+            <div class="section-head__sub">
+              Mostrado en modo edición. En modo nuevo, los campos llegan vacíos y no se muestra la acción <em>Eliminar</em>.
+            </div>
+          </div>
+        </div>
+
+        <form class="stack gap-5" action="/api/v1/art-7p-trips/42" method="post" novalidate>
+
+          <!-- Fact fields -->
+          <div class="section-divider">Datos del desplazamiento</div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="country">País de destino</label>
+              <select class="select" id="country" name="destination_country" required aria-describedby="country-hint">
+                <option value="">— selecciona —</option>
+                <optgroup label="Frecuentes">
+                  <option value="US" selected>Estados Unidos (US)</option>
+                  <option value="GB">Reino Unido (GB)</option>
+                  <option value="DE">Alemania (DE)</option>
+                  <option value="FR">Francia (FR)</option>
+                  <option value="IE">Irlanda (IE)</option>
+                  <option value="PT">Portugal (PT)</option>
+                </optgroup>
+                <optgroup label="Todos los países">
+                  <option value="ES">España (ES)</option>
+                  <option value="AR">Argentina (AR)</option>
+                  <option value="BR">Brasil (BR)</option>
+                  <option value="CA">Canadá (CA)</option>
+                  <option value="MX">México (MX)</option>
+                  <option value="NL">Países Bajos (NL)</option>
+                  <option value="CH">Suiza (CH)</option>
+                </optgroup>
+              </select>
+              <p class="field__hint" id="country-hint">ISO 3166-1 alfa-2. Busca por nombre en español.</p>
+            </div>
+            <div class="field">
+              <label for="employer-paid">¿Gastos pagados por el empleador?</label>
+              <fieldset class="choice-group" id="employer-paid" role="radiogroup" aria-describedby="employer-paid-hint">
+                <label class="choice"><input type="radio" name="employer_paid" value="yes" checked /><span>Sí</span></label>
+                <label class="choice"><input type="radio" name="employer_paid" value="no" /><span>No</span></label>
+              </fieldset>
+              <p class="field__hint" id="employer-paid-hint">¿El empleador asumió los costes del viaje (vuelos, dietas, alojamiento)?</p>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="from-date">Fecha de inicio</label>
+              <input class="input" id="from-date" name="from_date" type="date" value="2026-03-01" required />
+              <p class="field__hint">Primer día fuera de España.</p>
+            </div>
+            <div class="field">
+              <label for="to-date">Fecha de fin</label>
+              <input class="input" id="to-date" name="to_date" type="date" value="2026-04-15" required aria-describedby="to-date-err" />
+              <p class="field__hint">Último día del viaje. Debe ser igual o posterior a la fecha de inicio.</p>
+              <p class="field__error" id="to-date-err" role="alert" hidden>⚠ La fecha de fin no puede ser anterior a la de inicio.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="purpose">Motivo / descripción</label>
+            <textarea class="textarea" id="purpose" name="purpose_text" maxlength="500" required aria-describedby="purpose-hint" rows="2">Kickoff with NYC team, engineering reviews</textarea>
+            <p class="field__hint" id="purpose-hint">Hasta 500 caracteres. Útil para tu asesor fiscal; no lo interpretamos.</p>
+          </div>
+
+          <!-- Soft advisory: destination_country == "ES" (AC-5.2.7). Hidden unless ES is selected. -->
+          <aside class="alert alert--warning" role="status" hidden>
+            <strong>Destino dentro de España</strong>
+            <p>Un viaje dentro de España no suele cumplir el Art. 7.p; confirma las respuestas de la lista de verificación antes de guardar.</p>
+          </aside>
+
+          <!-- Future-date warning (AC-5.2.5). Hidden by default. -->
+          <aside class="alert alert--warning" role="status" hidden>
+            <strong>Fecha muy futura</strong>
+            <p>La fecha de fin es más de un año posterior a hoy. Puedes continuar, pero revisa si es lo que querías registrar.</p>
+          </aside>
+
+          <!-- Eligibility checklist -->
+          <div class="section-divider">Criterios de elegibilidad Art. 7.p</div>
+          <p class="muted text-sm">
+            Capturamos tus respuestas para que el motor fiscal las evalúe en Slice 4.
+            <strong>Responde a los cinco criterios antes de guardar.</strong>
+            <span class="text-xs">EN · <em>Answer all five criteria before saving.</em></span>
+          </p>
+
+          <fieldset class="checklist" aria-label="Criterios de elegibilidad Art. 7.p">
+            <legend class="visually-hidden">Cinco criterios de elegibilidad Art. 7.p, uno por fila, responde Sí o No a cada uno.</legend>
+
+            <!-- 1 -->
+            <div class="checklist__item" role="radiogroup" aria-labelledby="crit-1-title">
+              <div class="checklist__num" aria-hidden="true">1</div>
+              <div class="checklist__body">
+                <div>
+                  <span class="checklist__title" id="crit-1-title">
+                    Servicios prestados fuera de España
+                  </span>
+                  <button class="checklist__help" type="button" aria-label="Ayuda para el criterio 1" title="Los servicios tienen que realizarse físicamente fuera del territorio español durante el viaje. Una videollamada desde Madrid a un cliente extranjero no cuenta.">?</button>
+                </div>
+                <span class="checklist__title-en">EN · Services rendered physically outside Spain</span>
+                <p class="checklist__hint">Si durante esos días trabajaste estando físicamente fuera de España, marca <strong>Sí</strong>. Teletrabajo desde España para un cliente extranjero no cuenta.</p>
+              </div>
+              <div class="checklist__answer">
+                <label class="choice"><input type="radio" name="c1_services_outside_spain" value="yes" checked /><span>Sí</span></label>
+                <label class="choice"><input type="radio" name="c1_services_outside_spain" value="no" /><span>No</span></label>
+              </div>
+            </div>
+
+            <!-- 2 -->
+            <div class="checklist__item" role="radiogroup" aria-labelledby="crit-2-title">
+              <div class="checklist__num" aria-hidden="true">2</div>
+              <div class="checklist__body">
+                <div>
+                  <span class="checklist__title" id="crit-2-title">
+                    Empleador no residente en España o establecimiento permanente beneficiario
+                  </span>
+                  <button class="checklist__help" type="button" aria-label="Ayuda para el criterio 2" title="Puede ser la matriz extranjera del grupo (p. ej. la matriz en EE. UU.) o el establecimiento permanente de una filial extranjera que se beneficia del trabajo.">?</button>
+                </div>
+                <span class="checklist__title-en">EN · Non-Spain-resident employer, or permanent establishment that benefits from the work</span>
+                <p class="checklist__hint">Por ejemplo, si trabajas para la filial española pero la matriz estadounidense (no residente) es la que se beneficia del servicio durante el viaje.</p>
+              </div>
+              <div class="checklist__answer">
+                <label class="choice"><input type="radio" name="c2_employer_non_spanish" value="yes" checked /><span>Sí</span></label>
+                <label class="choice"><input type="radio" name="c2_employer_non_spanish" value="no" /><span>No</span></label>
+              </div>
+            </div>
+
+            <!-- 3 -->
+            <div class="checklist__item" role="radiogroup" aria-labelledby="crit-3-title">
+              <div class="checklist__num" aria-hidden="true">3</div>
+              <div class="checklist__body">
+                <div>
+                  <span class="checklist__title" id="crit-3-title">
+                    País de destino no clasificado como paraíso fiscal
+                  </span>
+                  <button class="checklist__help" type="button" aria-label="Ayuda para el criterio 3" title="España mantiene una lista pública de jurisdicciones no cooperativas. Si el destino está en ella, el Art. 7.p no aplica. Si no estás seguro, consulta a tu asesor.">?</button>
+                </div>
+                <span class="checklist__title-en">EN · Country not on Spain's list of non-cooperative jurisdictions</span>
+                <p class="checklist__hint">Orbit no resuelve la lista por ti — responde según tu criterio o el de tu asesor.</p>
+              </div>
+              <div class="checklist__answer">
+                <label class="choice"><input type="radio" name="c3_country_not_tax_haven" value="yes" checked /><span>Sí</span></label>
+                <label class="choice"><input type="radio" name="c3_country_not_tax_haven" value="no" /><span>No</span></label>
+              </div>
+            </div>
+
+            <!-- 4 -->
+            <div class="checklist__item" role="radiogroup" aria-labelledby="crit-4-title">
+              <div class="checklist__num" aria-hidden="true">4</div>
+              <div class="checklist__body">
+                <div>
+                  <span class="checklist__title" id="crit-4-title">
+                    No aplicas otra exención equivalente
+                  </span>
+                  <button class="checklist__help" type="button" aria-label="Ayuda para el criterio 4" title="No puedes usar el Art. 7.p y a la vez otra exención equivalente para los mismos días trabajados en el extranjero. Ejemplo: dietas exentas por expatriación.">?</button>
+                </div>
+                <span class="checklist__title-en">EN · Not claiming an equivalent exemption elsewhere for the same days</span>
+                <p class="checklist__hint">Si para esos días ya aplicas exención por expatriación u otro régimen equivalente, marca <strong>No</strong>.</p>
+              </div>
+              <div class="checklist__answer">
+                <label class="choice"><input type="radio" name="c4_no_double_exemption" value="yes" checked /><span>Sí</span></label>
+                <label class="choice"><input type="radio" name="c4_no_double_exemption" value="no" /><span>No</span></label>
+              </div>
+            </div>
+
+            <!-- 5 -->
+            <div class="checklist__item" role="radiogroup" aria-labelledby="crit-5-title">
+              <div class="checklist__num" aria-hidden="true">5</div>
+              <div class="checklist__body">
+                <div>
+                  <span class="checklist__title" id="crit-5-title">
+                    Dentro del tope anual (€60 100)
+                  </span>
+                  <button class="checklist__help" type="button" aria-label="Ayuda para el criterio 5" title="Auto-declaración. Orbit no calcula si cruzas el tope — eso ocurre con el motor fiscal en Slice 4. Marca Sí si estimas que este viaje y los demás del año quedan por debajo.">?</button>
+                </div>
+                <span class="checklist__title-en">EN · Within the €60 100 annual cap (self-assertion)</span>
+                <p class="checklist__hint">Auto-declaración. Considera todos los viajes Art. 7.p del año, incluido éste.</p>
+              </div>
+              <div class="checklist__answer">
+                <label class="choice"><input type="radio" name="c5_within_cap" value="yes" checked /><span>Sí</span></label>
+                <label class="choice"><input type="radio" name="c5_within_cap" value="no" /><span>No</span></label>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- Inline rejection preview (AC-5.2.3). Hidden by default. -->
+          <p class="field__error" role="alert" hidden>⚠ Responde a los cinco criterios antes de guardar.</p>
+
+          <hr class="divider" />
+
+          <div class="row row--between row--wrap gap-3">
+            <!-- Destructive action; edit mode only (AC-5.3.3). Two-step confirm modal below. -->
+            <button class="btn btn--danger btn--sm" type="button" aria-haspopup="dialog" aria-controls="delete-modal">Eliminar viaje</button>
+            <div class="row gap-2">
+              <a class="back-link" href="#">← Cancelar</a>
+              <button class="btn btn--primary" type="submit">Guardar desplazamiento</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- Two-step delete confirm (Slice-1 precedent pattern; reference state, shown open) -->
+      <div class="modal-backdrop" id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="del-title" hidden>
+        <div class="modal">
+          <div class="modal__header">
+            <h3 id="del-title">Eliminar este viaje</h3>
+          </div>
+          <div class="modal__body">
+            <p>Vas a eliminar el desplazamiento <strong>United States · 2026-03-01 → 2026-04-15</strong>. Esta acción es irreversible y elimina también las respuestas de la lista de verificación asociadas al viaje.</p>
+            <p class="muted text-sm">Escribe <span class="mono">ELIMINAR</span> para confirmar.</p>
+            <input class="input" aria-label="Confirmación" placeholder="ELIMINAR" />
+          </div>
+          <div class="modal__footer">
+            <button class="btn btn--secondary" type="button">Cancelar</button>
+            <button class="btn btn--danger" type="button">Eliminar viaje</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

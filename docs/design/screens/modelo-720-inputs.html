@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Perfil y residencia · Modelo 720</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  modelo-720-inputs.html — Slice 2 §6 (AC-6.1..AC-6.3).
+
+  Surface: a SECTION inside the Profile page (Account → Perfil y residencia).
+  This file renders the Profile shell with the existing residency block +
+  the NEW Modelo 720 inputs section. It is not a standalone page — lift the
+  <section class="account-panel"> into the Slice-1 residency-setup.html on
+  the /app/account/profile route.
+
+  Scope (AC-6.1.5): only bank-accounts and real-estate are user-editable;
+  the securities row is STUBBED with "activar seguimiento fiscal" copy —
+  no input, no number, disabled state. Deliberate. Do not flag.
+
+  Time-series semantics (AC-6.2.2): on save, the currently-open row gets
+  to_date = today and a new row is inserted with from_date = today,
+  to_date = NULL, atomically. Same pattern as residency_periods in Slice 1.
+  AC-6.2.3 accepts the same-day re-edit → 1-day orphan row as natural.
+
+  No threshold alert in Slice 2 (AC-6.3.1), even above €50k. No FX (AC-6.3.2).
+  No export (AC-6.3.3).
+
+  Accessibility:
+   - Panel is <section aria-labelledby> within the Profile <main>; the
+     Profile <h1> is owned by residency, so this section uses <h2>.
+   - Inline edit is triggered from "Editar" button and opens a numeric
+     field + Save / Cancel (AC-6.2.1).
+   - Disabled submit when no value differs from the currently-open row
+     (AC-6.2.4 + style-guide form field pattern).
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+
+    <nav class="sidebar__group" aria-label="Cartera">
+      <div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="multi-grant-dashboard.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Decisiones">
+      <div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="#">Sell-now <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Escenarios <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Cumplimiento">
+      <div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="art-7p-trip-form.html">Viajes Art. 7.p</a>
+      <a class="sidebar__link sidebar__link--active" href="modelo-720-inputs.html" aria-current="page">Modelo 720</a>
+      <a class="sidebar__link" href="#">Exports <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group mt-auto" aria-label="Cuenta">
+      <div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="residency-setup.html">Perfil y residencia</a>
+      <a class="sidebar__link" href="session-management.html">Sesiones activas</a>
+      <a class="sidebar__link" href="dsr-self-service.html">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Cuenta / <strong>Perfil y residencia</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma (ES / EN)">ES · EN</button>
+        <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="page-title">
+        <div>
+          <h1>Perfil y residencia</h1>
+          <div class="page-title__meta">Ajustes que Orbit necesita para interpretar tu cartera. Cada bloque está versionado como serie temporal.</div>
+        </div>
+      </div>
+
+      <div class="account-split">
+
+        <!-- Profile sub-menu -->
+        <nav class="account-menu" aria-label="Ajustes de la cuenta">
+          <a class="account-menu__link account-menu__link--active" href="residency-setup.html">Perfil y residencia</a>
+          <a class="account-menu__link" href="#">Contraseña</a>
+          <a class="account-menu__link" href="#">Segundo factor (MFA) <span class="muted text-xs">próx.</span></a>
+          <a class="account-menu__link" href="session-management.html">Sesiones activas</a>
+          <a class="account-menu__link" href="dsr-self-service.html">Datos y privacidad</a>
+          <a class="account-menu__link" href="#">Facturación</a>
+        </nav>
+
+        <div class="stack gap-6">
+
+          <!-- Residency section — unchanged Slice-1 summary card (reference only) -->
+          <section class="account-panel" aria-labelledby="residency-title">
+            <header class="stack gap-2">
+              <h2 id="residency-title">Residencia fiscal</h2>
+              <p class="muted text-sm">Determinada desde el <span class="mono">2024-09-01</span>. Si te mudas, crearemos un período nuevo y cerraremos éste automáticamente.</p>
+            </header>
+
+            <dl class="grid grid--3 gap-3">
+              <div class="stack gap-1">
+                <dt class="card__label">Jurisdicción</dt>
+                <dd class="mono text-sm">España · territorio común</dd>
+              </div>
+              <div class="stack gap-1">
+                <dt class="card__label">Autonomía</dt>
+                <dd class="mono text-sm">ES-MD — Comunidad de Madrid</dd>
+              </div>
+              <div class="stack gap-1">
+                <dt class="card__label">Regímenes especiales</dt>
+                <dd class="mono text-sm">—</dd>
+              </div>
+            </dl>
+
+            <div>
+              <a class="btn btn--secondary btn--sm" href="residency-setup.html">Editar residencia</a>
+            </div>
+          </section>
+
+          <!-- Modelo 720 inputs — THIS is the new Slice-2 section -->
+          <section class="account-panel" aria-labelledby="m720-title">
+            <header class="stack gap-2">
+              <h2 id="m720-title">Modelo 720 — valores declarados</h2>
+              <p class="muted text-sm">
+                Tus totales declarados (o que declararías) en el Modelo 720, por categoría.
+                Cada modificación abre un <strong>nuevo período</strong> y cierra el anterior con la fecha de hoy — así mantienes la trazabilidad año a año. Slice 2 no emite ninguna alerta de umbral ni convierte monedas: lo que escribes es lo que se guarda.
+                <br />
+                <span class="text-xs">EN · <em>Your declared (or would-be-declared) Modelo 720 totals per category. Each save opens a new period and closes the prior one; no threshold alert and no FX conversion in Slice 2.</em></span>
+              </p>
+            </header>
+
+            <!-- Inline edit form for the currently-open period -->
+            <form class="stack gap-4" action="/api/v1/modelo-720-inputs" method="post" novalidate>
+
+              <div class="section-divider">Valores en la fecha de referencia</div>
+
+              <div class="form-grid form-grid--1">
+
+                <!-- Row 1: securities — STUBBED (AC-6.1.5) -->
+                <div class="m720-row">
+                  <div class="m720-row__label stack gap-1">
+                    <span>Valores / títulos en el extranjero</span>
+                    <span class="muted text-xs">EN · Foreign securities and holdings</span>
+                  </div>
+                  <div class="m720-row__value m720-row__value--stub">
+                    Se calculará automáticamente cuando actives seguimiento fiscal <span class="badge">próx.</span>
+                  </div>
+                </div>
+                <p class="muted text-xs" id="securities-hint">
+                  EN · <em>Calculated automatically once tax tracking is enabled (coming soon).</em>
+                  Esta categoría se deriva de tus grants; requiere el pipeline FX de Slice 3.
+                </p>
+
+                <!-- Row 2: bank accounts — EDITABLE -->
+                <div class="field">
+                  <label for="m720-bank">Saldo de cuentas bancarias en el extranjero</label>
+                  <div class="row gap-2">
+                    <input class="input num" id="m720-bank" name="bank_accounts_total_eur" inputmode="decimal" value="25000,00" min="0" step="0.01" aria-describedby="m720-bank-hint" />
+                    <span class="mono text-sm muted">EUR</span>
+                  </div>
+                  <p class="field__hint" id="m720-bank-hint">
+                    Suma de saldos en todas tus cuentas no residentes en España en la fecha de referencia. Valor actual: <span class="mono">€25.000,00</span> desde <span class="mono">2025-12-31</span>.
+                  </p>
+                </div>
+
+                <!-- Row 3: real estate — EDITABLE -->
+                <div class="field">
+                  <label for="m720-realestate">Valor de bienes inmuebles en el extranjero</label>
+                  <div class="row gap-2">
+                    <input class="input num" id="m720-realestate" name="real_estate_total_eur" inputmode="decimal" value="0,00" min="0" step="0.01" aria-describedby="m720-realestate-hint" />
+                    <span class="mono text-sm muted">EUR</span>
+                  </div>
+                  <p class="field__hint" id="m720-realestate-hint">
+                    Valor total de inmuebles declarables. Introduce <span class="mono">0</span> si tienes la categoría pero sin valor actual; deja en blanco si nunca la has declarado. Valor actual: <span class="mono">€0,00</span> desde <span class="mono">2025-12-31</span>.
+                  </p>
+                </div>
+
+                <!-- Reference date -->
+                <div class="field">
+                  <label for="m720-refdate">Fecha de referencia</label>
+                  <input class="input" id="m720-refdate" name="reference_date" type="date" value="2026-12-31" aria-describedby="m720-refdate-hint" />
+                  <p class="field__hint" id="m720-refdate-hint">Día al que se refieren los valores. Por defecto el 31 de diciembre del año actual.</p>
+                </div>
+              </div>
+
+              <!-- Close-and-create note -->
+              <aside class="alert alert--info">
+                <strong>Al guardar abriremos un nuevo período</strong>
+                <p>
+                  Guardaremos un registro nuevo con fecha de inicio <span class="mono">hoy</span> y cerraremos el período actual con fecha de fin <span class="mono">hoy</span>. El histórico queda disponible para la alerta de umbral que llega en Slice 3.
+                  <br />
+                  <span class="text-xs">EN · <em>Saving opens a new period and closes the previous one, so the year-on-year history is preserved.</em></span>
+                </p>
+              </aside>
+
+              <div class="row row--between">
+                <!-- AC-6.2.4: inert when no value differs from the currently-open row -->
+                <span class="muted text-xs">Guardar sólo activa cuando modificas al menos un valor.</span>
+                <div class="row gap-2">
+                  <button class="btn btn--secondary" type="button">Cancelar</button>
+                  <button class="btn btn--primary" type="submit">Guardar</button>
+                </div>
+              </div>
+            </form>
+
+            <hr class="divider" />
+
+            <!-- Time-series display (AC-6.2.6 deferred-UI note: backend has year-on-year; Slice 2 surfaces a basic history here) -->
+            <section aria-labelledby="m720-history" class="stack gap-3">
+              <header>
+                <h3 id="m720-history">Histórico por categoría</h3>
+                <p class="muted text-sm">Períodos guardados, más recientes primero. La fila con pill <em>actual</em> es la abierta.</p>
+              </header>
+
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th scope="col">Fecha de referencia</th>
+                    <th scope="col" class="num">Cuentas bancarias (EUR)</th>
+                    <th scope="col" class="num">Bienes inmuebles (EUR)</th>
+                    <th scope="col">Vigencia</th>
+                    <th scope="col">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">2026-12-31</th>
+                    <td class="num">€25.000,00</td>
+                    <td class="num">€0,00</td>
+                    <td><span class="mono text-xs">desde 2026-04-19</span></td>
+                    <td><span class="pill pill--full">actual</span></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">2025-12-31</th>
+                    <td class="num">€18.500,00</td>
+                    <td class="num">€0,00</td>
+                    <td><span class="mono text-xs">2025-12-31 → 2026-04-19</span></td>
+                    <td><span class="pill pill--empty">cerrado</span></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">2024-12-31</th>
+                    <td class="num"><span class="muted">Sin valor registrado</span></td>
+                    <td class="num"><span class="muted">Sin valor registrado</span></td>
+                    <td><span class="mono text-xs">2024-12-31 → 2025-12-31</span></td>
+                    <td><span class="pill pill--empty">cerrado</span></td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p class="muted text-xs">
+                AC-6.1.4 · <em>Sin valor registrado</em> y <span class="mono">€0</span> son estados distintos y nunca se colapsan en la misma representación.
+              </p>
+            </section>
+
+            <!-- Out-of-scope reminder (AC-6.3.*) -->
+            <aside class="alert alert--info">
+              <strong>Todavía no mostramos alertas</strong>
+              <p class="text-sm">
+                Aunque la suma de categorías supere los €50.000, Slice 2 no emite ninguna notificación. El banner de alerta de umbral del Modelo 720 se activa en Slice 3 con el pipeline FX. Tampoco exportamos ninguna hoja de trabajo en PDF todavía (Slice 6).
+              </p>
+            </aside>
+          </section>
+
+        </div>
+      </div>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

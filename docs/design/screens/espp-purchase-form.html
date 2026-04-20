@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Registrar compra ESPP</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  espp-purchase-form.html — Slice 2 §4 (AC-4.1..AC-4.5).
+
+  Route:   /app/grants/:id/espp-purchases/new       (create; AC-4.1.2)
+           /app/grants/:id/espp-purchases/:pid/edit (edit; AC-4.3.4)
+  Parent:  `grant-detail.html` for an ESPP grant. The CTA "Registrar
+           compra ESPP" only renders when grants.instrument = "espp"
+           (AC-4.1.1 / AC-4.1.5).
+
+  Field map (AC-4.2.1 + AC-4.2.2):
+    offering_date              date      required       pre-fills parent's grant_date
+    purchase_date              date      required       must be >= offering_date (AC-4.2.3)
+    fmv_at_purchase            decimal   required, >0   up to 6 decimals model / 4 UI (G-13)
+    purchase_price_per_share   decimal   required, >0   up to 4 decimals UI (G-13)
+    shares_purchased           integer   required, >=1  (AC-4.2.4)
+    currency                   enum      required       {USD, EUR, GBP} (AC-4.2.6)
+    fmv_at_offering            decimal   optional       lookback FMV (AC-4.2.10)
+    employer_discount_percent  decimal   optional 0-100 (AC-4.2.11); pre-fills from notes JSON (AC-4.5.1)
+    notes                      text      optional, 2048 char cap
+
+  Non-blocking warnings:
+    - purchase_date > today+1 (AC-4.2.7)
+    - duplicate (offering_date, purchase_date, shares_purchased) (AC-4.2.8)
+
+  Slice-2 migration banner (AC-4.5.1) shows only when the parent grant's
+  notes JSON carried estimated_discount_percent. This mockup renders both
+  paths: the form at the top (migration banner present), and immediately
+  below, a SECTION FRAGMENT illustrating the ESPP-grant detail screen's
+  "Compras registradas" block (AC-4.1.3 .. AC-4.1.4). Engineers lift the
+  fragment into grant-detail.html — it is NOT a full page.
+
+  Disclaimer footer: text only, no rule-set chip (G-5).
+  Footer sidebar entries follow the Slice-2-refreshed IA: sessions +
+  Art. 7.p + M720 entries resolve to live screens; sell-now / scenarios
+  remain "próximamente" stubs.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+
+    <nav class="sidebar__group" aria-label="Cartera">
+      <div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="multi-grant-dashboard.html">Dashboard</a>
+      <a class="sidebar__link sidebar__link--active" href="grant-detail.html" aria-current="page">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Decisiones">
+      <div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="#">Sell-now <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Escenarios <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Cumplimiento">
+      <div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="art-7p-trip-form.html">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="modelo-720-inputs.html">Modelo 720</a>
+      <a class="sidebar__link" href="#">Exports <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group mt-auto" aria-label="Cuenta">
+      <div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="residency-setup.html">Perfil y residencia</a>
+      <a class="sidebar__link" href="session-management.html">Sesiones activas</a>
+      <a class="sidebar__link" href="dsr-self-service.html">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">
+        <a href="multi-grant-dashboard.html">Cartera</a> /
+        <a href="grant-detail.html">Grants</a> /
+        <a href="grant-detail.html">ESPP Jan-Jun 2025 — Different Inc.</a> /
+        <strong>Registrar compra</strong>
+      </div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma (ES / EN)">ES · EN</button>
+        <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="page-title">
+        <div>
+          <h1>Registrar compra ESPP</h1>
+          <div class="page-title__meta">
+            Different Inc. · ventana de oferta <span class="mono">2025-01-15</span> → <span class="mono">2025-06-30</span> ·
+            moneda del grant <span class="mono">USD</span>
+          </div>
+        </div>
+        <div class="row gap-2">
+          <a class="back-link" href="grant-detail.html">← Volver al grant</a>
+        </div>
+      </div>
+
+      <!-- Migration banner (renders only when parent grant.notes carries estimated_discount_percent) -->
+      <aside class="alert alert--info mb-6" role="status">
+        <strong>Descuento migrado desde las notas del grant</strong>
+        <p>
+          Hemos trasladado el descuento del 15 % que tenías guardado en las notas del grant (Slice 1) al campo <span class="mono">% de descuento del empleador</span> de este registro. Puedes modificarlo antes de guardar.
+          <br />
+          <span class="muted text-xs">EN · We moved the 15 % discount you had saved in the grant's notes (Slice 1) into the <span class="mono">Employer discount %</span> field on this purchase. You can change it before saving.</span>
+        </p>
+      </aside>
+
+      <!-- Form card -->
+      <section class="card" aria-labelledby="espp-form-title">
+        <div class="section-divider" id="espp-form-title">Datos de la compra</div>
+
+        <form class="stack gap-5" action="/api/v1/grants/123/espp-purchases" method="post" novalidate>
+
+          <!-- Dates -->
+          <div class="form-grid">
+            <div class="field">
+              <label for="offering-date">Fecha de oferta</label>
+              <input class="input" id="offering-date" name="offering_date" type="date" value="2025-01-15" required aria-describedby="offering-date-hint" />
+              <p class="field__hint" id="offering-date-hint">Inicio de la ventana de acumulación. Por defecto usamos la fecha del grant.</p>
+            </div>
+            <div class="field">
+              <label for="purchase-date">Fecha de compra</label>
+              <input class="input" id="purchase-date" name="purchase_date" type="date" value="2025-06-30" required aria-describedby="purchase-date-hint purchase-date-err" aria-invalid="false" />
+              <p class="field__hint" id="purchase-date-hint">Día en que se ejecuta la compra al precio con descuento. Debe ser igual o posterior a la fecha de oferta.</p>
+              <!-- Rendered only when purchase_date < offering_date (AC-4.2.3). Kept visible here as a reference state. -->
+              <p class="field__error" id="purchase-date-err" role="alert" hidden>
+                ⚠ La fecha de compra no puede ser anterior a la fecha de oferta.
+              </p>
+            </div>
+          </div>
+
+          <!-- Numeric core -->
+          <div class="form-grid">
+            <div class="field">
+              <label for="fmv-purchase">FMV en fecha de compra</label>
+              <div class="row gap-2">
+                <input class="input num" id="fmv-purchase" name="fmv_at_purchase" inputmode="decimal" value="45,0000" required aria-describedby="fmv-purchase-hint" />
+                <span class="muted mono text-sm">USD / acción</span>
+              </div>
+              <p class="field__hint" id="fmv-purchase-hint">Valor razonable del activo en <em>purchase_date</em>. Admitimos hasta 4 decimales. Almacenamos con precisión de 6 decimales; mostramos lo que escribiste.</p>
+            </div>
+            <div class="field">
+              <label for="purchase-price">Precio pagado por acción</label>
+              <div class="row gap-2">
+                <input class="input num" id="purchase-price" name="purchase_price_per_share" inputmode="decimal" value="38,2500" required aria-describedby="purchase-price-hint" />
+                <span class="muted mono text-sm">USD / acción</span>
+              </div>
+              <p class="field__hint" id="purchase-price-hint">Precio que pagaste realmente tras aplicar el descuento del empleador.</p>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="shares-purchased">Acciones compradas</label>
+              <input class="input num" id="shares-purchased" name="shares_purchased" inputmode="numeric" value="100" required aria-describedby="shares-hint" />
+              <p class="field__hint" id="shares-hint">Entero &gt; 0. Aceptamos fracciones hasta 4 decimales sólo si tu plan las emite.</p>
+            </div>
+            <div class="field">
+              <label for="currency">Moneda</label>
+              <select class="select" id="currency" name="currency" required aria-describedby="currency-hint">
+                <option value="USD" selected>USD — Dólar estadounidense</option>
+                <option value="EUR">EUR — Euro</option>
+                <option value="GBP">GBP — Libra esterlina</option>
+              </select>
+              <p class="field__hint" id="currency-hint">Por defecto, la moneda del grant padre (<span class="mono">USD</span>). En Slice 2 no convertimos a EUR.</p>
+            </div>
+          </div>
+
+          <!-- Optional: lookback / employer discount -->
+          <details class="card card--tight">
+            <summary class="row gap-2 mono text-sm">
+              <span>Detalles del plan con lookback <span class="muted">· opcionales</span></span>
+            </summary>
+            <div class="form-grid mt-3">
+              <div class="field">
+                <label for="fmv-offering">FMV en fecha de oferta <span class="muted text-xs">(opcional)</span></label>
+                <div class="row gap-2">
+                  <input class="input num" id="fmv-offering" name="fmv_at_offering" inputmode="decimal" placeholder="30,0000" aria-describedby="fmv-offering-hint" />
+                  <span class="muted mono text-sm">USD / acción</span>
+                </div>
+                <p class="field__hint" id="fmv-offering-hint">
+                  El "lookback FMV": valor del activo al <em>inicio</em> de la ventana de oferta. Algunos planes ESPP aplican el descuento al menor de los dos FMV (oferta / compra). Rellénalo sólo si tu plan tiene esa provisión. Si lo dejas vacío lo guardaremos como <span class="mono">NULL</span>.
+                </p>
+              </div>
+              <div class="field">
+                <label for="discount">% de descuento del empleador <span class="muted text-xs">(opcional)</span></label>
+                <div class="row gap-2">
+                  <input class="input num" id="discount" name="employer_discount_percent" inputmode="decimal" value="15" min="0" max="100" aria-describedby="discount-hint" />
+                  <span class="muted mono text-sm">%</span>
+                </div>
+                <p class="field__hint" id="discount-hint">Entre 0 y 100. Por defecto vacío. Si tu grant se creó en Slice 1 con el descuento en las notas, pre-cargamos ese valor aquí (migración no destructiva, AC-4.5.1).</p>
+              </div>
+            </div>
+          </details>
+
+          <!-- Notes -->
+          <div class="field">
+            <label for="notes">Notas <span class="muted text-xs">(opcional, máx. 2048 caracteres)</span></label>
+            <textarea class="textarea" id="notes" name="notes" maxlength="2048" rows="3" aria-describedby="notes-hint" placeholder="Ej.: compra trimestral Q2 2025; el plan aplica lookback sobre el menor FMV."></textarea>
+            <p class="field__hint" id="notes-hint">Texto libre. No interpretamos el contenido — es tuyo, sólo para tu referencia.</p>
+          </div>
+
+          <hr class="divider" />
+
+          <!-- Warning preview: future purchase_date (AC-4.2.7). Hidden by default. -->
+          <aside class="alert alert--warning" role="status" hidden>
+            <strong>Fecha de compra futura</strong>
+            <p>La fecha de compra es posterior a hoy. Puedes continuar, pero revisa si es lo que querías registrar.</p>
+          </aside>
+
+          <!-- Duplicate warning preview (AC-4.2.8). Hidden by default. -->
+          <aside class="alert alert--warning" role="status" hidden>
+            <strong>Posible duplicado</strong>
+            <p>Ya registraste una compra con esta misma fecha de oferta, fecha de compra y número de acciones. Si no es un duplicado, confirma para guardar de todas formas.</p>
+            <button class="btn btn--secondary btn--sm alert__cta" type="button">Confirmar que no es un duplicado</button>
+          </aside>
+
+          <div class="row row--between">
+            <a class="back-link" href="grant-detail.html">← Cancelar</a>
+            <div class="row gap-2">
+              <button class="btn btn--secondary" type="button">Cancelar</button>
+              <button class="btn btn--primary" type="submit">Guardar compra</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <hr class="divider mt-8" />
+
+      <!-- grant-detail ESPP section — NOT a full page, a fragment to lift into grant-detail.html (AC-4.1.3, AC-4.1.4).
+           Shown here so engineers see the compact shape next to the form that feeds it. -->
+      <section class="mt-6" aria-label="Compras registradas — fragmento para grant-detail.html">
+        <div class="section-head">
+          <div class="section-head__title">
+            <h2>Compras registradas <span class="muted text-sm">· referencia para grant-detail.html</span></h2>
+            <div class="section-head__sub">Bloque que aparece en la pantalla de detalle del grant entre el resumen y el timeline de vesting. Sólo para grants ESPP (AC-4.1.5). Sin interpretación fiscal en Slice 2.</div>
+          </div>
+          <a class="btn btn--primary btn--sm" href="espp-purchase-form.html">+ Registrar compra ESPP</a>
+        </div>
+
+        <div class="card card--flush">
+          <!-- Header -->
+          <div class="purchase-row" role="row" aria-label="cabecera">
+            <div class="purchase-row__date muted text-xs">COMPRA</div>
+            <div class="purchase-row__shares muted text-xs">ACCIONES</div>
+            <div class="purchase-row__price muted text-xs">PRECIO / FMV</div>
+            <div class="purchase-row__fmv muted text-xs">OFERTA</div>
+            <div class="purchase-row__extras muted text-xs">EXTRAS</div>
+            <div class="muted text-xs">ACCIONES</div>
+          </div>
+          <!-- Row 1 -->
+          <div class="purchase-row">
+            <div class="purchase-row__date">
+              2025-06-30
+              <div class="purchase-row__offering">oferta 2025-01-15</div>
+            </div>
+            <div class="purchase-row__shares">100</div>
+            <div class="purchase-row__price">$38,2500 <span class="muted text-xs">USD</span></div>
+            <div class="purchase-row__fmv">FMV $45,0000 <span class="muted text-xs">USD</span></div>
+            <div class="purchase-row__extras">· 15 % descuento</div>
+            <div class="row gap-1">
+              <a class="btn btn--ghost btn--sm" href="espp-purchase-form.html">Editar</a>
+              <button class="btn btn--danger btn--sm" type="button">Eliminar</button>
+            </div>
+          </div>
+          <!-- Row 2 (earlier window, minimal — no discount, no lookback) -->
+          <div class="purchase-row">
+            <div class="purchase-row__date">
+              2024-12-31
+              <div class="purchase-row__offering">oferta 2024-07-15</div>
+            </div>
+            <div class="purchase-row__shares">100</div>
+            <div class="purchase-row__price">$26,5000 <span class="muted text-xs">USD</span></div>
+            <div class="purchase-row__fmv">FMV $31,2000 <span class="muted text-xs">USD</span></div>
+            <div class="purchase-row__extras">—</div>
+            <div class="row gap-1">
+              <a class="btn btn--ghost btn--sm" href="#">Editar</a>
+              <button class="btn btn--danger btn--sm" type="button">Eliminar</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="muted text-xs mt-3">
+          Las compras ESPP se guardan tal cual. Slice 2 no calcula el descuento como rendimiento del trabajo ni separa la base del ahorro en la venta — eso llega con el motor fiscal (Slice 4) y el módulo de ventas (Slice 5).
+        </p>
+
+        <!-- Empty-state reference -->
+        <div class="card mt-5">
+          <div class="card__label">Estado vacío — referencia (AC-4.1.3)</div>
+          <p class="muted text-sm mt-2">
+            <strong>Aún no has registrado ninguna compra.</strong> Las compras ESPP deben registrarse con FMV y precio de cada ventana.
+            <br />
+            <span class="text-xs">EN · <em>No purchases recorded yet. ESPP purchases must be logged with FMV and per-window price.</em></span>
+          </p>
+          <div class="row mt-3">
+            <a class="btn btn--primary btn--sm" href="espp-purchase-form.html">+ Registrar compra ESPP</a>
+          </div>
+        </div>
+
+        <!-- Pagination affordance reference -->
+        <div class="row row--between mt-4">
+          <span class="muted text-xs">Mostrando 2 de 2 compras · ordenadas por <span class="mono">purchase_date DESC</span>.</span>
+          <a class="back-link" href="#" hidden>Ver todas →</a>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

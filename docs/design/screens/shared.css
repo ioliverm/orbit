@@ -1200,3 +1200,309 @@ ul.list-indent li { margin-bottom: var(--space-2); }
 .card--flush { padding: 0; }
 .card--tight { padding: var(--space-3); }
 
+/* ============================================================
+   Slice-2 additions
+   ============================================================
+   Every class below is used by at least one Slice-2 mockup and
+   is additive (no existing token edits). The design goal is to
+   stay CSP-strict: only CSS custom properties are allowed on
+   inline style="" attributes. The classes below consume those
+   custom properties so Slice-2 screens never need arbitrary
+   inline style declarations (colors, margins, widths hard-coded
+   inline are all forbidden by SEC-180).
+   ------------------------------------------------------------ */
+
+/* Width helper driven by a --bar-width custom property.
+   Used on .sparkline__fill / .vesting__fill children in Slice-2
+   mockups so HTML carries style="--bar-width: 41.7%" (custom
+   property only) instead of style="width: 41.7%".           */
+.bar-fill { width: var(--bar-width, 0%); }
+
+/* ---------- Employer portfolio panel (multi-grant dashboard, AC-8.2) ---------- */
+.portfolio-panel {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.portfolio-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 160px 28px;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+}
+.portfolio-row:first-of-type { border-top: none; padding-top: 0; }
+.portfolio-row__employer {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.portfolio-row__name { font-size: var(--text-md); font-weight: 600; color: var(--color-fg); }
+.portfolio-row__meta { font-size: var(--text-xs); color: var(--color-fg-subtle); font-family: var(--font-mono); }
+.portfolio-row__count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--color-fg-muted);
+  text-align: right;
+}
+.portfolio-row__toggle {
+  background: transparent; border: none; cursor: pointer;
+  font-size: var(--text-md); color: var(--color-fg-muted);
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.portfolio-row__toggle:hover { background: var(--color-surface-sunken); color: var(--color-fg); }
+.portfolio-sub {
+  grid-column: 1 / -1;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+@media (max-width: 640px) {
+  .portfolio-row { grid-template-columns: 1fr 28px; row-gap: var(--space-2); }
+  .portfolio-row__count { text-align: left; }
+}
+
+/* SVG curve block inside a portfolio row (ChartContainer). */
+.curve {
+  width: 100%;
+  height: 48px;
+  display: block;
+}
+.curve__grid { stroke: var(--color-border); stroke-width: 1; fill: none; }
+.curve__envelope { stroke: var(--color-accent); stroke-width: 2; fill: none; }
+.curve__envelope-fill { fill: var(--color-accent-subtle); opacity: .6; }
+.curve__grant { stroke: var(--color-fg-muted); stroke-width: 1; fill: none; opacity: .7; }
+.curve__grant--pending {
+  stroke: var(--color-warning);
+  stroke-dasharray: 4 3;
+  stroke-width: 1;
+  fill: none;
+  opacity: .8;
+}
+.curve__axis { stroke: var(--color-border-strong); stroke-width: 1; }
+.curve__label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--color-fg-subtle);
+}
+
+/* Mini-legend for the portfolio drill-down. */
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--text-xs); }
+.legend__item { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-fg-muted); }
+.legend__swatch {
+  width: 14px; height: 3px; border-radius: 2px;
+  background: var(--color-fg-muted);
+  display: inline-block;
+}
+.legend__swatch--envelope { background: var(--color-accent); height: 3px; }
+.legend__swatch--pending {
+  background: repeating-linear-gradient(90deg, var(--color-warning) 0 4px, transparent 4px 7px);
+  height: 3px;
+}
+.legend__group-label {
+  font-size: var(--text-xs);
+  color: var(--color-fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-right: var(--space-1);
+}
+
+/* ---------- ESPP purchases list tile (grant-detail) ---------- */
+.purchase-row {
+  display: grid;
+  grid-template-columns: 130px 100px 140px 140px 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+}
+.purchase-row:last-child { border-bottom: none; }
+.purchase-row__date { color: var(--color-fg); }
+.purchase-row__offering { color: var(--color-fg-muted); font-size: var(--text-xs); }
+.purchase-row__shares,
+.purchase-row__price,
+.purchase-row__fmv {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+}
+.purchase-row__extras {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-fg-subtle);
+}
+@media (max-width: 640px) {
+  .purchase-row {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    row-gap: var(--space-1);
+  }
+  .purchase-row__offering { grid-column: 1 / -1; }
+}
+
+/* ---------- Art. 7.p eligibility checklist (AC-5.2.2) ---------- */
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+.checklist__item {
+  display: grid;
+  grid-template-columns: 28px 1fr 180px;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  align-items: flex-start;
+}
+.checklist__item:last-child { border-bottom: none; }
+.checklist__num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.checklist__body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.checklist__title { font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); }
+.checklist__title-en { font-size: var(--text-xs); color: var(--color-fg-muted); font-weight: 400; }
+.checklist__hint { font-size: var(--text-xs); color: var(--color-fg-subtle); }
+.checklist__help {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-fg-muted);
+  border-radius: 50%;
+  width: 20px; height: 20px;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
+  margin-left: var(--space-1);
+}
+.checklist__help:hover { background: var(--color-surface-sunken); color: var(--color-fg); }
+.checklist__answer {
+  display: inline-flex; gap: var(--space-3);
+  align-self: flex-start;
+}
+@media (max-width: 640px) {
+  .checklist__item { grid-template-columns: 28px 1fr; }
+  .checklist__answer { grid-column: 1 / -1; margin-left: 40px; }
+}
+
+/* Summary chip for captured (not computed) checklist outcome. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  border-radius: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-fg-muted);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+}
+.pill--full { background: #e0efe4; color: var(--color-positive); border-color: #c4e0cc; }
+.pill--partial { background: var(--color-warning-subtle); color: var(--color-warning); border-color: #ddc99b; }
+.pill--empty { background: var(--color-surface-sunken); color: var(--color-fg-subtle); }
+@media (prefers-color-scheme: dark) {
+  .pill--full { background: #1e3a26; border-color: #2f5a3c; }
+}
+
+/* Annual-cap tracker panel on Art. 7.p list (read-only, AC-5.1.3). */
+.cap-tracker {
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-left-color: var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  background: var(--color-surface-raised);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.cap-tracker__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.cap-tracker__meta { font-size: var(--text-xs); color: var(--color-fg-subtle); }
+
+/* ---------- Modelo 720 time-series history table ---------- */
+.m720-row {
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  align-items: baseline;
+  border-bottom: 1px solid var(--color-border);
+}
+.m720-row:last-child { border-bottom: none; }
+.m720-row__label { font-size: var(--text-sm); color: var(--color-fg); font-weight: 500; }
+.m720-row__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-md);
+  color: var(--color-fg);
+  text-align: right;
+}
+.m720-row__value--stub {
+  color: var(--color-fg-subtle);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-align: right;
+}
+.m720-row__value--empty { color: var(--color-fg-subtle); font-style: italic; }
+
+/* ---------- Trip-list row ---------- */
+.trip-row {
+  display: grid;
+  grid-template-columns: 140px 180px 120px 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.trip-row:last-child { border-bottom: none; }
+.trip-row:hover { background: var(--color-surface-sunken); }
+.trip-row__dates {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+}
+.trip-row__country { color: var(--color-fg); }
+.trip-row__purpose {
+  color: var(--color-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .trip-row {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    row-gap: var(--space-1);
+  }
+  .trip-row__purpose { grid-column: 1 / -1; }
+  .trip-row__dates { grid-column: 1 / span 1; }
+}
+

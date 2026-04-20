@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Dashboard (Slice 2)</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  multi-grant-dashboard.html — Slice 2 §8 (AC-8.1..AC-8.2).
+
+  Slice-2 refresh of dashboard-slice-1.html. Starting point: the Slice-1
+  skeleton (sidebar, topbar, page title, grant-tile grid, disclaimer
+  footer — all copied verbatim in structure). Slice-2 deltas:
+
+    - 3 grant tiles instead of 1: ACME RSU (double-trigger, pending
+      liquidity), ACME NSO (fully vested), DIFFERENT ESPP.
+    - NEW "Cartera por empleador" panel between the page title and the
+      tile grid (AC-8.2.1 stacked view). ACME stacks (2 grants, mixed
+      instruments) with an inline SVG cumulative curve and per-grant
+      drill-down. DIFFERENT renders as a single-grant row with a
+      sparkline (AC-8.2.7 no-stack-of-size-1; row shape stays uniform).
+    - Mixed-instrument drill-down groups legend by instrument
+      (AC-8.2.4). Each legend entry links to that grant's detail.
+    - Double-trigger grant's contribution uses the dashed-fill visual
+      (AC-8.2.5).
+    - Share counts only. No EUR. No rule-set chip. No sell-now or
+      scenarios tile. No Modelo 720 passive banner. (§14 do-not-flag.)
+
+  IMPORTANT — CSP strictness: dynamic widths on sparkline fills are
+  expressed via CSS custom properties (style="--bar-width: 41.7%") so
+  the HTML never carries an arbitrary style declaration. The matching
+  rule is `.bar-fill { width: var(--bar-width, 0%); }` in shared.css.
+  The SVG curves are static geometry; no inline style.
+
+  Sidebar IA: slice-2-refreshed — Art. 7.p and Modelo 720 resolve to
+  live screens; sessions entry too. Sell-now / scenarios / exports
+  remain próximamente stubs (AC-6.3.3 + §14).
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <!-- Sidebar (Slice-1 IA, Slice-2 entries activated) -->
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+
+    <nav class="sidebar__group" aria-label="Cartera">
+      <div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link sidebar__link--active" href="multi-grant-dashboard.html" aria-current="page">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail.html#vesting">Vesting</a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Decisiones">
+      <div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="#">Sell-now <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Escenarios <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Cumplimiento">
+      <div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="art-7p-trip-form.html">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="modelo-720-inputs.html">Modelo 720</a>
+      <a class="sidebar__link" href="#">Exports <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group mt-auto" aria-label="Cuenta">
+      <div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link" href="residency-setup.html">Perfil y residencia</a>
+      <a class="sidebar__link" href="session-management.html">Sesiones activas</a>
+      <a class="sidebar__link" href="dsr-self-service.html">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs"><strong>Dashboard</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma (ES / EN)">ES · EN</button>
+        <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="page-title">
+        <div>
+          <h1>Tu cartera</h1>
+          <div class="page-title__meta">3 grants · 2 empleadores · residencia: Comunidad de Madrid · moneda principal EUR</div>
+        </div>
+        <div class="row gap-2">
+          <a class="btn btn--primary btn--sm" href="first-grant-form.html">Añadir grant</a>
+        </div>
+      </div>
+
+      <!--
+        INTENTIONALLY ABSENT IN SLICE 2 (§14):
+          - Modelo 720 passive banner
+          - Paper-gains EUR tile
+          - Impuesto estimado tile
+          - Rule-set chip in footer
+          - Scenario / Sell-now CTAs beyond próx. sidebar stubs
+          - EUR conversion anywhere (still Slice 3)
+      -->
+
+      <!-- Cartera por empleador — Slice-2 new (AC-8.2) -->
+      <section class="portfolio-panel mb-8" aria-labelledby="portfolio-title">
+        <header class="section-head">
+          <div class="section-head__title">
+            <h2 id="portfolio-title">Cartera por empleador</h2>
+            <div class="section-head__sub">
+              Cuando tienes varios grants con el mismo empleador, Orbit los apila en una curva acumulada. Haz clic en el empleador para desplegar el detalle por grant / instrumento.
+            </div>
+          </div>
+          <div class="row gap-2">
+            <button class="btn btn--ghost btn--sm" type="button" aria-pressed="true">Curva</button>
+            <button class="btn btn--ghost btn--sm" type="button" aria-pressed="false">Lista</button>
+          </div>
+        </header>
+
+        <!-- Row 1: Acme Inc. — 2 grants stacked, mixed instruments (AC-8.2.1, AC-8.2.4, AC-8.2.5) -->
+        <div class="portfolio-row" role="group" aria-labelledby="acme-name">
+          <div class="portfolio-row__employer">
+            <span class="portfolio-row__name" id="acme-name">Acme Inc.</span>
+            <span class="portfolio-row__meta">2 grants · RSU + NSO</span>
+          </div>
+
+          <svg class="curve" viewBox="0 0 300 48" role="img" aria-label="Curva acumulada de acciones vested para Acme Inc.: suma combinada de un RSU double-trigger (pendiente de liquidez) y un NSO totalmente vested.">
+            <!-- Grid -->
+            <line class="curve__grid" x1="0" y1="12" x2="300" y2="12" />
+            <line class="curve__grid" x1="0" y1="24" x2="300" y2="24" />
+            <line class="curve__grid" x1="0" y1="36" x2="300" y2="36" />
+            <!-- Envelope fill -->
+            <path class="curve__envelope-fill" d="M0,44 L40,40 L80,34 L120,28 L160,22 L200,18 L240,14 L280,10 L300,10 L300,48 L0,48 Z" />
+            <!-- Envelope line -->
+            <path class="curve__envelope" d="M0,44 L40,40 L80,34 L120,28 L160,22 L200,18 L240,14 L280,10 L300,10" />
+            <!-- NSO (fully vested, solid, lighter) -->
+            <path class="curve__grant" d="M0,46 L40,40 L80,36 L120,32 L160,30 L200,30 L240,30 L280,30 L300,30" />
+            <!-- RSU (double-trigger; dashed portion = pending liquidity; AC-8.2.5) -->
+            <path class="curve__grant curve__grant--pending" d="M0,46 L40,44 L80,42 L120,40 L160,36 L200,32 L240,28 L280,24 L300,24" />
+            <!-- Axis -->
+            <line class="curve__axis" x1="0" y1="47" x2="300" y2="47" />
+            <!-- Labels -->
+            <text class="curve__label" x="0" y="46" text-anchor="start">2022</text>
+            <text class="curve__label" x="300" y="46" text-anchor="end">2028</text>
+          </svg>
+
+          <div class="portfolio-row__count">
+            <span class="mono text-md">22.500</span>
+            <div class="muted text-xs">vested · 7.500 pendientes</div>
+          </div>
+
+          <!-- Disclosure toggle -->
+          <button class="portfolio-row__toggle" type="button" aria-expanded="true" aria-controls="acme-sub" aria-label="Contraer detalle de Acme Inc.">−</button>
+
+          <!-- Drill-down (AC-8.2.3, AC-8.2.4) -->
+          <div class="portfolio-sub" id="acme-sub">
+            <div class="legend">
+              <span class="legend__item"><span class="legend__swatch legend__swatch--envelope"></span>Suma Acme Inc.</span>
+              <span class="legend__item"><span class="legend__swatch"></span>Contribución individual</span>
+              <span class="legend__item"><span class="legend__swatch legend__swatch--pending"></span>Pendiente de liquidez</span>
+            </div>
+
+            <!-- Per-instrument grouping (AC-8.2.4) -->
+            <div class="stack gap-2">
+              <div class="row gap-3">
+                <span class="legend__group-label">RSU · 1 grant</span>
+                <a class="back-link mono text-sm" href="grant-detail.html">Refresh 2024-09 — 30.000 sh · 12.500 vested (trama)</a>
+              </div>
+              <div class="row gap-3">
+                <span class="legend__group-label">NSO · 1 grant</span>
+                <a class="back-link mono text-sm" href="grant-detail.html">Opciones 2022-03 — 10.000 sh · 10.000 vested</a>
+              </div>
+            </div>
+
+            <p class="muted text-xs">
+              La parte rayada del envelope corresponde al RSU double-trigger que está vesting en tiempo pero aún no ha cumplido el evento de liquidez. Se convertirá en sólido cuando registres la fecha de IPO / adquisición / tender offer.
+              <br />
+              Ingresos imponibles hasta la fecha en Acme Inc.: <span class="mono">10.000 acciones</span> (NSO sin ejercer, sin evento fiscal aún).
+            </p>
+          </div>
+        </div>
+
+        <!-- Row 2: Different Inc. — 1 grant, degenerate single-grant sparkline (AC-8.2.7) -->
+        <div class="portfolio-row" role="group" aria-labelledby="different-name">
+          <div class="portfolio-row__employer">
+            <span class="portfolio-row__name" id="different-name">Different Inc.</span>
+            <span class="portfolio-row__meta">1 grant · ESPP</span>
+          </div>
+
+          <svg class="curve" viewBox="0 0 300 48" role="img" aria-label="Curva acumulada de acciones compradas para Different Inc. vía ESPP: 200 acciones en dos ventanas.">
+            <line class="curve__grid" x1="0" y1="12" x2="300" y2="12" />
+            <line class="curve__grid" x1="0" y1="24" x2="300" y2="24" />
+            <line class="curve__grid" x1="0" y1="36" x2="300" y2="36" />
+            <!-- Step curve: two ESPP purchases -->
+            <path class="curve__envelope" d="M0,44 L100,44 L100,36 L200,36 L200,26 L300,26" />
+            <line class="curve__axis" x1="0" y1="47" x2="300" y2="47" />
+            <text class="curve__label" x="0" y="46" text-anchor="start">2024</text>
+            <text class="curve__label" x="300" y="46" text-anchor="end">2026</text>
+          </svg>
+
+          <div class="portfolio-row__count">
+            <span class="mono text-md">200</span>
+            <div class="muted text-xs">acciones compradas</div>
+          </div>
+
+          <button class="portfolio-row__toggle" type="button" aria-expanded="false" aria-controls="different-sub" aria-label="Expandir detalle de Different Inc.">+</button>
+
+          <div class="portfolio-sub" id="different-sub" hidden>
+            <div class="legend">
+              <span class="legend__item"><span class="legend__swatch legend__swatch--envelope"></span>Suma Different Inc.</span>
+            </div>
+            <div class="row gap-3">
+              <span class="legend__group-label">ESPP · 1 grant</span>
+              <a class="back-link mono text-sm" href="grant-detail.html">ESPP Jan-Jun 2025 — 2 compras · 200 sh</a>
+            </div>
+          </div>
+        </div>
+
+        <p class="muted text-xs mt-2">
+          AC-8.2.6: la curva muestra número de acciones, no valor monetario. La conversión a EUR llega con el pipeline FX (Slice 3).
+        </p>
+      </section>
+
+      <!-- Multi-grant tile grid (C-4: native currency only, no EUR). Three tiles. -->
+      <section aria-label="Grants individuales" class="mb-8">
+        <div class="section-head">
+          <div class="section-head__title">
+            <h2>Grants individuales</h2>
+            <div class="section-head__sub">Tiles por grant, ordenadas por <span class="mono">grant_date DESC</span>. Alterna el orden a <em>empleador → fecha</em> con el selector.</div>
+          </div>
+          <div class="row gap-2">
+            <label class="muted text-xs" for="sort">Ordenar por</label>
+            <select class="select" id="sort" name="sort">
+              <option value="grant_date_desc" selected>Fecha del grant · más recientes</option>
+              <option value="employer_date">Empleador, luego fecha</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid--3 mt-4">
+
+          <!-- Tile 1: ACME RSU, double-trigger, pending liquidity -->
+          <article class="grant-tile">
+            <div class="grant-tile__header">
+              <div class="stack gap-1">
+                <span class="grant-tile__title">Acme Inc.</span>
+                <span class="grant-tile__instrument">RSU · double-trigger</span>
+              </div>
+              <a class="btn btn--ghost btn--sm" href="grant-detail.html">Detalle</a>
+            </div>
+
+            <div class="grant-tile__body">
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Acciones</span>
+                <span class="grant-tile__cell-value">30.000</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Fecha del grant</span>
+                <span class="grant-tile__cell-value">2024-09-15</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Time-vested</span>
+                <span class="grant-tile__cell-value">12.500</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Estado</span>
+                <span class="grant-tile__cell-value text-sm">
+                  <span class="badge badge--stale">Pendiente liquidez</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="stack gap-1 mt-2">
+              <span class="grant-tile__cell-label">Progreso (tiempo)</span>
+              <div class="sparkline" aria-label="41,7 % time-vested, pendiente de liquidez">
+                <div class="sparkline__fill sparkline__fill--pending bar-fill" style="--bar-width: 41.7%;"></div>
+              </div>
+              <span class="muted text-xs">Ingresos imponibles hasta la fecha: <span class="mono">0 acciones</span></span>
+            </div>
+          </article>
+
+          <!-- Tile 2: ACME NSO, fully vested -->
+          <article class="grant-tile">
+            <div class="grant-tile__header">
+              <div class="stack gap-1">
+                <span class="grant-tile__title">Acme Inc.</span>
+                <span class="grant-tile__instrument">NSO · 4yr · cliff 1yr</span>
+              </div>
+              <a class="btn btn--ghost btn--sm" href="grant-detail.html">Detalle</a>
+            </div>
+
+            <div class="grant-tile__body">
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Acciones</span>
+                <span class="grant-tile__cell-value">10.000</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Fecha del grant</span>
+                <span class="grant-tile__cell-value">2022-03-01</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Vested</span>
+                <span class="grant-tile__cell-value">10.000</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Strike</span>
+                <span class="grant-tile__cell-value mono">$8,00 USD</span>
+              </div>
+            </div>
+
+            <div class="stack gap-1 mt-2">
+              <span class="grant-tile__cell-label">Progreso</span>
+              <div class="sparkline" aria-label="100 % vested">
+                <div class="sparkline__fill bar-fill" style="--bar-width: 100%;"></div>
+              </div>
+              <span class="muted text-xs">Totalmente vested · sin evento de liquidez pendiente</span>
+            </div>
+          </article>
+
+          <!-- Tile 3: DIFFERENT ESPP -->
+          <article class="grant-tile">
+            <div class="grant-tile__header">
+              <div class="stack gap-1">
+                <span class="grant-tile__title">Different Inc.</span>
+                <span class="grant-tile__instrument">ESPP · ventanas semestrales</span>
+              </div>
+              <a class="btn btn--ghost btn--sm" href="grant-detail.html">Detalle</a>
+            </div>
+
+            <div class="grant-tile__body">
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Acciones compradas</span>
+                <span class="grant-tile__cell-value">200</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Último purchase</span>
+                <span class="grant-tile__cell-value">2025-06-30</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Compras registradas</span>
+                <span class="grant-tile__cell-value">2</span>
+              </div>
+              <div class="grant-tile__cell">
+                <span class="grant-tile__cell-label">Descuento</span>
+                <span class="grant-tile__cell-value mono">15 %</span>
+              </div>
+            </div>
+
+            <div class="stack gap-1 mt-2">
+              <span class="grant-tile__cell-label">Progreso (por ventanas)</span>
+              <div class="sparkline" aria-label="2 de 4 ventanas capturadas">
+                <div class="sparkline__fill bar-fill" style="--bar-width: 50%;"></div>
+              </div>
+              <span class="muted text-xs">2 de 4 ventanas capturadas · <a href="espp-purchase-form.html">registrar otra compra</a></span>
+            </div>
+          </article>
+
+        </div>
+
+        <div class="row mt-5">
+          <a class="btn btn--secondary btn--sm" href="first-grant-form.html">Añadir otro grant</a>
+          <span class="spacer"></span>
+          <span class="muted text-xs">Conversión a EUR disponible al activar seguimiento fiscal <span class="mono">(Slice 3)</span></span>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <!-- Slice 2 footer: text only. NO rule-set chip (G-5). -->
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>
