@@ -104,29 +104,30 @@ jobs:
         # reads it by default. Keep in sync with deny.toml's `ignore = [...]`.
         run: cargo audit --color never
 
+      # EmbarkStudios/cargo-deny-action@v2.0.4 ships an older cargo-deny
+      # that rejects the CVSS 4.0 field format used by recent RustSec
+      # advisories (e.g. RUSTSEC-2026-0073 on libcrux-poly1305):
+      #
+      #     parse error: unsupported CVSS version: 4.0
+      #
+      # Install the latest cargo-deny ourselves (0.19+ supports CVSS 4.0) so
+      # we advance with the advisory database without waiting for the action
+      # to cut a new release. `--locked` respects cargo-deny's published
+      # lockfile so the transitive graph stays inside the 1.88 toolchain.
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny
+
       - name: cargo-deny (advisories)
-        uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
-        with:
-          command: check advisories
-          manifest-path: ./Cargo.toml
+        run: cargo deny --manifest-path ./Cargo.toml check advisories
 
       - name: cargo-deny (bans)
-        uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
-        with:
-          command: check bans
-          manifest-path: ./Cargo.toml
+        run: cargo deny --manifest-path ./Cargo.toml check bans
 
       - name: cargo-deny (licenses)
-        uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
-        with:
-          command: check licenses
-          manifest-path: ./Cargo.toml
+        run: cargo deny --manifest-path ./Cargo.toml check licenses
 
       - name: cargo-deny (sources)
-        uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
-        with:
-          command: check sources
-          manifest-path: ./Cargo.toml
+        run: cargo deny --manifest-path ./Cargo.toml check sources
 
   # ---------------------------------------------------------------------------
   # Frontend: install, lint, typecheck, test. `pnpm audit` always runs (S0-03).
