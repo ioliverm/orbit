@@ -1,62 +1,63 @@
-# cargo-deny configuration — Slice 0a.
+# cargo-deny configuration — Slice 0a, schema version 2.
 #
 # Backs security-checklist item S0-02 (advisories, bans, licenses, sources).
 # Invoked from .github/workflows/ci.yaml's `backend-audit` job.
 # See also ADR-013 §Dependency hygiene.
 #
 # Policy summary:
-#   - Advisories: deny known-vulnerable crates; warn on unmaintained/yanked.
+#   - Advisories: deny known vulnerabilities by default (built-in behaviour
+#     of the v2 schema); ignore-list carries one entry with rationale.
 #   - Licenses:   explicit allowlist; GPL/AGPL/LGPL families are denied.
 #   - Sources:    only crates.io. No git sources in Slice 0a.
 #   - Bans:       warn on duplicate versions; no skip-list by default.
 #
-# This file is tightened in Slice 0b (deny-instead-of-warn on unmaintained,
-# confidence-threshold bump to 0.93, and the duplicate-version allow-list
-# once the real dep graph settles).
+# The v2 schema (cargo-deny ≥ 0.15) replaces the per-category severity knobs
+# (`vulnerability`, `unmaintained`, `yanked`, `notice`) with defaults plus a
+# per-advisory-ID `ignore` mechanism. Toggle via `version = 2` under each
+# section that supports it. This file is tightened in Slice 0b (e.g.
+# `multiple-versions = "deny"` + a curated skip list).
 
 # ---------------------------------------------------------------------------
 # Advisories
 # ---------------------------------------------------------------------------
 [advisories]
+version = 2
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 
-# Hard deny on any known vulnerability. A blocker advisory must be either
-# fixed (preferred) or explicitly `ignore`-listed here with a comment
-# naming the owner and follow-up issue.
-vulnerability = "deny"
-
-# Unmaintained crates are a warn-signal in 0a; promoted to deny in 0b once
-# the graph is known-clean. Rationale: during scaffold we may pull transitive
-# deps tagged unmaintained that we will swap out in Slice 1-2.
-unmaintained = "warn"
-
-# Yanked crates are a warn so we notice without blocking; they generally
-# indicate a maintainer took action and a newer version is preferred.
-yanked = "warn"
-
-# Unsound / notice advisories — treat as warn for now; upgrade individually
-# as they appear.
-notice = "warn"
-
-ignore = []
+# Every entry must carry a reason + review date. When an ignore lands, open
+# a tracking issue so the entry has an owner and a natural expiry when the
+# upstream fix ships. Keep in sync with `.cargo/audit.toml`.
+ignore = [
+    # RUSTSEC-2023-0071 — "Marvin Attack: potential key recovery through
+    # timing sidechannels" in the `rsa` crate. Pulled transitively by
+    # `sqlx-postgres` for password auth over the wire.
+    #
+    # Why ignored (2026-04-20): there is NO fixed upstream release. Orbit's
+    # exposure is narrow — server-initiated TLS from the API to an internal
+    # Postgres (loopback in 0a; private LAN in Slice 8). The session-password
+    # path does NOT traverse `rsa`; Orbit uses argon2id + CSPRNG session
+    # tokens (orbit-auth crate). Re-evaluate each time `sqlx` bumps `rsa`
+    # or at Slice-8 cutover.
+    { id = "RUSTSEC-2023-0071", reason = "rsa Marvin Attack — no upstream fix; sqlx-postgres transitive; Orbit does not use rsa for session crypto." },
+]
 
 # ---------------------------------------------------------------------------
 # Licenses
 # ---------------------------------------------------------------------------
 [licenses]
-# SPDX identifiers. This set is the intersection of:
+version = 2
+# SPDX identifiers. Intersection of:
 #   - permissive licenses Orbit can redistribute freely,
 #   - MPL-2.0 (file-scope copyleft; compatible with our single-binary
 #     distribution per ADR-013 §Dependency hygiene),
 #   - CC0-1.0 + Unicode-DFS-2016 (data / identifier tables pulled in by
 #     common crates such as `unicode-ident`).
 #
-# The copyleft families GPL-*, AGPL-*, LGPL-* are NOT in this list and are
-# therefore effectively denied. We prefer deny over a narrow LGPL exception:
-# if a crate pulls an LGPL dep, the resolution path is to find a permissive
-# alternative; only if no alternative exists does the security-engineer
-# review and approve a case-by-case `exceptions` entry below.
+# Copyleft families GPL-*, AGPL-*, LGPL-* are not on this list and are
+# therefore effectively denied. If a crate pulls an LGPL dep, the resolution
+# path is a permissive alternative; only if no alternative exists does
+# security-engineer review and approve a case-by-case `exceptions` entry.
 allow = [
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
@@ -65,22 +66,31 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "Unicode-DFS-2016",
+    "Unicode-3.0",
     "MPL-2.0",
     "CC0-1.0",
+    "Zlib",
+    # CDLA-Permissive-2.0 is the Community Data License Agreement (permissive
+    # data license). Pulled in by `webpki-roots` for the Mozilla CA store.
+    # Documented as permissive-only, compatible with single-binary
+    # distribution; reviewed 2026-04-20.
+    "CDLA-Permissive-2.0",
 ]
 
-# Match the spec: confidence threshold. 0.8 is cargo-deny's default; we keep
-# it at 0a and bump to 0.93 in 0b once the full dep graph is frozen.
+# Confidence threshold for the license detector. 0.8 is cargo-deny's default;
+# bump to 0.93 in 0b once the full dep graph is frozen.
 confidence-threshold = 0.8
 
 # Per-crate license overrides. Empty at 0a — any entry here requires a
 # comment naming the reviewer and the upstream discussion.
 exceptions = []
 
-# Deny-by-silence: any license that is not in `allow` and not matched by an
-# `exceptions` entry fails the build. This is the shape we want; no
-# `deny = [...]` list is needed because the allowlist is exhaustive for the
-# licenses we intend to tolerate.
+# Orbit's own workspace crates declare `license = "UNLICENSED"` (the project
+# is not open-source). `publish = false` is set on every workspace member;
+# telling cargo-deny to skip license checks on private (unpublishable) crates
+# avoids the false-positive `unlicensed` failure on Orbit crates while still
+# enforcing the allowlist against real third-party deps.
+private = { ignore = true }
 
 # ---------------------------------------------------------------------------
 # Bans
@@ -91,9 +101,14 @@ exceptions = []
 # `skip` list once the dep graph is stable.
 multiple-versions = "warn"
 
-# Wildcard version requirements (e.g. `version = "*"`) are banned outright.
-# Backs S0-04 (no `*`/`latest` ranges in manifests).
+# Wildcard version requirements (e.g. `version = "*"`) are banned outright
+# for third-party deps. Backs S0-04 (no `*`/`latest` ranges in manifests).
 wildcards = "deny"
+# Workspace-internal path deps (`{ path = "..." }` without a `version`) are
+# wildcard-shaped by definition; that's how `cargo` ingests them. Allow those
+# explicitly so S0-04 only bites real `version = "*"` declarations on external
+# crates.
+allow-wildcard-paths = true
 
 # Highlight the full dependency path in warnings so fix-ups are obvious.
 highlight = "all"

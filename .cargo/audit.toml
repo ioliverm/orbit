@@ -1,0 +1,29 @@
+# cargo-audit / rustsec/audit-check configuration.
+#
+# Backs security-checklist item S0-02 (vuln scan via cargo-audit). See also
+# `deny.toml` which implements the cargo-deny side of S0-02.
+#
+# Policy: every `advisories.ignore` entry must carry a reason + review date.
+# When an ignore lands, open a tracking issue so the entry has an owner and a
+# natural expiry when the upstream fix ships.
+
+[advisories]
+ignore = [
+    # RUSTSEC-2023-0071 — "Marvin Attack: potential key recovery through timing
+    # sidechannels" in the `rsa` crate. Pulled transitively by
+    # `sqlx-postgres` for MD5 / SCRAM password auth over the wire.
+    #
+    # Why ignored (2026-04-20): there is NO fixed upstream release. The RSA
+    # crate maintainers have flagged this as long-standing and the Rust
+    # ecosystem as a whole hasn't converged on a patched implementation.
+    # Orbit's exposure is narrow — server-initiated TLS from the API to the
+    # internal Postgres (loopback in 0a; private LAN in Slice 8) — so the
+    # timing side-channel is not reachable by any external caller. The
+    # session-password path does NOT traverse `rsa`; Orbit uses
+    # argon2id + a bespoke CSPRNG session token (orbit-auth crate).
+    #
+    # Re-evaluate every time `sqlx` bumps `rsa` or at Slice-8 cutover, whichever
+    # comes first. Remove this entry once a patched `rsa` is transitively
+    # available.
+    "RUSTSEC-2023-0071",
+]

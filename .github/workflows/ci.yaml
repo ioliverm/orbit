@@ -82,6 +82,10 @@ jobs:
         uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Keep the ignore list in sync with `.cargo/audit.toml`. The action
+          # input is a comma-separated list; our reason / review-date context
+          # lives in the audit.toml comment alongside each ID.
+          ignore: RUSTSEC-2023-0071
 
       - name: cargo-deny (advisories)
         uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4

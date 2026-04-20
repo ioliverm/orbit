@@ -25,7 +25,9 @@ members = [
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.86"
+# Kept in lockstep with `rust-toolchain.toml`. Bumped 1.86 → 1.88 to unblock
+# `time 0.3.47+` (RUSTSEC-2026-0009 fix; pulled transitively by `cookie`).
+rust-version = "1.88"
 license = "UNLICENSED"
 publish = false
 
@@ -66,7 +68,7 @@ bytes = "1"
 clap = { version = "4", features = ["derive", "env"] }
 hex = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
-validator = { version = "0.18", features = ["derive"] }
+validator = { version = "0.20", features = ["derive"] }
 utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
 async-trait = "0.1"
 futures-util = "0.3"
