@@ -1,0 +1,24 @@
+# Gitleaks config for Orbit.
+#
+# Extends the built-in default ruleset and adds narrow allowlists for
+# false positives produced by domain identifiers (vesting-template keys,
+# scenario IDs, rule-set IDs).
+#
+# S0-01 requires gitleaks in the pre-commit hook. This file keeps the
+# hook useful — a config full of generic allowlist entries would
+# silently weaken S0-01.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Orbit domain identifiers that match the generic high-entropy rules but are not secrets."
+
+# Vesting template keys used in GrantForm.tsx and tests. Format is
+# `<instrument>-<duration>-<cliff>-<cadence>`, e.g. `rsu-4y-1y-monthly`.
+# These identifiers are committed to the repo by design (UI template
+# presets) and will recur as new templates land in later slices.
+regexes = [
+  '''rsu-\d+y-\d+y-(monthly|quarterly)''',
+  '''\d+y-\d+-(monthly|quarterly)''',
+]

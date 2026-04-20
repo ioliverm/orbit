@@ -21,6 +21,7 @@ import FirstGrantStepPage from './onboarding/first-grant';
 import DashboardPage from './app/dashboard';
 import GrantsIndexPage from './app/grants';
 import GrantDetailPage from './app/grants/detail';
+import AddGrantPage from './app/grants/new';
 import ProximamenteRoute from './app/proximamente';
 import ProfilePage from './account/profile';
 
@@ -65,6 +66,7 @@ export function buildRoutes(): RouteObject[] {
           children: [
             { path: 'dashboard', element: <DashboardPage /> },
             { path: 'grants', element: <GrantsIndexPage /> },
+            { path: 'grants/new', element: <AddGrantPage /> },
             { path: 'grants/:grantId', element: <GrantDetailPage /> },
             { path: 'proximamente', element: <ProximamenteRoute /> },
             { path: 'account/profile', element: <ProfilePage /> },

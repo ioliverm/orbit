@@ -13,6 +13,14 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: src/components/grants/ResidencyForm.tsx:138
+msgid "— selecciona —"
+msgstr "— select —"
+
+#: src/routes/app/grants/detail.tsx:429
+msgid "¿Confirmas la eliminación definitiva?"
+msgstr "Confirm permanent deletion?"
+
 #: src/routes/auth/signin.tsx:182
 msgid "¿Has olvidado tu contraseña?"
 msgstr "Forgot your password?"
@@ -21,17 +29,69 @@ msgstr "Forgot your password?"
 msgid "¿Todavía no tienes cuenta? <0>Regístrate</0>"
 msgstr "Don't have an account yet? <0>Sign up</0>"
 
+#: src/components/grants/GrantForm.tsx:397
+#: src/components/grants/GrantForm.tsx:605
+msgid "(opcional)"
+msgstr "(optional)"
+
+#: src/routes/app/dashboard.tsx:86
+msgid "{0} grants"
+msgstr "{0} grants"
+
+#: src/components/grants/GrantForm.tsx:518
+msgid "3 años · sin cliff · mensual"
+msgstr "3 years · no cliff · monthly"
+
+#: src/components/grants/GrantForm.tsx:513
+msgid "4 años · cliff 1 año · mensual"
+msgstr "4 years · 1-year cliff · monthly"
+
+#: src/components/grants/GrantForm.tsx:516
+msgid "4 años · cliff 1 año · trimestral"
+msgstr "4 years · 1-year cliff · quarterly"
+
 #: src/routes/auth/verify-email.tsx:43
 msgid "Abre el enlace desde el correo que te enviamos."
 msgstr "Open the link from the email we sent you."
+
+#: src/routes/app/dashboard.tsx:165
+msgid "Acciones"
+msgstr "Shares"
+
+#: src/components/grants/GrantForm.tsx:659
+#: src/routes/app/grants/detail.tsx:290
+msgid "Acciones totales"
+msgstr "Total shares"
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:136
 msgid "Aceptar y continuar"
 msgstr "Accept and continue"
 
+#: src/routes/account/profile.tsx:55
+msgid "Actualiza tu autonomía o tu moneda principal. Al guardar se abre un nuevo período de residencia y se cierra el anterior."
+msgstr "Update your autonomía or your primary currency. Saving opens a new residency period and closes the previous one."
+
+#: src/routes/app/grants/detail.tsx:211
+msgid "Acumulado mensual. Acciones que cumplen las dos condiciones (tiempo + liquidez) en sólido; RSU con sólo tiempo cumplido aparecen con trama."
+msgstr "Cumulative monthly. Shares that meet both conditions (time + liquidity) appear solid; RSUs with only time met appear dashed."
+
+#: src/components/grants/ResidencyForm.tsx:192
+msgid "Afecta a cómo se muestran los valores en tu dashboard. En Slice 1 no hay conversión a EUR."
+msgstr "Affects how values are displayed in your dashboard. In Slice 1 there is no EUR conversion."
+
 #: src/routes/auth/signup.tsx:153
 msgid "Al crear una cuenta aceptas nuestra Política de privacidad. Sólo usamos cookies esenciales; no necesitas aceptar analíticas."
 msgstr "By creating an account you accept our Privacy Policy. We only use essential cookies; no analytics opt-in required."
+
+#: src/routes/app/dashboard.tsx:78
+#: src/routes/app/dashboard.tsx:99
+#: src/routes/app/grants/new.tsx:53
+msgid "Añadir grant"
+msgstr "Add grant"
+
+#: src/routes/app/dashboard.tsx:112
+msgid "Añadir otro grant"
+msgstr "Add another grant"
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:74
 msgid "Antes de continuar — lo que Orbit es y no es"
@@ -42,6 +102,10 @@ msgstr "Before you continue — what Orbit is and isn't"
 msgid "Aún no disponible"
 msgstr "Not yet available"
 
+#: src/components/grants/ResidencyForm.tsx:121
+msgid "Autonomía (territorio común o foral)"
+msgstr "Autonomía (territorio común or foral)"
+
 #: src/routes/auth/signin.tsx:107
 msgid "Bienvenido de nuevo."
 msgstr "Welcome back."
@@ -50,11 +114,31 @@ msgstr "Welcome back."
 msgid "Cada export lleva un traceability ID enlazado al audit-log."
 msgstr "Every export carries a traceability ID linked to the audit log."
 
+#: src/components/grants/GrantForm.tsx:563
+msgid "Cadencia"
+msgstr "Cadence"
+
+#: src/components/grants/GrantForm.tsx:509
+#: src/routes/app/grants/detail.tsx:208
+msgid "Calendario de vesting"
+msgstr "Vesting schedule"
+
+#: src/components/grants/GrantForm.tsx:673
+msgid "Calendario estimado"
+msgstr "Estimated schedule"
+
 #: src/components/Layout/LocaleSwitcher.tsx:20
 msgid "Cambiar idioma"
 msgstr "Change language"
 
+#: src/routes/app/grants/detail.tsx:151
+#: src/routes/app/grants/detail.tsx:434
+msgid "Cancelar"
+msgstr "Cancel"
+
 #: src/components/Spinner.tsx:11
+#: src/routes/app/dashboard.tsx:47
+#: src/routes/app/grants/detail.tsx:124
 msgid "Cargando…"
 msgstr "Loading…"
 
@@ -67,6 +151,14 @@ msgstr "Portfolio"
 msgid "Cerrar sesión"
 msgstr "Sign out"
 
+#: src/components/grants/GrantForm.tsx:546
+msgid "Cliff (meses)"
+msgstr "Cliff (months)"
+
+#: src/components/grants/GrantForm.tsx:701
+msgid "Completa los campos de vesting para ver la previsualización."
+msgstr "Fill in the vesting fields to see the preview."
+
 #: src/routes/auth/signin.tsx:115
 msgid "Comprobación adicional"
 msgstr "Additional check"
@@ -75,6 +167,15 @@ msgstr "Additional check"
 msgid "Comprobación CAPTCHA (integración disponible en Slice 7+)."
 msgstr "CAPTCHA check (integration available from Slice 7 onwards)."
 
+#: src/routes/app/grants/detail.tsx:182
+msgid "concedida"
+msgstr "granted"
+
+#: src/routes/app/grants/detail.tsx:294
+msgid "concedidas"
+msgstr "granted"
+
+#: src/routes/app/grants/detail.tsx:443
 #: src/routes/auth/signup.tsx:147
 msgid "Continuar"
 msgstr "Continue"
@@ -110,6 +211,10 @@ msgstr "Account"
 msgid "Cumplimiento"
 msgstr "Compliance"
 
+#: src/routes/app/grants/detail.tsx:224
+msgid "Curva"
+msgstr "Curve"
+
 #: src/components/Layout/Sidebar.tsx:43
 msgid "Dashboard"
 msgstr "Dashboard"
@@ -118,9 +223,17 @@ msgstr "Dashboard"
 msgid "Datos y privacidad"
 msgstr "Data & privacy"
 
+#: src/components/grants/GrantForm.tsx:548
+msgid "Debe ser menor o igual a los meses totales."
+msgstr "Must be less than or equal to the total months."
+
 #: src/components/Layout/Sidebar.tsx:52
 msgid "Decisiones"
 msgstr "Decisions"
+
+#: src/components/grants/GrantForm.tsx:610
+msgid "Déjalo vacío si aún no ha ocurrido. El timeline mostrará las acciones time-vested con trama de rayas hasta que el evento se cumpla."
+msgstr "Leave empty if it has not happened yet. The timeline will show time-vested shares with a dashed pattern until the event occurs."
 
 #: src/routes/auth/signin.tsx:79
 #: src/routes/auth/verify-email.tsx:64
@@ -131,21 +244,53 @@ msgstr "Too many attempts"
 msgid "Demasiados intentos. Espera unos minutos y vuelve a probar."
 msgstr "Too many attempts. Wait a few minutes and try again."
 
+#: src/components/grants/GrantForm.tsx:476
+msgid "Descuento estimado (%)"
+msgstr "Estimated discount (%)"
+
+#: src/routes/app/dashboard.tsx:158
+msgid "Detalle"
+msgstr "Detail"
+
+#: src/components/grants/GrantForm.tsx:578
+msgid "Double-trigger (sólo RSU)"
+msgstr "Double-trigger (RSU only)"
+
+#: src/routes/app/grants/detail.tsx:191
+msgid "Editar"
+msgstr "Edit"
+
+#: src/routes/app/grants/detail.tsx:138
+msgid "Editar grant"
+msgstr "Edit grant"
+
+#: src/components/grants/GrantForm.tsx:216
+msgid "El cliff no puede superar el periodo total de vesting."
+msgstr "The cliff cannot exceed the total vesting period."
+
+#: src/components/grants/GrantForm.tsx:478
+msgid "El descuento ESPP (p. ej. 15%) se usa sólo como referencia; los detalles de la compra se registran en Slice 2."
+msgstr "The ESPP discount (e.g. 15%) is for reference only; purchase details are captured in Slice 2."
+
 #: src/routes/app/grants/detail.tsx:17
-msgid "El detalle del grant llega en la siguiente iteración (T14b)."
-msgstr "Grant detail ships in the next iteration (T14b)."
+#~ msgid "El detalle del grant llega en la siguiente iteración (T14b)."
+#~ msgstr "Grant detail ships in the next iteration (T14b)."
 
 #: src/routes/onboarding/residency.tsx:16
-msgid "El formulario de residencia llega en la siguiente iteración (T14b)."
-msgstr "The residency form ships in the next iteration (T14b)."
+#~ msgid "El formulario de residencia llega en la siguiente iteración (T14b)."
+#~ msgstr "The residency form ships in the next iteration (T14b)."
 
 #: src/routes/account/profile.tsx:22
-msgid "El formulario de residencia y la sección de datos y privacidad llegan en T14b."
-msgstr "The residency form and the data & privacy section ship in T14b."
+#~ msgid "El formulario de residencia y la sección de datos y privacidad llegan en T14b."
+#~ msgstr "The residency form and the data & privacy section ship in T14b."
 
 #: src/routes/onboarding/first-grant.tsx:14
-msgid "El formulario del primer grant llega en la siguiente iteración (T14b)."
-msgstr "The first-grant form ships in the next iteration (T14b)."
+#~ msgid "El formulario del primer grant llega en la siguiente iteración (T14b)."
+#~ msgstr "The first-grant form ships in the next iteration (T14b)."
+
+#: src/routes/app/grants/detail.tsx:377
+msgid "El grant no existe o no pertenece a tu cuenta."
+msgstr "The grant does not exist or does not belong to your account."
 
 #: src/routes/auth/password-reset-request.tsx:28
 msgid "El restablecimiento de contraseña se habilitará en una iteración posterior. Mientras tanto, contacta con soporte si necesitas recuperar el acceso."
@@ -155,13 +300,37 @@ msgstr "Password reset will be enabled in a later iteration. In the meantime, co
 msgid "El restablecimiento de contraseña se habilitará en una iteración posterior. Si tu enlace caduca mientras tanto, pide uno nuevo cuando la función esté disponible."
 msgstr "Password reset will be enabled in a later iteration. If your link expires in the meantime, request a fresh one once the feature ships."
 
+#: src/components/grants/GrantForm.tsx:224
+msgid "El strike es obligatorio para NSO / ISO."
+msgstr "Strike is required for NSO / ISO."
+
 #: src/routes/auth/password-reset-landing.tsx:13
 msgid "Elige una contraseña nueva"
 msgstr "Choose a new password"
 
+#: src/routes/app/grants/detail.tsx:198
+msgid "Eliminar"
+msgstr "Delete"
+
+#: src/routes/app/grants/detail.tsx:453
+msgid "Eliminar definitivamente"
+msgstr "Delete permanently"
+
+#: src/routes/app/grants/detail.tsx:409
+msgid "Eliminar grant"
+msgstr "Delete grant"
+
 #: src/routes/app/dashboard.tsx:24
-msgid "Empieza añadiendo tu primer grant"
-msgstr "Start by adding your first grant"
+#~ msgid "Empieza añadiendo tu primer grant"
+#~ msgstr "Start by adding your first grant"
+
+#: src/components/grants/GrantForm.tsx:378
+msgid "Empleador"
+msgstr "Employer"
+
+#: src/components/grants/GrantForm.tsx:354
+msgid "Employee Stock Purchase Plan. El descuento tributa como rendimiento del trabajo en la compra."
+msgstr "Employee Stock Purchase Plan. The discount is taxable as rendimiento del trabajo at purchase."
 
 #: src/routes/auth/verify-email.tsx:66
 msgid "Enlace caducado o ya usado"
@@ -187,6 +356,14 @@ msgstr "This password appears in public breach datasets. Pick another one."
 msgid "Esta función llega en una iteración posterior. Gracias por tu paciencia."
 msgstr "This feature ships in a later iteration. Thanks for your patience."
 
+#: src/components/grants/GrantForm.tsx:591
+msgid "Este grant requiere un evento de liquidez (IPO, adquisición o tender offer) además del tiempo para considerarse totalmente vesting."
+msgstr "This grant requires a liquidity event (IPO, acquisition, or tender offer) in addition to time to be considered fully vested."
+
+#: src/routes/app/grants/detail.tsx:422
+msgid "Esto eliminará el grant y todo su historial de vesting. Esta acción no se puede deshacer."
+msgstr "This will delete the grant and all of its vesting history. This action cannot be undone."
+
 #: src/components/Layout/Footer.tsx:27
 msgid "Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja."
 msgstr "Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja."
@@ -203,18 +380,61 @@ msgstr "Exports"
 msgid "Falta el token"
 msgstr "Missing token"
 
-#: src/routes/account/profile.tsx:16
-msgid "Gestión de datos disponible a partir de la siguiente iteración."
-msgstr "Data management available from the next iteration onwards."
+#: src/components/grants/GrantForm.tsx:603
+msgid "Fecha del evento de liquidez"
+msgstr "Liquidity event date"
 
-#: src/routes/app/grants/detail.tsx:12
+#: src/components/grants/GrantForm.tsx:418
+#: src/routes/app/dashboard.tsx:173
+msgid "Fecha del grant"
+msgstr "Grant date"
+
+#: src/components/grants/GrantForm.tsx:401
+msgid "Formato inválido."
+msgstr "Invalid format."
+
+#: src/routes/app/grants/new.tsx:62
+msgid "Formulario de nuevo grant"
+msgstr "New grant form"
+
+#: src/routes/app/grants/detail.tsx:232
+msgid "Gantt"
+msgstr "Gantt"
+
+#: src/routes/account/profile.tsx:16
+#~ msgid "Gestión de datos disponible a partir de la siguiente iteración."
+#~ msgstr "Data management available from the next iteration onwards."
+
+#: src/routes/app/grants/detail.tsx:103
+#: src/routes/app/grants/detail.tsx:120
 msgid "Grant"
 msgstr "Grant"
 
+#: src/routes/app/grants/detail.tsx:372
+msgid "Grant no encontrado"
+msgstr "Grant not found"
+
 #: src/components/Layout/Sidebar.tsx:46
-#: src/routes/app/grants/index.tsx:10
+#: src/routes/app/dashboard.tsx:104
 msgid "Grants"
 msgstr "Grants"
+
+#: src/routes/app/grants/detail.tsx:158
+msgid "Guardar cambios"
+msgstr "Save changes"
+
+#: src/routes/app/grants/new.tsx:65
+#: src/routes/onboarding/first-grant.tsx:80
+msgid "Guardar grant"
+msgstr "Save grant"
+
+#: src/routes/account/profile.tsx:73
+msgid "Guardar residencia"
+msgstr "Save residency"
+
+#: src/routes/onboarding/residency.tsx:59
+msgid "Guardar residencia y continuar"
+msgstr "Save residency and continue"
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:128
 msgid "He leído y entiendo que Orbit no es asesoramiento fiscal ni financiero. Acepto continuar con ese entendimiento."
@@ -236,6 +456,14 @@ msgstr "We've sent a link to your email. The link expires in 24 hours."
 msgid "Idioma"
 msgstr "Language"
 
+#: src/routes/app/dashboard.tsx:211
+msgid "Ingresos imponibles hasta la fecha: <0>0 acciones</0>"
+msgstr "Taxable income to date: <0>0 shares</0>"
+
+#: src/routes/app/grants/detail.tsx:251
+msgid "Ingresos imponibles hasta la fecha: 0 acciones"
+msgstr "Taxable income to date: 0 shares"
+
 #: src/routes/auth/signin.tsx:104
 msgid "Inicia sesión"
 msgstr "Sign in"
@@ -244,6 +472,10 @@ msgstr "Sign in"
 msgid "Iniciar sesión"
 msgstr "Sign in"
 
+#: src/components/grants/GrantForm.tsx:499
+msgid "Inicio del vesting"
+msgstr "Vesting start"
+
 #: src/routes/auth/signin.tsx:81
 msgid "Inicios de sesión pausados"
 msgstr "Sign-ins paused"
@@ -251,6 +483,14 @@ msgstr "Sign-ins paused"
 #: src/routes/auth/password-reset-request.tsx:21
 msgid "Introduce el correo con el que te registraste. Si la dirección existe en Orbit, recibirás un enlace de un solo uso válido durante 60 minutos."
 msgstr "Enter the email you registered with. If the address is on file at Orbit, you'll receive a one-time link valid for 60 minutes."
+
+#: src/components/grants/GrantForm.tsx:232
+msgid "Introduce el nombre del empleador."
+msgstr "Enter the employer name."
+
+#: src/routes/app/grants/new.tsx:56
+msgid "Introduce los datos del grant; la previsualización aparece a la derecha."
+msgstr "Enter the grant details; the preview appears on the right."
 
 #: src/routes/auth/signin.tsx:142
 msgid "Introduce tu contraseña."
@@ -261,13 +501,45 @@ msgstr "Enter your password."
 msgid "Introduce un correo válido."
 msgstr "Enter a valid email."
 
+#: src/routes/onboarding/first-grant.tsx:72
+msgid "Introduce un grant manualmente. El calendario de vesting se dibuja a la derecha conforme escribes. Si tienes varios grants, puedes saltar este paso y usar el importador CSV más adelante."
+msgstr "Enter a grant manually. The vesting schedule draws on the right as you type. If you have multiple grants, you can skip this step and use the CSV importer later."
+
+#: src/components/grants/GrantForm.tsx:202
+msgid "Introduce un número de acciones mayor que 0."
+msgstr "Enter a share count greater than 0."
+
+#: src/components/grants/GrantForm.tsx:703
+msgid "Introduce un número de acciones para ver la previsualización."
+msgstr "Enter a share count to see the preview."
+
 #: src/routes/auth/verify-email.tsx:46
 msgid "Ir a iniciar sesión"
 msgstr "Go to sign in"
 
+#: src/components/grants/ResidencyForm.tsx:123
+msgid "La autonomía determina los tramos autonómicos de IRPF. Los regímenes forales se guardan pero no activan cálculos fiscales en v1."
+msgstr "The autonomía determines the autonomous IRPF brackets. Foral regimes are stored but do not activate tax calculations in v1."
+
+#: src/components/grants/GrantForm.tsx:299
+msgid "La fecha es futura. ¿Estás seguro?"
+msgstr "That date is in the future. Are you sure?"
+
 #: src/routes/app/grants/index.tsx:14
-msgid "La lista de grants llega en la siguiente iteración (T14b)."
-msgstr "The grants list ships in the next iteration (T14b)."
+#~ msgid "La lista de grants llega en la siguiente iteración (T14b)."
+#~ msgstr "The grants list ships in the next iteration (T14b)."
+
+#: src/components/grants/GrantForm.tsx:691
+msgid "La trama rayada indica acciones time-vested pendientes de evento de liquidez."
+msgstr "The dashed pattern indicates time-vested shares awaiting a liquidity event."
+
+#: src/routes/app/grants/detail.tsx:245
+msgid "Las acciones time-vested aparecen con trama diagonal: están vested por tiempo pero no cuentan como rendimiento del trabajo hasta que ocurra el evento de liquidez."
+msgstr "Time-vested shares appear with a diagonal pattern: they are time-vested but do not count as rendimiento del trabajo until the liquidity event occurs."
+
+#: src/components/grants/GrantForm.tsx:366
+msgid "Las ISO se tratan como NSO a efectos fiscales españoles en v1."
+msgstr "ISOs are treated as NSOs for Spanish tax purposes in v1."
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:102
 msgid "Los cálculos llevan la versión del rule set y la fecha de guía AEAT."
@@ -276,6 +548,22 @@ msgstr "Calculations carry the rule-set version and the AEAT guidance date."
 #: src/routes/auth/verify-email.tsx:70
 msgid "Los enlaces de verificación caducan a las 24 horas y sólo pueden usarse una vez."
 msgstr "Verification links expire after 24 hours and can only be used once."
+
+#: src/components/grants/GrantForm.tsx:209
+msgid "Los meses totales deben estar entre 1 y 240."
+msgstr "Total months must be between 1 and 240."
+
+#: src/routes/app/grants/detail.tsx:317
+msgid "mensual"
+msgstr "monthly"
+
+#: src/components/grants/GrantForm.tsx:566
+msgid "Mensual"
+msgstr "Monthly"
+
+#: src/components/grants/GrantForm.tsx:529
+msgid "Meses totales"
+msgstr "Total months"
 
 #: src/routes/auth/signup.tsx:123
 msgid "Mínimo 12 caracteres."
@@ -289,9 +577,29 @@ msgstr "At least 12 characters. We check your password against public breach dat
 msgid "Modelo 720"
 msgstr "Modelo 720"
 
+#: src/routes/app/grants/detail.tsx:217
+msgid "Modo de vista"
+msgstr "View mode"
+
+#: src/components/grants/GrantForm.tsx:461
+msgid "Moneda del strike"
+msgstr "Strike currency"
+
+#: src/components/grants/ResidencyForm.tsx:189
+msgid "Moneda principal"
+msgstr "Primary currency"
+
+#: src/components/grants/ResidencyForm.tsx:169
+msgid "No"
+msgstr "No"
+
 #: src/routes/auth/verify-email.tsx:58
 msgid "No pudimos verificar el enlace"
 msgstr "We couldn't verify the link"
+
+#: src/routes/app/grants/detail.tsx:108
+msgid "No se pudo cargar el grant."
+msgstr "Could not load the grant."
 
 #: src/routes/auth/signup.tsx:88
 msgid "No se pudo crear la cuenta"
@@ -301,9 +609,25 @@ msgstr "Account couldn't be created"
 msgid "No se pudo crear la cuenta. Inténtalo de nuevo."
 msgstr "Account couldn't be created. Try again."
 
+#: src/routes/app/grants/detail.tsx:416
+msgid "No se pudo eliminar. Inténtalo de nuevo."
+msgstr "Could not delete. Try again."
+
 #: src/components/Disclaimer/DisclaimerModal.tsx:116
+#: src/components/grants/GrantForm.tsx:317
+#: src/components/grants/ResidencyForm.tsx:116
 msgid "No se pudo guardar"
 msgstr "Couldn't save"
+
+#: src/routes/account/profile.tsx:34
+#: src/routes/app/grants/detail.tsx:74
+#: src/routes/app/grants/new.tsx:43
+#: src/routes/onboarding/first-grant.tsx:47
+#: src/routes/onboarding/first-grant.tsx:49
+#: src/routes/onboarding/residency.tsx:39
+#: src/routes/onboarding/residency.tsx:41
+msgid "No se pudo guardar. Inténtalo de nuevo."
+msgstr "Could not save. Try again."
 
 #: src/routes/auth/signin.tsx:64
 #: src/routes/auth/signin.tsx:67
@@ -314,6 +638,14 @@ msgstr "Couldn't sign you in. Try again."
 #: src/components/Disclaimer/DisclaimerModal.tsx:45
 msgid "No se pudo registrar la aceptación. Inténtalo de nuevo."
 msgstr "Couldn't record your acceptance. Try again."
+
+#: src/components/grants/GrantForm.tsx:342
+msgid "Non-qualified Stock Options. Bargain element como rendimiento del trabajo al ejercer."
+msgstr "Non-qualified Stock Options. Bargain element taxed as rendimiento del trabajo at exercise."
+
+#: src/components/grants/GrantForm.tsx:426
+msgid "Número de acciones"
+msgstr "Share count"
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:83
 msgid "Orbit calcula, visualiza y exporta. No te dice qué hacer ni te da recomendaciones. Para actuar sobre estos números, consulta con tu asesor fiscal o tu gestor. Orbit no está registrado en CNMV ni presta servicios regulados."
@@ -328,26 +660,50 @@ msgstr "Orbit is a decision-support tool, not tax advice. You'll accept the full
 msgid "disclaimer.en-gloss"
 msgstr "Orbit is not tax or financial advice. It calculates, visualizes, and exports; it does not tell you what to do. Before acting on these numbers, consult your tax advisor. Orbit is not CNMV-registered and does not provide regulated services."
 
+#: src/routes/onboarding/residency.tsx:52
+msgid "Orbit necesita saber dónde tributas antes de modelar tus grants. Guardaremos esta información como un período de residencia con fecha de inicio hoy."
+msgstr "Orbit needs to know where you are taxed before modelling your grants. We will save this as a residency period starting today."
+
 #: src/components/Disclaimer/DisclaimerModal.tsx:80
 msgid "Orbit no es asesoramiento fiscal ni financiero."
 msgstr "Orbit is not tax or financial advice."
 
 #: src/routes/onboarding/residency.tsx:13
-msgid "Paso 4 — Tu residencia fiscal"
-msgstr "Step 4 — Your tax residency"
+#~ msgid "Paso 4 — Tu residencia fiscal"
+#~ msgstr "Step 4 — Your tax residency"
 
 #: src/routes/onboarding/first-grant.tsx:11
-msgid "Paso 5 — Añade tu primer grant"
-msgstr "Step 5 — Add your first grant"
+#~ msgid "Paso 5 — Añade tu primer grant"
+#~ msgstr "Step 5 — Add your first grant"
+
+#: src/routes/app/grants/detail.tsx:304
+msgid "Pendiente de evento de liquidez"
+msgstr "Awaiting liquidity event"
+
+#: src/components/vesting/VestingTimeline.tsx:57
+msgid "Pendiente de liquidez"
+msgstr "Awaiting liquidity"
 
 #: src/components/Layout/Sidebar.tsx:71
-#: src/routes/account/profile.tsx:13
+#: src/routes/account/profile.tsx:52
 msgid "Perfil y residencia"
 msgstr "Profile & residency"
+
+#: src/components/grants/GrantForm.tsx:519
+msgid "Personalizado…"
+msgstr "Custom…"
+
+#: src/routes/app/grants/detail.tsx:310
+msgid "Plan de vesting"
+msgstr "Vesting plan"
 
 #: src/routes/auth/signin.tsx:82
 msgid "Por tu seguridad, hemos pausado los inicios de sesión durante unos minutos. Inténtalo de nuevo en ~{mins} min. Si no reconoces esta actividad, restablece tu contraseña."
 msgstr "For your security, we've paused sign-ins for a few minutes. Try again in ~{mins} min. If you don't recognise this activity, reset your password."
+
+#: src/routes/app/dashboard.tsx:202
+msgid "Progreso"
+msgstr "Progress"
 
 #: src/components/Layout/Sidebar.tsx:21
 msgid "próx."
@@ -361,11 +717,36 @@ msgstr "Coming soon"
 msgid "Reenviar enlace (próximamente)"
 msgstr "Resend link (coming soon)"
 
+#: src/components/grants/ResidencyForm.tsx:163
+msgid "Régimen de impatriados (Beckham)"
+msgstr "Impatriados regime (Beckham)"
+
+#: src/components/grants/ResidencyForm.tsx:147
+msgid "Régimen foral (no soportado en v1)"
+msgstr "Foral regime (not supported in v1)"
+
+#: src/routes/account/profile.tsx:28
+msgid "Residencia actualizada. Los cambios aplicarán a los próximos períodos."
+msgstr "Residency updated. Changes will apply to the next periods."
+
+#: src/routes/account/profile.tsx:69
+msgid "Residencia fiscal"
+msgstr "Tax residency"
+
 #: src/routes/auth/password-reset-request.tsx:18
 msgid "Restablecer contraseña"
 msgstr "Reset password"
 
+#: src/components/grants/GrantForm.tsx:331
+msgid "Restricted Stock Units. Tributan como rendimiento del trabajo al vestear."
+msgstr "Restricted Stock Units. Taxed as rendimiento del trabajo on vesting."
+
+#: src/routes/account/profile.tsx:32
+#: src/routes/app/grants/detail.tsx:71
+#: src/routes/app/grants/new.tsx:40
 #: src/routes/auth/signup.tsx:58
+#: src/routes/onboarding/first-grant.tsx:44
+#: src/routes/onboarding/residency.tsx:37
 msgid "Revisa el formulario e inténtalo de nuevo."
 msgstr "Review the form and try again."
 
@@ -373,34 +754,109 @@ msgstr "Review the form and try again."
 msgid "Revisa tu correo"
 msgstr "Check your email"
 
+#: src/routes/app/grants/detail.tsx:242
+msgid "RSU double-trigger — estado actual"
+msgstr "RSU double-trigger — current state"
+
 #: src/components/Layout/AppShell.tsx:17
 #: src/components/Layout/AuthShell.tsx:17
 msgid "Saltar al contenido"
 msgstr "Skip to content"
 
+#: src/components/grants/ResidencyForm.tsx:87
+msgid "Selecciona una autonomía."
+msgstr "Select an autonomía."
+
+#: src/components/grants/ResidencyForm.tsx:94
+msgid "Selecciona una moneda."
+msgstr "Select a currency."
+
 #: src/components/Layout/Sidebar.tsx:54
 msgid "Sell-now"
 msgstr "Sell-now"
+
+#: src/components/grants/ResidencyForm.tsx:180
+msgid "Si aplicas el régimen especial de impatriados (Beckham), v1 no calcula tu IRPF bajo ese régimen. Guardamos tu respuesta para cuando lleguen los cálculos."
+msgstr "If you apply the impatriados special regime (Beckham), v1 does not calculate your IRPF under that regime. We save your answer for when calculations arrive."
 
 #: src/routes/auth/signup-verify-sent.tsx:30
 msgid "Si no recibiste el correo, comprueba la carpeta de spam. No puedes entrar en la app hasta verificar tu email."
 msgstr "If you didn't receive the email, check your spam folder. You can't enter the app until your email is verified."
 
+#: src/components/grants/ResidencyForm.tsx:175
+msgid "Sí, estoy bajo el régimen"
+msgstr "Yes, I am under the regime"
+
+#: src/components/grants/GrantForm.tsx:446
+#: src/routes/app/dashboard.tsx:190
+msgid "Strike"
+msgstr "Strike"
+
+#: src/routes/onboarding/first-grant.tsx:85
+msgid "Tengo varios grants — importaré desde Carta o Shareworks después"
+msgstr "I have multiple grants — I'll import from Carta or Shareworks later"
+
+#: src/components/grants/ResidencyForm.tsx:139
+msgid "Territorio común (soportado)"
+msgstr "Territorio común (supported)"
+
 #: src/components/Layout/Footer.tsx:29
 msgid "This is not tax or financial advice — Orbit calculates, it doesn't recommend."
 msgstr "This is not tax or financial advice — Orbit calculates, it doesn't recommend."
 
-#: src/routes/app/dashboard.tsx:18
+#: src/components/grants/GrantForm.tsx:395
+msgid "Ticker"
+msgstr "Ticker"
+
+#: src/routes/app/dashboard.tsx:181
+msgid "Time-vested"
+msgstr "Time-vested"
+
+#: src/routes/app/grants/detail.tsx:299
+msgid "Time-vested (pendiente)"
+msgstr "Time-vested (pending)"
+
+#: src/components/grants/GrantForm.tsx:323
+msgid "Tipo de instrumento"
+msgstr "Instrument type"
+
+#: src/routes/app/dashboard.tsx:62
 msgid "Todavía no has añadido ningún grant."
 msgstr "You haven't added any grants yet."
 
-#: src/routes/app/dashboard.tsx:15
+#: src/routes/app/grants/detail.tsx:319
+msgid "trimestral"
+msgstr "quarterly"
+
+#: src/components/grants/GrantForm.tsx:567
+msgid "Trimestral"
+msgstr "Quarterly"
+
+#: src/routes/app/dashboard.tsx:43
+#: src/routes/app/dashboard.tsx:59
+#: src/routes/app/dashboard.tsx:93
 msgid "Tu cartera"
 msgstr "Your portfolio"
 
+#: src/routes/app/dashboard.tsx:68
+msgid "Tu cartera está vacía"
+msgstr "Your portfolio is empty"
+
+#: src/routes/onboarding/first-grant.tsx:69
+msgid "Tu primer grant"
+msgstr "Your first grant"
+
+#: src/routes/onboarding/residency.tsx:49
+msgid "Tu residencia fiscal"
+msgstr "Your tax residency"
+
 #: src/routes/app/dashboard.tsx:27
-msgid "Un grant es la concesión de acciones de una empresa (RSU, NSO, ISO, ESPP). Registrarlo en Orbit te permite visualizar tu vesting."
-msgstr "A grant is a company's stock award (RSU, NSO, ISO, ESPP). Recording it in Orbit lets you visualise its vesting."
+#~ msgid "Un grant es la concesión de acciones de una empresa (RSU, NSO, ISO, ESPP). Registrarlo en Orbit te permite visualizar tu vesting."
+#~ msgstr "A grant is a company's stock award (RSU, NSO, ISO, ESPP). Recording it in Orbit lets you visualise its vesting."
+
+#: src/routes/app/dashboard.tsx:71
+msgid "Un grant es una concesión de equity — las acciones u opciones que te asigna tu empleador. Añade la primera para empezar a ver tu calendario de vesting."
+msgstr "A grant is an equity award — the shares or options your employer assigns to you. Add your first grant to start seeing your vesting schedule."
 
 #: src/routes/auth/signup.tsx:94
 msgid "Usaremos esta dirección para verificarte y para avisos de seguridad."
@@ -418,6 +874,19 @@ msgstr "v1 does not support País Vasco, Navarra, or the Beckham regime for calc
 msgid "Verificando tu correo…"
 msgstr "Verifying your email…"
 
+#: src/routes/app/dashboard.tsx:181
+msgid "Vested"
+msgstr "Vested"
+
+#: src/routes/app/grants/detail.tsx:299
+msgid "Vested hasta la fecha"
+msgstr "Vested to date"
+
+#: src/components/grants/GrantForm.tsx:649
+#: src/components/grants/GrantForm.tsx:653
+msgid "Vista previa del vesting"
+msgstr "Vesting preview"
+
 #: src/routes/auth/password-reset-request.tsx:42
 #: src/routes/auth/signin.tsx:95
 msgid "Volver"
@@ -428,6 +897,10 @@ msgstr "Back"
 #: src/routes/auth/verify-email.tsx:88
 msgid "Volver a iniciar sesión"
 msgstr "Back to sign in"
+
+#: src/routes/app/grants/detail.tsx:380
+msgid "Volver al dashboard"
+msgstr "Back to dashboard"
 
 #: src/routes/auth/signup.tsx:144
 msgid "Ya tengo cuenta"

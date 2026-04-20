@@ -1,18 +1,10 @@
-// /app/grants — T14b stub.
+// /app/grants — mirrors the dashboard for Slice 1. Clicking "Grants" in
+// the sidebar lands here; we render the same tile grid by delegating to
+// the dashboard component. A standalone index view with filters / search
+// is Slice 2 once CSV import introduces enough rows to warrant it.
 
-import { Trans } from '@lingui/macro';
+import DashboardPage from '../dashboard';
 
 export default function GrantsIndexPage(): JSX.Element {
-  return (
-    <>
-      <div className="page-title">
-        <h1>
-          <Trans>Grants</Trans>
-        </h1>
-      </div>
-      <p className="muted">
-        <Trans>La lista de grants llega en la siguiente iteración (T14b).</Trans>
-      </p>
-    </>
-  );
+  return <DashboardPage />;
 }
