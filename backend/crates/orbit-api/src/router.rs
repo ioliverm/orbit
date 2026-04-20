@@ -58,9 +58,20 @@ pub fn router(state: AppState) -> Router {
     // Authenticated subtree: session + CSRF are required. Wizard-stage
     // endpoints (`/auth/*`, `/consent/*`, `/residency*`) live here WITHOUT
     // the onboarding gate — they are how the user *completes* the wizard.
+    // Session management (Slice 2 T21) also lives here — AC-7.1.1 asks
+    // that the device list be reachable regardless of onboarding stage.
     let wizard_authed = Router::new()
         .route("/auth/signout", post(handlers::auth::signout))
         .route("/auth/me", get(handlers::auth::me))
+        .route("/auth/sessions", get(handlers::auth::list_sessions))
+        .route(
+            "/auth/sessions/:session_id",
+            axum::routing::delete(handlers::auth::revoke_session),
+        )
+        .route(
+            "/auth/sessions/revoke-all-others",
+            post(handlers::auth::revoke_all_others),
+        )
         .route("/consent/disclaimer", post(handlers::consent::disclaimer))
         .route(
             "/residency",
@@ -85,6 +96,38 @@ pub fn router(state: AppState) -> Router {
             "/grants/:id/vesting",
             get(handlers::grants::vesting_for_grant),
         )
+        // Slice 2 T21 — ESPP purchases, Art.7.p trips, M720 inputs,
+        // stacked-dashboard read.
+        .route(
+            "/grants/:grant_id/espp-purchases",
+            get(handlers::espp_purchases::list_for_grant).post(handlers::espp_purchases::create),
+        )
+        .route(
+            "/espp-purchases/:id",
+            get(handlers::espp_purchases::get_one)
+                .put(handlers::espp_purchases::update)
+                .delete(handlers::espp_purchases::delete),
+        )
+        .route(
+            "/trips",
+            get(handlers::trips::list).post(handlers::trips::create),
+        )
+        .route(
+            "/trips/:id",
+            get(handlers::trips::get_one)
+                .put(handlers::trips::update)
+                .delete(handlers::trips::delete),
+        )
+        .route(
+            "/modelo-720-inputs",
+            get(handlers::modelo_720_inputs::list_history)
+                .post(handlers::modelo_720_inputs::upsert),
+        )
+        .route(
+            "/modelo-720-inputs/current",
+            get(handlers::modelo_720_inputs::get_current),
+        )
+        .route("/dashboard/stacked", get(handlers::dashboard::stacked))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             mw::onboarding::require_first_grant_or_later,

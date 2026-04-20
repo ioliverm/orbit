@@ -1,0 +1,226 @@
+{
+  "_comment": "Shared fixture for stack_dashboard (Slice 2 T21, ADR-016 §4). Consumed by both the Rust tests (backend/crates/orbit-core/tests/stacked_grants_fixtures.rs) and a Vitest suite that T22 will land alongside the frontend parity mirror. Any drift between the two implementations (AC-8.2.8) fails both suites. Dates are ISO-8601; scaled counts are in orbit_core::Shares units (1/10_000 of a share). GrantMeta.created_at is ISO-8601 with explicit UTC offset.",
+  "_sharesScale": 10000,
+  "cases": [
+    {
+      "name": "single-grant-acme-rsu-12m-no-cliff",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "11111111-1111-4111-8111-111111111111",
+          "employerName": "Acme Inc.",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["Acme Inc."],
+        "employerGrantIdCounts": [1],
+        "combinedPointCount": 12,
+        "finalCumulativeVestedScaled": 120000000,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    },
+    {
+      "name": "two-rsus-same-employer-case-insensitive-merge",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "22222222-2222-4222-8222-222222222201",
+          "employerName": "ACME Inc.",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "22222222-2222-4222-8222-222222222202",
+          "employerName": "acme inc.",
+          "instrument": "rsu",
+          "createdAt": "2024-06-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 240000000,
+            "vestingStart": "2024-06-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["acme inc."],
+        "employerGrantIdCounts": [2],
+        "combinedPointCount": 17,
+        "finalCumulativeVestedScaled": 360000000,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    },
+    {
+      "name": "rsu-plus-nso-mixed-instruments-same-employer",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "33333333-3333-4333-8333-333333333301",
+          "employerName": "Acme",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "33333333-3333-4333-8333-333333333302",
+          "employerName": "Acme",
+          "instrument": "nso",
+          "createdAt": "2024-02-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 240000000,
+            "vestingStart": "2024-02-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["Acme"],
+        "employerGrantIdCounts": [2],
+        "combinedPointCount": 13,
+        "finalCumulativeVestedScaled": 360000000,
+        "finalCumulativeAwaitingScaled": 0,
+        "instrumentsPresentInBreakdown": ["rsu", "nso"]
+      }
+    },
+    {
+      "name": "two-employers-disjoint-stacks",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "44444444-4444-4444-8444-444444444401",
+          "employerName": "Alpha",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "44444444-4444-4444-8444-444444444402",
+          "employerName": "Bravo",
+          "instrument": "nso",
+          "createdAt": "2024-02-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 60000000,
+            "vestingStart": "2024-02-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 2,
+        "employerNames": ["Alpha", "Bravo"],
+        "employerGrantIdCounts": [1, 1],
+        "combinedPointCount": 13,
+        "finalCumulativeVestedScaled": 180000000,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    },
+    {
+      "name": "double-trigger-pending-liquidity-lands-on-awaiting",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "55555555-5555-4555-8555-555555555555",
+          "employerName": "Stealth",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 480000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 48,
+            "cliffMonths": 12,
+            "cadence": "monthly",
+            "doubleTrigger": true,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["Stealth"],
+        "employerGrantIdCounts": [1],
+        "combinedPointCount": 37,
+        "finalCumulativeVestedScaled": 0,
+        "finalCumulativeAwaitingScaled": 480000000
+      }
+    },
+    {
+      "name": "fractional-espp-shares-preserve-scale",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "66666666-6666-4666-8666-666666666666",
+          "employerName": "Fraction Co.",
+          "instrument": "espp",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 1234567,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 6,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["Fraction Co."],
+        "employerGrantIdCounts": [1],
+        "combinedPointCount": 6,
+        "finalCumulativeVestedScaled": 1234567,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    }
+  ]
+}

@@ -71,6 +71,12 @@ pub enum AppError {
     #[error("onboarding required")]
     OnboardingRequired { stage: &'static str },
 
+    /// 403 — the user asked to revoke their own current session via the
+    /// device-list endpoint (AC-7.2.3). The UI should route them through
+    /// sign-out instead.
+    #[error("cannot revoke current session")]
+    CannotRevokeCurrent,
+
     /// 404 — resource not found or not owned (RLS fail-closed, AC-7.3).
     #[error("not found")]
     NotFound,
@@ -134,6 +140,12 @@ impl AppError {
                 "onboarding.required",
                 "Complete the onboarding step before continuing.",
                 Some(json!({ "stage": stage })),
+            ),
+            AppError::CannotRevokeCurrent => (
+                StatusCode::FORBIDDEN,
+                "cannot_revoke_current",
+                "Cannot revoke the current session from the device list.",
+                None,
             ),
             AppError::NotFound => (
                 StatusCode::NOT_FOUND,

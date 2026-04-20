@@ -45,6 +45,10 @@ impl AuthAction {
 /// allowlisted `payload_summary` shape (SEC-101) — share counts, strike
 /// amounts, autonomía values and the Beckham flag NEVER appear in the
 /// payload; handlers build the JSON via a typed helper at each call site.
+///
+/// Slice 2 T21 extends the taxonomy with the ESPP purchase, Art. 7.p trip,
+/// Modelo 720 upsert and session-revoke actions. The allowlists are
+/// declared per-variant below; T23 probes assert they are honored.
 #[derive(Debug, Clone, Copy)]
 pub enum WizardAction {
     /// `dsr.consent.disclaimer_accepted` — payload `{ version }`.
@@ -57,6 +61,38 @@ pub enum WizardAction {
     GrantUpdate,
     /// `grant.delete` — payload `{ instrument }`.
     GrantDelete,
+
+    // --- Slice 2 T21 ---
+    /// `espp_purchase.create` — payload allowlist:
+    /// `{ currency, had_lookback: bool, had_discount: bool, notes_lift: bool }`.
+    /// **Never** FMV, purchase price, share count, or raw notes text.
+    EsppPurchaseCreate,
+    /// `espp_purchase.update` — same allowlist as create (`notes_lift`
+    /// is always `false` on update; the lift only fires on first purchase).
+    EsppPurchaseUpdate,
+    /// `espp_purchase.delete` — payload `{ currency }`.
+    EsppPurchaseDelete,
+
+    /// `trip.create` — payload allowlist:
+    /// `{ country, criteria_answered: int (0..=5), employer_paid: bool }`.
+    /// **No raw purpose text, no dates, no criterion values.**
+    TripCreate,
+    /// `trip.update` — same allowlist as create.
+    TripUpdate,
+    /// `trip.delete` — payload `{}` (empty — destination and dates would
+    /// be leakage).
+    TripDelete,
+
+    /// `modelo_720_inputs.upsert` — payload allowlist:
+    /// `{ category, outcome }` where `outcome` is one of
+    /// `"inserted" | "closed_and_created" | "updated_same_day"`. The
+    /// `NoOp` branch writes NO audit row (AC-6.2.5).
+    Modelo720Upsert,
+
+    /// `session.revoke` — payload allowlist:
+    /// `{ kind: "single", initiator: "self" }`
+    /// or `{ kind: "bulk", initiator: "self", count: int }`.
+    SessionRevoke,
 }
 
 impl WizardAction {
@@ -67,6 +103,14 @@ impl WizardAction {
             WizardAction::GrantCreate => "grant.create",
             WizardAction::GrantUpdate => "grant.update",
             WizardAction::GrantDelete => "grant.delete",
+            WizardAction::EsppPurchaseCreate => "espp_purchase.create",
+            WizardAction::EsppPurchaseUpdate => "espp_purchase.update",
+            WizardAction::EsppPurchaseDelete => "espp_purchase.delete",
+            WizardAction::TripCreate => "trip.create",
+            WizardAction::TripUpdate => "trip.update",
+            WizardAction::TripDelete => "trip.delete",
+            WizardAction::Modelo720Upsert => "modelo_720_inputs.upsert",
+            WizardAction::SessionRevoke => "session.revoke",
         }
     }
 
@@ -77,6 +121,14 @@ impl WizardAction {
             WizardAction::GrantCreate | WizardAction::GrantUpdate | WizardAction::GrantDelete => {
                 "grant"
             }
+            WizardAction::EsppPurchaseCreate
+            | WizardAction::EsppPurchaseUpdate
+            | WizardAction::EsppPurchaseDelete => "espp_purchase",
+            WizardAction::TripCreate | WizardAction::TripUpdate | WizardAction::TripDelete => {
+                "art_7p_trip"
+            }
+            WizardAction::Modelo720Upsert => "modelo_720_input",
+            WizardAction::SessionRevoke => "session",
         }
     }
 }

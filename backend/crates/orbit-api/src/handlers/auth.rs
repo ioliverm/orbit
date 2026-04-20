@@ -26,7 +26,7 @@ use std::net::SocketAddr;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::audit::{self, AuthAction};
+use crate::audit::{self, AuthAction, WizardAction};
 use crate::error::{AppError, FieldError};
 use crate::hibp::{self, HibpCheck};
 use crate::middleware::rate_limit::{self, Decision, Limiter};
@@ -612,6 +612,127 @@ pub async fn me(
 /// `POST /api/v1/auth/mfa/*` — Slice 1 scaffold only.
 pub async fn mfa_not_implemented() -> AppError {
     AppError::NotImplemented
+}
+
+// ---------------------------------------------------------------------------
+// Slice 2 T21: session list + revoke (AC-7.1..AC-7.2)
+// ---------------------------------------------------------------------------
+
+const USER_AGENT_DISPLAY_CAP: usize = 120;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRowDto {
+    pub id: Uuid,
+    /// Truncated to 120 chars for display per AC-7.1.2. Long UAs render
+    /// ugly in the table; the raw value stays in the DB for support.
+    pub user_agent: String,
+    pub country_iso2: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub last_used_at: chrono::DateTime<chrono::Utc>,
+    /// `true` for the session matching the request's own cookie
+    /// (AC-7.1.4). The UI disables its revoke button on that row.
+    pub is_current: bool,
+}
+
+/// `GET /api/v1/auth/sessions` — list the caller's active sessions.
+/// Does **not** return `session_id_hash`, `refresh_token_hash`,
+/// `ip_hash`, or `family_id` (SEC-054 / AC-7.1.3).
+pub async fn list_sessions(
+    State(state): State<AppState>,
+    Extension(auth): Extension<SessionAuth>,
+) -> Result<Response, AppError> {
+    let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id)
+        .await
+        .map_err(|_| AppError::Internal)?;
+    let rows = orbit_db::sessions_mgmt::list_for_user(&mut tx, auth.user_id)
+        .await
+        .map_err(|_| AppError::Internal)?;
+    tx.commit().await.map_err(|_| AppError::Internal)?;
+
+    let dtos: Vec<SessionRowDto> = rows
+        .into_iter()
+        .map(|s| SessionRowDto {
+            id: s.id,
+            user_agent: truncate(&s.user_agent, USER_AGENT_DISPLAY_CAP),
+            country_iso2: s.country_iso2,
+            created_at: s.created_at,
+            last_used_at: s.last_used_at,
+            is_current: s.id == auth.session_id,
+        })
+        .collect();
+    Ok((StatusCode::OK, Json(json!({ "sessions": dtos }))).into_response())
+}
+
+/// `DELETE /api/v1/auth/sessions/:session_id` — revoke one non-current
+/// session. 403 `session.cannot_revoke_current` if the target is the
+/// caller's own session (AC-7.2.3).
+pub async fn revoke_session(
+    State(state): State<AppState>,
+    Extension(auth): Extension<SessionAuth>,
+    axum::extract::Path(target_id): axum::extract::Path<Uuid>,
+    ip: ClientIp,
+) -> Result<Response, AppError> {
+    let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id)
+        .await
+        .map_err(|_| AppError::Internal)?;
+    let outcome =
+        orbit_db::sessions_mgmt::revoke_other(&mut tx, auth.user_id, target_id, auth.session_id)
+            .await
+            .map_err(|_| AppError::Internal)?;
+
+    match outcome {
+        orbit_db::sessions_mgmt::RevokeOtherOutcome::Revoked => {
+            tx.commit().await.map_err(|_| AppError::Internal)?;
+            let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
+            audit::record_wizard(
+                &state.pool,
+                WizardAction::SessionRevoke,
+                auth.user_id,
+                Some(target_id),
+                ip_hash.as_ref().map(|s| &s[..]),
+                json!({ "kind": "single", "initiator": "self" }),
+            )
+            .await?;
+            Ok(StatusCode::NO_CONTENT.into_response())
+        }
+        orbit_db::sessions_mgmt::RevokeOtherOutcome::CannotRevokeCurrent => {
+            tx.commit().await.map_err(|_| AppError::Internal)?;
+            Err(AppError::CannotRevokeCurrent)
+        }
+        orbit_db::sessions_mgmt::RevokeOtherOutcome::NotFound => {
+            tx.commit().await.map_err(|_| AppError::Internal)?;
+            Err(AppError::NotFound)
+        }
+    }
+}
+
+/// `POST /api/v1/auth/sessions/revoke-all-others` — bulk.
+pub async fn revoke_all_others(
+    State(state): State<AppState>,
+    Extension(auth): Extension<SessionAuth>,
+    ip: ClientIp,
+) -> Result<Response, AppError> {
+    let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id)
+        .await
+        .map_err(|_| AppError::Internal)?;
+    let count = orbit_db::sessions_mgmt::revoke_all_others(&mut tx, auth.user_id, auth.session_id)
+        .await
+        .map_err(|_| AppError::Internal)?;
+    tx.commit().await.map_err(|_| AppError::Internal)?;
+
+    let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
+    audit::record_wizard(
+        &state.pool,
+        WizardAction::SessionRevoke,
+        auth.user_id,
+        Some(auth.session_id),
+        ip_hash.as_ref().map(|s| &s[..]),
+        json!({ "kind": "bulk", "initiator": "self", "count": count }),
+    )
+    .await?;
+
+    Ok((StatusCode::OK, Json(json!({ "revokedCount": count }))).into_response())
 }
 
 // ---------------------------------------------------------------------------
