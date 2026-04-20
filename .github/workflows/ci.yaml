@@ -83,14 +83,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: cargo-audit
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+      # We run cargo-audit by hand rather than through rustsec/audit-check
+      # because the action installs with `cargo install cargo-audit` (no
+      # `--locked`), which resolves transitive deps to their latest versions
+      # and pulls `smol_str@0.3.6`, which requires rustc 1.89. Our pinned
+      # toolchain is 1.88. Using `cargo install --locked` respects
+      # cargo-audit's published Cargo.lock and keeps the compile inside
+      # the 1.88 range. If we ever move the toolchain to ≥ 1.89, swapping
+      # back to the action is a one-step revert.
+      - name: Install Rust toolchain (from rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # stable (2025-10)
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # Keep the ignore list in sync with `.cargo/audit.toml`. The action
-          # input is a comma-separated list; our reason / review-date context
-          # lives in the audit.toml comment alongside each ID.
-          ignore: RUSTSEC-2023-0071
+          toolchain: "1.88.0"
+
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+
+      - name: cargo-audit
+        # `.cargo/audit.toml` carries the ignore-list + rationale; cargo-audit
+        # reads it by default. Keep in sync with deny.toml's `ignore = [...]`.
+        run: cargo audit --color never
 
       - name: cargo-deny (advisories)
         uses: EmbarkStudios/cargo-deny-action@e2f4ede4a4e60ea15ff31bc0647485d80c66cfba # v2.0.4
