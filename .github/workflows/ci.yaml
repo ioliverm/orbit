@@ -47,6 +47,11 @@ jobs:
       - name: Install Rust toolchain (from rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # stable (2025-10)
         with:
+          # Must stay in lockstep with rust-toolchain.toml (1.88 today). The
+          # pinned SHA of this action predates the `rust-toolchain.toml`
+          # auto-detect fix, so we pass the channel explicitly — otherwise
+          # the action's cachekey step runs `rustc "+" --version` and errors.
+          toolchain: "1.88.0"
           components: rustfmt, clippy
 
       - name: Cargo cache
@@ -215,6 +220,9 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # stable
         with:
+          # Must stay in lockstep with rust-toolchain.toml. See the backend
+          # job for the rationale.
+          toolchain: "1.88.0"
           components: clippy
 
       - name: Cargo cache
@@ -255,6 +263,10 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # stable
+        with:
+          # Must stay in lockstep with rust-toolchain.toml. See the backend
+          # job for the rationale.
+          toolchain: "1.88.0"
 
       - name: Cargo cache
         uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
