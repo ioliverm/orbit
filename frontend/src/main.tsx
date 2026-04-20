@@ -4,7 +4,7 @@ import { I18nProvider } from '@lingui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { i18n } from './i18n';
-import { rootRoute } from './routes/root';
+import { buildRoutes } from './routes';
 
 // TanStack Query cache per ADR-009 §State-management taxonomy.
 // Conservative defaults; feature slices will tune retry/staleTime per-query.
@@ -17,7 +17,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const router = createBrowserRouter([rootRoute]);
+const router = createBrowserRouter(buildRoutes());
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

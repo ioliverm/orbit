@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { lingui } from '@lingui/vite-plugin';
@@ -43,9 +44,11 @@ export default defineConfig({
     strictPort: true,
     headers: securityHeaders,
     proxy: {
-      // orbit-api binds to 127.0.0.1:3000 in Slice 0a local-dev.
+      // orbit-api binds to 127.0.0.1:8080 (APP_BIND_ADDR default) per
+      // backend/binaries/orbit/src/main.rs. Proxy keeps the SPA same-origin
+      // (ADR-010 §2) so cookies + CSRF double-submit work without CORS in dev.
       '/api': {
-        target: 'http://127.0.0.1:3000',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: false,
       },
     },
@@ -65,6 +68,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: false,
-    setupFiles: [],
+    setupFiles: ['src/testing/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
 });

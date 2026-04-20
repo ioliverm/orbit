@@ -13,10 +13,422 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/routes/root.tsx
-msgid "Orbit — Slice 0a scaffold"
-msgstr "Orbit — andamiaje Slice 0a"
+#: src/routes/auth/signin.tsx:182
+msgid "¿Has olvidado tu contraseña?"
+msgstr "¿Has olvidado tu contraseña?"
 
-#: src/routes/root.tsx
-msgid "Security envelope first. Features follow."
-msgstr "Primero el perímetro de seguridad. Después las funcionalidades."
+#: src/routes/auth/signin.tsx:176
+msgid "¿Todavía no tienes cuenta? <0>Regístrate</0>"
+msgstr "¿Todavía no tienes cuenta? <0>Regístrate</0>"
+
+#: src/routes/auth/verify-email.tsx:43
+msgid "Abre el enlace desde el correo que te enviamos."
+msgstr "Abre el enlace desde el correo que te enviamos."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:136
+msgid "Aceptar y continuar"
+msgstr "Aceptar y continuar"
+
+#: src/routes/auth/signup.tsx:153
+msgid "Al crear una cuenta aceptas nuestra Política de privacidad. Sólo usamos cookies esenciales; no necesitas aceptar analíticas."
+msgstr "Al crear una cuenta aceptas nuestra Política de privacidad. Sólo usamos cookies esenciales; no necesitas aceptar analíticas."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:74
+msgid "Antes de continuar — lo que Orbit es y no es"
+msgstr "Antes de continuar — lo que Orbit es y no es"
+
+#: src/routes/auth/password-reset-landing.tsx:15
+#: src/routes/auth/password-reset-request.tsx:27
+msgid "Aún no disponible"
+msgstr "Aún no disponible"
+
+#: src/routes/auth/signin.tsx:107
+msgid "Bienvenido de nuevo."
+msgstr "Bienvenido de nuevo."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:105
+msgid "Cada export lleva un traceability ID enlazado al audit-log."
+msgstr "Cada export lleva un traceability ID enlazado al audit-log."
+
+#: src/components/Layout/LocaleSwitcher.tsx:20
+msgid "Cambiar idioma"
+msgstr "Cambiar idioma"
+
+#: src/components/Spinner.tsx:11
+msgid "Cargando…"
+msgstr "Cargando…"
+
+#: src/components/Layout/Sidebar.tsx:40
+msgid "Cartera"
+msgstr "Cartera"
+
+#: src/components/Layout/Header.tsx:41
+#: src/components/Layout/Header.tsx:43
+msgid "Cerrar sesión"
+msgstr "Cerrar sesión"
+
+#: src/routes/auth/signin.tsx:115
+msgid "Comprobación adicional"
+msgstr "Comprobación adicional"
+
+#: src/routes/auth/signin.tsx:164
+msgid "Comprobación CAPTCHA (integración disponible en Slice 7+)."
+msgstr "Comprobación CAPTCHA (integración disponible en Slice 7+)."
+
+#: src/routes/auth/signup.tsx:147
+msgid "Continuar"
+msgstr "Continuar"
+
+#: src/routes/auth/signin.tsx:141
+#: src/routes/auth/signup.tsx:111
+msgid "Contraseña"
+msgstr "Contraseña"
+
+#: src/routes/auth/password-reset-request.tsx:35
+#: src/routes/auth/signin.tsx:124
+#: src/routes/auth/signup.tsx:93
+msgid "Correo electrónico"
+msgstr "Correo electrónico"
+
+#: src/routes/auth/signup.tsx:77
+msgid "Crea tu cuenta"
+msgstr "Crea tu cuenta"
+
+#: src/routes/auth/signin.tsx:111
+msgid "Credenciales inválidas"
+msgstr "Credenciales inválidas"
+
+#: src/routes/auth/signin.tsx:61
+msgid "Credenciales inválidas. Comprueba tu correo y contraseña."
+msgstr "Credenciales inválidas. Comprueba tu correo y contraseña."
+
+#: src/components/Layout/Sidebar.tsx:68
+msgid "Cuenta"
+msgstr "Cuenta"
+
+#: src/components/Layout/Sidebar.tsx:60
+msgid "Cumplimiento"
+msgstr "Cumplimiento"
+
+#: src/components/Layout/Sidebar.tsx:43
+msgid "Dashboard"
+msgstr "Dashboard"
+
+#: src/components/Layout/Sidebar.tsx:73
+msgid "Datos y privacidad"
+msgstr "Datos y privacidad"
+
+#: src/components/Layout/Sidebar.tsx:52
+msgid "Decisiones"
+msgstr "Decisiones"
+
+#: src/routes/auth/signin.tsx:79
+#: src/routes/auth/verify-email.tsx:64
+msgid "Demasiados intentos"
+msgstr "Demasiados intentos"
+
+#: src/routes/auth/signup.tsx:61
+msgid "Demasiados intentos. Espera unos minutos y vuelve a probar."
+msgstr "Demasiados intentos. Espera unos minutos y vuelve a probar."
+
+#: src/routes/app/grants/detail.tsx:17
+msgid "El detalle del grant llega en la siguiente iteración (T14b)."
+msgstr "El detalle del grant llega en la siguiente iteración (T14b)."
+
+#: src/routes/onboarding/residency.tsx:16
+msgid "El formulario de residencia llega en la siguiente iteración (T14b)."
+msgstr "El formulario de residencia llega en la siguiente iteración (T14b)."
+
+#: src/routes/account/profile.tsx:22
+msgid "El formulario de residencia y la sección de datos y privacidad llegan en T14b."
+msgstr "El formulario de residencia y la sección de datos y privacidad llegan en T14b."
+
+#: src/routes/onboarding/first-grant.tsx:14
+msgid "El formulario del primer grant llega en la siguiente iteración (T14b)."
+msgstr "El formulario del primer grant llega en la siguiente iteración (T14b)."
+
+#: src/routes/auth/password-reset-request.tsx:28
+msgid "El restablecimiento de contraseña se habilitará en una iteración posterior. Mientras tanto, contacta con soporte si necesitas recuperar el acceso."
+msgstr "El restablecimiento de contraseña se habilitará en una iteración posterior. Mientras tanto, contacta con soporte si necesitas recuperar el acceso."
+
+#: src/routes/auth/password-reset-landing.tsx:16
+msgid "El restablecimiento de contraseña se habilitará en una iteración posterior. Si tu enlace caduca mientras tanto, pide uno nuevo cuando la función esté disponible."
+msgstr "El restablecimiento de contraseña se habilitará en una iteración posterior. Si tu enlace caduca mientras tanto, pide uno nuevo cuando la función esté disponible."
+
+#: src/routes/auth/password-reset-landing.tsx:13
+msgid "Elige una contraseña nueva"
+msgstr "Elige una contraseña nueva"
+
+#: src/routes/app/dashboard.tsx:24
+msgid "Empieza añadiendo tu primer grant"
+msgstr "Empieza añadiendo tu primer grant"
+
+#: src/routes/auth/verify-email.tsx:66
+msgid "Enlace caducado o ya usado"
+msgstr "Enlace caducado o ya usado"
+
+#: src/routes/auth/verify-email.tsx:40
+msgid "Enlace de verificación no válido"
+msgstr "Enlace de verificación no válido"
+
+#: src/routes/auth/password-reset-request.tsx:45
+msgid "Enviar enlace"
+msgstr "Enviar enlace"
+
+#: src/components/Layout/Sidebar.tsx:55
+msgid "Escenarios"
+msgstr "Escenarios"
+
+#: src/routes/auth/signup.tsx:54
+msgid "Esta contraseña aparece en listas públicas de filtraciones. Elige otra."
+msgstr "Esta contraseña aparece en listas públicas de filtraciones. Elige otra."
+
+#: src/components/ProximamenteStub.tsx:19
+msgid "Esta función llega en una iteración posterior. Gracias por tu paciencia."
+msgstr "Esta función llega en una iteración posterior. Gracias por tu paciencia."
+
+#: src/components/Layout/Footer.tsx:27
+msgid "Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja."
+msgstr "Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja."
+
+#: src/routes/auth/verify-email.tsx:102
+msgid "Esto sólo toma un momento."
+msgstr "Esto sólo toma un momento."
+
+#: src/components/Layout/Sidebar.tsx:63
+msgid "Exports"
+msgstr "Exports"
+
+#: src/routes/auth/verify-email.tsx:42
+msgid "Falta el token"
+msgstr "Falta el token"
+
+#: src/routes/account/profile.tsx:16
+msgid "Gestión de datos disponible a partir de la siguiente iteración."
+msgstr "Gestión de datos disponible a partir de la siguiente iteración."
+
+#: src/routes/app/grants/detail.tsx:12
+msgid "Grant"
+msgstr "Grant"
+
+#: src/components/Layout/Sidebar.tsx:46
+#: src/routes/app/grants/index.tsx:10
+msgid "Grants"
+msgstr "Grants"
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:128
+msgid "He leído y entiendo que Orbit no es asesoramiento fiscal ni financiero. Acepto continuar con ese entendimiento."
+msgstr "He leído y entiendo que Orbit no es asesoramiento fiscal ni financiero. Acepto continuar con ese entendimiento."
+
+#: src/routes/auth/signin.tsx:116
+msgid "Hemos detectado varios intentos fallidos. Resuelve la comprobación antes de continuar."
+msgstr "Hemos detectado varios intentos fallidos. Resuelve la comprobación antes de continuar."
+
+#: src/routes/auth/signup-verify-sent.tsx:24
+msgid "Hemos enviado un enlace a {email}. El enlace caduca en 24 horas."
+msgstr "Hemos enviado un enlace a {email}. El enlace caduca en 24 horas."
+
+#: src/routes/auth/signup-verify-sent.tsx:26
+msgid "Hemos enviado un enlace a tu correo. El enlace caduca en 24 horas."
+msgstr "Hemos enviado un enlace a tu correo. El enlace caduca en 24 horas."
+
+#: src/components/Layout/LocaleSwitcher.tsx:17
+msgid "Idioma"
+msgstr "Idioma"
+
+#: src/routes/auth/signin.tsx:104
+msgid "Inicia sesión"
+msgstr "Inicia sesión"
+
+#: src/routes/auth/signin.tsx:169
+msgid "Iniciar sesión"
+msgstr "Iniciar sesión"
+
+#: src/routes/auth/signin.tsx:81
+msgid "Inicios de sesión pausados"
+msgstr "Inicios de sesión pausados"
+
+#: src/routes/auth/password-reset-request.tsx:21
+msgid "Introduce el correo con el que te registraste. Si la dirección existe en Orbit, recibirás un enlace de un solo uso válido durante 60 minutos."
+msgstr "Introduce el correo con el que te registraste. Si la dirección existe en Orbit, recibirás un enlace de un solo uso válido durante 60 minutos."
+
+#: src/routes/auth/signin.tsx:142
+msgid "Introduce tu contraseña."
+msgstr "Introduce tu contraseña."
+
+#: src/routes/auth/signin.tsx:125
+#: src/routes/auth/signup.tsx:95
+msgid "Introduce un correo válido."
+msgstr "Introduce un correo válido."
+
+#: src/routes/auth/verify-email.tsx:46
+msgid "Ir a iniciar sesión"
+msgstr "Ir a iniciar sesión"
+
+#: src/routes/app/grants/index.tsx:14
+msgid "La lista de grants llega en la siguiente iteración (T14b)."
+msgstr "La lista de grants llega en la siguiente iteración (T14b)."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:102
+msgid "Los cálculos llevan la versión del rule set y la fecha de guía AEAT."
+msgstr "Los cálculos llevan la versión del rule set y la fecha de guía AEAT."
+
+#: src/routes/auth/verify-email.tsx:70
+msgid "Los enlaces de verificación caducan a las 24 horas y sólo pueden usarse una vez."
+msgstr "Los enlaces de verificación caducan a las 24 horas y sólo pueden usarse una vez."
+
+#: src/routes/auth/signup.tsx:123
+msgid "Mínimo 12 caracteres."
+msgstr "Mínimo 12 caracteres."
+
+#: src/routes/auth/signup.tsx:113
+msgid "Mínimo 12 caracteres. Comprobamos tu contraseña contra bases de datos públicas de filtraciones (HIBP k-anonymity)."
+msgstr "Mínimo 12 caracteres. Comprobamos tu contraseña contra bases de datos públicas de filtraciones (HIBP k-anonymity)."
+
+#: src/components/Layout/Sidebar.tsx:62
+msgid "Modelo 720"
+msgstr "Modelo 720"
+
+#: src/routes/auth/verify-email.tsx:58
+msgid "No pudimos verificar el enlace"
+msgstr "No pudimos verificar el enlace"
+
+#: src/routes/auth/signup.tsx:88
+msgid "No se pudo crear la cuenta"
+msgstr "No se pudo crear la cuenta"
+
+#: src/routes/auth/signup.tsx:63
+msgid "No se pudo crear la cuenta. Inténtalo de nuevo."
+msgstr "No se pudo crear la cuenta. Inténtalo de nuevo."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:116
+msgid "No se pudo guardar"
+msgstr "No se pudo guardar"
+
+#: src/routes/auth/signin.tsx:64
+#: src/routes/auth/signin.tsx:67
+msgid "No se pudo iniciar sesión. Inténtalo de nuevo."
+msgstr "No se pudo iniciar sesión. Inténtalo de nuevo."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:44
+#: src/components/Disclaimer/DisclaimerModal.tsx:45
+msgid "No se pudo registrar la aceptación. Inténtalo de nuevo."
+msgstr "No se pudo registrar la aceptación. Inténtalo de nuevo."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:83
+msgid "Orbit calcula, visualiza y exporta. No te dice qué hacer ni te da recomendaciones. Para actuar sobre estos números, consulta con tu asesor fiscal o tu gestor. Orbit no está registrado en CNMV ni presta servicios regulados."
+msgstr "Orbit calcula, visualiza y exporta. No te dice qué hacer ni te da recomendaciones. Para actuar sobre estos números, consulta con tu asesor fiscal o tu gestor. Orbit no está registrado en CNMV ni presta servicios regulados."
+
+#: src/routes/auth/signup.tsx:80
+msgid "Orbit es una herramienta de apoyo a la decisión, no asesoramiento fiscal. Aceptarás el aviso completo en el paso 3."
+msgstr "Orbit es una herramienta de apoyo a la decisión, no asesoramiento fiscal. Aceptarás el aviso completo en el paso 3."
+
+#. js-lingui-explicit-id
+#: src/components/Disclaimer/DisclaimerModal.tsx:91
+msgid "disclaimer.en-gloss"
+msgstr "Orbit is not tax or financial advice. It calculates, visualizes, and exports; it does not tell you what to do. Before acting on these numbers, consult your tax advisor. Orbit is not CNMV-registered and does not provide regulated services."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:80
+msgid "Orbit no es asesoramiento fiscal ni financiero."
+msgstr "Orbit no es asesoramiento fiscal ni financiero."
+
+#: src/routes/onboarding/residency.tsx:13
+msgid "Paso 4 — Tu residencia fiscal"
+msgstr "Paso 4 — Tu residencia fiscal"
+
+#: src/routes/onboarding/first-grant.tsx:11
+msgid "Paso 5 — Añade tu primer grant"
+msgstr "Paso 5 — Añade tu primer grant"
+
+#: src/components/Layout/Sidebar.tsx:71
+#: src/routes/account/profile.tsx:13
+msgid "Perfil y residencia"
+msgstr "Perfil y residencia"
+
+#: src/routes/auth/signin.tsx:82
+msgid "Por tu seguridad, hemos pausado los inicios de sesión durante unos minutos. Inténtalo de nuevo en ~{mins} min. Si no reconoces esta actividad, restablece tu contraseña."
+msgstr "Por tu seguridad, hemos pausado los inicios de sesión durante unos minutos. Inténtalo de nuevo en ~{mins} min. Si no reconoces esta actividad, restablece tu contraseña."
+
+#: src/components/Layout/Sidebar.tsx:21
+msgid "próx."
+msgstr "próx."
+
+#: src/components/ProximamenteStub.tsx:16
+msgid "Próximamente"
+msgstr "Próximamente"
+
+#: src/routes/auth/verify-email.tsx:85
+msgid "Reenviar enlace (próximamente)"
+msgstr "Reenviar enlace (próximamente)"
+
+#: src/routes/auth/password-reset-request.tsx:18
+msgid "Restablecer contraseña"
+msgstr "Restablecer contraseña"
+
+#: src/routes/auth/signup.tsx:58
+msgid "Revisa el formulario e inténtalo de nuevo."
+msgstr "Revisa el formulario e inténtalo de nuevo."
+
+#: src/routes/auth/signup-verify-sent.tsx:20
+msgid "Revisa tu correo"
+msgstr "Revisa tu correo"
+
+#: src/components/Layout/AppShell.tsx:17
+#: src/components/Layout/AuthShell.tsx:17
+msgid "Saltar al contenido"
+msgstr "Saltar al contenido"
+
+#: src/components/Layout/Sidebar.tsx:54
+msgid "Sell-now"
+msgstr "Sell-now"
+
+#: src/routes/auth/signup-verify-sent.tsx:30
+msgid "Si no recibiste el correo, comprueba la carpeta de spam. No puedes entrar en la app hasta verificar tu email."
+msgstr "Si no recibiste el correo, comprueba la carpeta de spam. No puedes entrar en la app hasta verificar tu email."
+
+#: src/components/Layout/Footer.tsx:29
+msgid "This is not tax or financial advice — Orbit calculates, it doesn't recommend."
+msgstr "This is not tax or financial advice — Orbit calculates, it doesn't recommend."
+
+#: src/routes/app/dashboard.tsx:18
+msgid "Todavía no has añadido ningún grant."
+msgstr "Todavía no has añadido ningún grant."
+
+#: src/routes/app/dashboard.tsx:15
+msgid "Tu cartera"
+msgstr "Tu cartera"
+
+#: src/routes/app/dashboard.tsx:27
+msgid "Un grant es la concesión de acciones de una empresa (RSU, NSO, ISO, ESPP). Registrarlo en Orbit te permite visualizar tu vesting."
+msgstr "Un grant es la concesión de acciones de una empresa (RSU, NSO, ISO, ESPP). Registrarlo en Orbit te permite visualizar tu vesting."
+
+#: src/routes/auth/signup.tsx:94
+msgid "Usaremos esta dirección para verificarte y para avisos de seguridad."
+msgstr "Usaremos esta dirección para verificarte y para avisos de seguridad."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:111
+msgid "v1 no presenta ningún modelo: ni 100, ni 720, ni 721."
+msgstr "v1 no presenta ningún modelo: ni 100, ni 720, ni 721."
+
+#: src/components/Disclaimer/DisclaimerModal.tsx:108
+msgid "v1 no soporta País Vasco, Navarra ni el régimen Beckham para cálculos."
+msgstr "v1 no soporta País Vasco, Navarra ni el régimen Beckham para cálculos."
+
+#: src/routes/auth/verify-email.tsx:97
+msgid "Verificando tu correo…"
+msgstr "Verificando tu correo…"
+
+#: src/routes/auth/password-reset-request.tsx:42
+#: src/routes/auth/signin.tsx:95
+msgid "Volver"
+msgstr "Volver"
+
+#: src/routes/auth/password-reset-landing.tsx:22
+#: src/routes/auth/signup-verify-sent.tsx:37
+#: src/routes/auth/verify-email.tsx:88
+msgid "Volver a iniciar sesión"
+msgstr "Volver a iniciar sesión"
+
+#: src/routes/auth/signup.tsx:144
+msgid "Ya tengo cuenta"
+msgstr "Ya tengo cuenta"
