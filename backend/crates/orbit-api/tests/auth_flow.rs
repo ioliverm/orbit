@@ -558,6 +558,111 @@ async fn signout_without_csrf_header_is_403() {
     assert_eq!(body["error"]["code"], "csrf");
 }
 
+/// T17 B1: after `SIGNIN_CAPTCHA_FAILURE_THRESHOLD` consecutive failures
+/// against the same account, the next attempt must return
+/// `AppError::CaptchaRequired` (HTTP 401, `code: "captcha_required"`) —
+/// without ever needing to SELECT from `audit_log` (orbit_app has no
+/// SELECT grant there). The counter is a token bucket in
+/// `rate_limit_buckets` keyed by `captcha:account:<sha256(email)>` and
+/// `captcha:ip:<hash>`.
+///
+/// Also pins the `login.failure` audit payload allowlist (SEC-101) post
+/// the T17 shrink: after B1 the payload is `{ reason }` — no `email_hash`.
+#[tokio::test]
+async fn captcha_gate_trips_after_threshold_failures() {
+    let (state, app) = app().await;
+    let email = unique_email("captcha");
+    let password = unique_password();
+
+    // Seed a verified user so we're exercising the bad_password branch
+    // rather than the unknown_email one — either branch should feed the
+    // captcha counter, but bad_password is the more interesting path and
+    // also gives us a user_id to filter the audit query against.
+    let r = post(
+        &app,
+        "/api/v1/auth/signup",
+        json!({ "email": email, "password": password }),
+        vec![],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::CREATED);
+    sqlx::query("UPDATE users SET email_verified_at = now() WHERE email = $1")
+        .bind(&email)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    let user_id = find_user(&state.pool, &email).await;
+
+    // Drive from a single IP so the account bucket is the one that trips
+    // (the per-account captcha bucket fills with THRESHOLD tokens; the
+    // per-IP bucket is keyed by the IP hash — both would exhaust together
+    // here, which is fine). Reusing one IP also keeps us from polluting
+    // a range of captcha:ip:* buckets on this shared dev DB.
+    let xff_ip = unique_ip();
+
+    // THRESHOLD consecutive bad-password attempts — each lands a
+    // login.failure audit row and consumes one token from both buckets.
+    // Status is 401 `auth` on each, not `captcha_required` yet.
+    const THRESHOLD: usize = 3;
+    for _ in 0..THRESHOLD {
+        let resp = post(
+            &app,
+            "/api/v1/auth/signin",
+            json!({ "email": email, "password": "not-the-password" }),
+            vec![("x-forwarded-for", xff_ip.clone())],
+        )
+        .await;
+        let (status, _c, body) = body_json(resp).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(body["error"]["code"], "auth");
+    }
+
+    // N+1: the captcha bucket is exhausted, so the peek at the top of
+    // signin short-circuits to captcha_required.
+    let resp = post(
+        &app,
+        "/api/v1/auth/signin",
+        json!({ "email": email, "password": "not-the-password" }),
+        vec![("x-forwarded-for", xff_ip.clone())],
+    )
+    .await;
+    let (status, _c, body) = body_json(resp).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"]["code"], "captcha_required");
+
+    // THRESHOLD login.failure rows: we consumed THRESHOLD before the
+    // gate tripped. The N+1-th attempt never reached the audit write —
+    // it was blocked at the top of signin.
+    assert_eq!(
+        audit_count(user_id, "login.failure").await,
+        THRESHOLD as i64
+    );
+
+    // SEC-101 / T17 B1: login.failure carries exactly `{ reason }`. No
+    // `email_hash`, no email, no password hash, no raw payload leakage.
+    let mpool = pool_from_env("DATABASE_URL_MIGRATE").await;
+    let payload: Value = sqlx::query_scalar(
+        "SELECT payload_summary FROM audit_log WHERE user_id = $1 AND action = 'login.failure' \
+         ORDER BY occurred_at DESC LIMIT 1",
+    )
+    .bind(user_id)
+    .fetch_one(&mpool)
+    .await
+    .unwrap();
+    let keys: Vec<String> = payload
+        .as_object()
+        .expect("payload is a JSON object")
+        .keys()
+        .cloned()
+        .collect();
+    assert_eq!(
+        keys,
+        vec!["reason".to_string()],
+        "login.failure payload must be exactly {{ reason }} (no email_hash)"
+    );
+    assert_eq!(payload["reason"], "bad_password");
+}
+
 #[tokio::test]
 async fn mfa_endpoints_return_501() {
     let (_state, app) = app().await;

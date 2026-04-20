@@ -216,6 +216,36 @@ async fn get(
         .expect("request ran")
 }
 
+/// PUT helper mirroring [`post`]. Exists because the grant.update probe
+/// needs a PUT and we keep the per-file harness free of a shared crate.
+async fn post_like_put(
+    app: &axum::Router,
+    path: &str,
+    body: Value,
+    extra_headers: Vec<(&str, String)>,
+) -> axum::http::Response<Body> {
+    let has_xff = extra_headers
+        .iter()
+        .any(|(k, _)| k.eq_ignore_ascii_case("x-forwarded-for"));
+    let mut req = Request::builder()
+        .method("PUT")
+        .uri(path)
+        .header(header::CONTENT_TYPE, "application/json");
+    for (k, v) in extra_headers {
+        req = req.header(k, v);
+    }
+    if !has_xff {
+        req = req.header("x-forwarded-for", unique_ip());
+    }
+    app.clone()
+        .oneshot(
+            req.body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .expect("request ran")
+}
+
 /// Signup + verify-email and return (user_id, cookie_header, csrf_token).
 async fn signup_verified(
     state: &AppState,
@@ -757,6 +787,200 @@ async fn grant_create_audit_payload_allowlist_is_strict() {
         assert!(
             payload.get(forbidden).is_none(),
             "SEC-101: forbidden key `{forbidden}` present in grant.create payload"
+        );
+    }
+}
+
+/// T17 O6 (sec-review): the `grant.update` audit row carries exactly
+/// `{ instrument, double_trigger, cadence }` — symmetrical to the
+/// `grant.create` probe. Catches regressions where an `update` handler
+/// accidentally widens the payload (e.g. to include a diff).
+#[tokio::test]
+async fn grant_update_audit_payload_allowlist_is_strict() {
+    let (state, app) = app().await;
+    let (user_id, cookie_header, csrf) = signup_verified(&state, &app, "gu-pl").await;
+
+    // Walk through to first-grant stage.
+    post(
+        &app,
+        "/api/v1/consent/disclaimer",
+        json!({ "version": "v1-2026-04" }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header.clone()),
+            ("x-csrf-token", csrf.clone()),
+        ],
+    )
+    .await;
+    post(
+        &app,
+        "/api/v1/residency",
+        json!({
+            "jurisdiction": "ES",
+            "subJurisdiction": "ES-MD",
+            "primaryCurrency": "EUR",
+            "regimeFlags": []
+        }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header.clone()),
+            ("x-csrf-token", csrf.clone()),
+        ],
+    )
+    .await;
+
+    // Create the grant.
+    let r = post(
+        &app,
+        "/api/v1/grants",
+        json!({
+            "instrument": "rsu",
+            "grantDate": "2024-09-15",
+            "shareCount": 30000,
+            "vestingStart": "2024-09-15",
+            "vestingTotalMonths": 48,
+            "cliffMonths": 12,
+            "vestingCadence": "monthly",
+            "doubleTrigger": true,
+            "employerName": "ACME Inc."
+        }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header.clone()),
+            ("x-csrf-token", csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let grant_id = body["grant"]["id"].as_str().unwrap().to_string();
+
+    // Update with a set of noisy fields that, if leaked, would be SEC-101
+    // violations (share_count bumped, strike set, notes filled, ticker
+    // added). The payload must still be exactly the three allowlisted keys.
+    let r = post_like_put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}"),
+        json!({
+            "instrument": "rsu",
+            "grantDate": "2024-09-15",
+            "shareCount": 45000,
+            "vestingStart": "2024-09-15",
+            "vestingTotalMonths": 48,
+            "cliffMonths": 12,
+            "vestingCadence": "quarterly",
+            "doubleTrigger": true,
+            "employerName": "ACME Inc.",
+            "ticker": "ACME",
+            "notes": "post-refresh — must not leak"
+        }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header),
+            ("x-csrf-token", csrf),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::OK);
+
+    let payload = audit_last_payload(user_id, "grant.update").await;
+    assert_eq!(payload["instrument"], "rsu");
+    assert_eq!(payload["double_trigger"], true);
+    assert_eq!(payload["cadence"], "quarterly");
+
+    let mut keys = audit_last_payload_keys(user_id, "grant.update").await;
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec![
+            "cadence".to_string(),
+            "double_trigger".to_string(),
+            "instrument".to_string(),
+        ],
+        "SEC-101 allowlist violated on grant.update"
+    );
+    for forbidden in [
+        "share_count",
+        "shareCount",
+        "strike_amount",
+        "strikeAmount",
+        "employer_name",
+        "employerName",
+        "ticker",
+        "notes",
+    ] {
+        assert!(
+            payload.get(forbidden).is_none(),
+            "SEC-101: forbidden key `{forbidden}` present in grant.update payload"
+        );
+    }
+}
+
+/// T17 O8 (sec-review): the `residency.create` audit row carries exactly
+/// `{ autonomia_changed, beckham_changed, currency_changed }` (booleans
+/// only — AC-4.1.8 / SEC-101). Symmetrical to the grant.create probe.
+#[tokio::test]
+async fn residency_create_audit_payload_allowlist_is_strict() {
+    let (state, app) = app().await;
+    let (user_id, cookie_header, csrf) = signup_verified(&state, &app, "rc-pl").await;
+
+    // Disclaimer.
+    post(
+        &app,
+        "/api/v1/consent/disclaimer",
+        json!({ "version": "v1-2026-04" }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header.clone()),
+            ("x-csrf-token", csrf.clone()),
+        ],
+    )
+    .await;
+
+    // Residency with regime flags + a currency change — guarantees the
+    // `*_changed` booleans take both values across a run and makes sure
+    // none of the *inputs* (autonomía code, currency code, flag list)
+    // leak into the audit payload.
+    let r = post(
+        &app,
+        "/api/v1/residency",
+        json!({
+            "jurisdiction": "ES",
+            "subJurisdiction": "ES-PV",
+            "primaryCurrency": "USD",
+            "regimeFlags": ["foral_pais_vasco", "beckham_law"]
+        }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header),
+            ("x-csrf-token", csrf),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::CREATED);
+
+    let payload = audit_last_payload(user_id, "residency.create").await;
+    assert_eq!(payload["autonomia_changed"], true);
+    assert_eq!(payload["beckham_changed"], true);
+    assert_eq!(payload["currency_changed"], true);
+
+    let mut keys = audit_last_payload_keys(user_id, "residency.create").await;
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec![
+            "autonomia_changed".to_string(),
+            "beckham_changed".to_string(),
+            "currency_changed".to_string(),
+        ],
+        "SEC-101 allowlist violated on residency.create"
+    );
+    for forbidden in [
+        "jurisdiction",
+        "sub_jurisdiction",
+        "subJurisdiction",
+        "primary_currency",
+        "primaryCurrency",
+        "regime_flags",
+        "regimeFlags",
+    ] {
+        assert!(
+            payload.get(forbidden).is_none(),
+            "SEC-101: forbidden key `{forbidden}` present in residency.create payload"
         );
     }
 }

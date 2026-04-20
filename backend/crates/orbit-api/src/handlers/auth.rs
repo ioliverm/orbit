@@ -44,7 +44,22 @@ const REFRESH_TTL_SECS: i64 = 604_800;
 const CSRF_COOKIE: &str = "orbit_csrf";
 const REFRESH_COOKIE: &str = "orbit_refresh";
 
-const SIGNIN_CAPTCHA_FAILURE_THRESHOLD: i64 = 3;
+// Captcha-required trigger. A login.failure consumes one token from each
+// of two buckets — one keyed by account, one by IP — covering both the
+// "attacker hammering one account from many IPs" and "attacker hammering
+// many accounts from one IP" axes. When either bucket is exhausted a
+// subsequent signin attempt short-circuits to `AppError::CaptchaRequired`
+// without spending its own token (see `rate_limit::peek`).
+//
+// Capacity is the failure budget (N failures within the window). Kept
+// below the per-account signin rate limit (5/10m) so an attacker walks
+// into the captcha gate before hitting the 429, which gives the user a
+// solvable challenge rather than a dead-end status.
+//
+// The bucket refills over `CAPTCHA_WINDOW_SECS` so natural back-off
+// clears the lockout without an explicit reset on successful login.
+const SIGNIN_CAPTCHA_FAILURE_THRESHOLD: f64 = 3.0;
+const CAPTCHA_WINDOW_SECS: u64 = 15 * 60;
 
 // ---------------------------------------------------------------------------
 // DTOs
@@ -384,20 +399,26 @@ pub async fn signin(
     )
     .await?;
 
-    // Captcha-required trigger: N consecutive failures for this email in
-    // the past 10 min. Slice 1 just emits the code; no server-side verify.
-    let recent_failures: i64 = sqlx::query_scalar(
-        r#"
-        SELECT COUNT(*)::bigint FROM audit_log
-         WHERE action = 'login.failure'
-           AND payload_summary->>'email_hash' = $1
-           AND occurred_at > now() - INTERVAL '10 minutes'
-        "#,
+    // Captcha-required trigger: N consecutive failures in the captcha
+    // window, tracked against two token-bucket counters (account + IP).
+    // Peek before the credential check — the signin attempt itself must
+    // not spend a failure-budget token; only an actual login.failure does.
+    let captcha_account_key = format!("captcha:account:{email_key_frag}");
+    let captcha_ip_key = format!("captcha:ip:{}", hex_or_unknown(ip_hash.as_ref()));
+    let captcha_limiter = Limiter {
+        capacity: SIGNIN_CAPTCHA_FAILURE_THRESHOLD,
+        period_secs: CAPTCHA_WINDOW_SECS,
+    };
+    if captcha_required(
+        &state,
+        &captcha_account_key,
+        &captcha_ip_key,
+        captcha_limiter,
     )
-    .bind(&email_key_frag)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(0);
+    .await?
+    {
+        return Err(AppError::CaptchaRequired);
+    }
 
     let row = sqlx::query(
         r#"
@@ -426,14 +447,18 @@ pub async fn signin(
                 AuthAction::LoginFailure,
                 None,
                 ip_hash.as_ref().map(|s| &s[..]),
-                json!({
-                    "reason": "unknown_email",
-                    "email_hash": email_key_frag,
-                }),
+                json!({ "reason": "unknown_email" }),
             )
             .await
             .map_err(|_| AppError::Internal)?;
-            if recent_failures + 1 >= SIGNIN_CAPTCHA_FAILURE_THRESHOLD {
+            let exhausted = consume_captcha_failure(
+                &state,
+                &captcha_account_key,
+                &captcha_ip_key,
+                captcha_limiter,
+            )
+            .await;
+            if exhausted {
                 return Err(AppError::CaptchaRequired);
             }
             return Err(AppError::InvalidCredentials);
@@ -449,12 +474,18 @@ pub async fn signin(
             ip_hash.as_ref().map(|s| &s[..]),
             json!({
                 "reason": if verified { "email_unverified" } else { "bad_password" },
-                "email_hash": email_key_frag,
             }),
         )
         .await
         .map_err(|_| AppError::Internal)?;
-        if recent_failures + 1 >= SIGNIN_CAPTCHA_FAILURE_THRESHOLD {
+        let exhausted = consume_captcha_failure(
+            &state,
+            &captcha_account_key,
+            &captcha_ip_key,
+            captcha_limiter,
+        )
+        .await;
+        if exhausted {
             return Err(AppError::CaptchaRequired);
         }
         return Err(AppError::InvalidCredentials);
@@ -809,6 +840,46 @@ async fn check_rate(state: &AppState, key: &str, limiter: Limiter) -> Result<(),
         }
         Err(_) => Err(AppError::Internal),
     }
+}
+
+/// Return `true` if either captcha bucket is already exhausted. A DB error
+/// here is fail-open (the signin attempt proceeds) — the buckets are a
+/// defense-in-depth counter, not an authentication primitive, and a hard
+/// fail would turn a transient DB hiccup into a user-facing lockout.
+async fn captcha_required(
+    state: &AppState,
+    account_key: &str,
+    ip_key: &str,
+    limiter: Limiter,
+) -> Result<bool, AppError> {
+    for key in [account_key, ip_key] {
+        match rate_limit::peek(&state.pool, key, limiter).await {
+            Ok(Decision::RateLimited { .. }) => return Ok(true),
+            Ok(Decision::Allowed) => {}
+            Err(_) => {}
+        }
+    }
+    Ok(false)
+}
+
+/// Consume one token from each captcha bucket. Returns `true` if *either*
+/// bucket ended up exhausted (i.e. the NEXT signin attempt must be
+/// captcha-gated). DB errors are swallowed — see [`captcha_required`].
+async fn consume_captcha_failure(
+    state: &AppState,
+    account_key: &str,
+    ip_key: &str,
+    limiter: Limiter,
+) -> bool {
+    let mut exhausted = false;
+    for key in [account_key, ip_key] {
+        match rate_limit::try_consume(&state.pool, key, limiter).await {
+            Ok(Decision::RateLimited { .. }) => exhausted = true,
+            Ok(Decision::Allowed) => {}
+            Err(_) => {}
+        }
+    }
+    exhausted
 }
 
 fn validation_errors(err: validator::ValidationErrors) -> AppError {

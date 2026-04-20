@@ -32,8 +32,10 @@ enum Command {
         /// 64-hex-char HMAC key for `audit_log.ip_hash` (SEC-054).
         #[arg(long, env = "APP_IP_HASH_KEY_HEX")]
         ip_hash_key_hex: String,
-        /// Emit `Secure` on session cookies. False in dev, true in Slice 8+.
-        #[arg(long, env = "APP_COOKIE_SECURE", default_value_t = false)]
+        /// Emit `Secure` on session cookies. Defaults to `true` — the dev
+        /// environment must explicitly set `APP_COOKIE_SECURE=false` so
+        /// cookies flow over `http://localhost:*` (see `.env.example`).
+        #[arg(long, env = "APP_COOKIE_SECURE", default_value_t = true)]
         cookie_secure: bool,
         /// Same-origin SPA origin for CORS.
         #[arg(long, env = "APP_CORS_ORIGIN", default_value = "http://localhost:5173")]

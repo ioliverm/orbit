@@ -123,7 +123,10 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(handlers::health::healthz))
         .route("/readyz", get(handlers::health::readyz))
         .layer(DefaultBodyLimit::max(BODY_LIMIT_BYTES))
-        .layer(middleware::from_fn(mw::security_headers::layer))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            mw::security_headers::layer,
+        ))
         .layer(middleware::from_fn(mw::request_id::layer))
         .layer(
             ServiceBuilder::new()

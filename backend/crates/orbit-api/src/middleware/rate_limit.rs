@@ -117,3 +117,66 @@ pub async fn try_consume(
     tx.commit().await?;
     Ok(Decision::Allowed)
 }
+
+/// Peek at the bucket at `key` without consuming a token. Returns
+/// [`Decision::RateLimited`] iff the (refilled) bucket holds less than one
+/// token. Used by the captcha check in the signin handler — the signin
+/// attempt itself must not spend a failure budget token; only an actual
+/// login.failure does.
+///
+/// The read path persists the refilled balance so that subsequent peeks
+/// account for elapsed time even if no failure lands between them. That
+/// mirrors [`try_consume`]'s behaviour on the RateLimited branch.
+pub async fn peek(pool: &PgPool, key: &str, limiter: Limiter) -> Result<Decision, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let now: DateTime<Utc> = Utc::now();
+
+    let existing = sqlx::query(
+        r#"SELECT tokens, last_refilled_at FROM rate_limit_buckets WHERE key = $1 FOR UPDATE"#,
+    )
+    .bind(key)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let (tokens, last_refilled_at) = match existing {
+        Some(row) => {
+            let prev_tokens: f64 = row.try_get("tokens")?;
+            let prev_at: DateTime<Utc> = row.try_get("last_refilled_at")?;
+            (prev_tokens, prev_at)
+        }
+        None => {
+            // No row yet — a fresh bucket is full. Nothing to persist.
+            tx.commit().await?;
+            return Ok(Decision::Allowed);
+        }
+    };
+
+    let elapsed = (now - last_refilled_at).num_milliseconds().max(0) as f64 / 1000.0;
+    let refilled = (tokens + elapsed * limiter.refill_per_second()).min(limiter.capacity);
+
+    sqlx::query(
+        r#"
+        INSERT INTO rate_limit_buckets (key, tokens, last_refilled_at)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (key) DO UPDATE
+          SET tokens = EXCLUDED.tokens,
+              last_refilled_at = EXCLUDED.last_refilled_at
+        "#,
+    )
+    .bind(key)
+    .bind(refilled)
+    .bind(now)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    if refilled < 1.0 {
+        let missing = 1.0 - refilled;
+        let secs = (missing / limiter.refill_per_second()).ceil() as u64;
+        Ok(Decision::RateLimited {
+            retry_after_secs: secs.max(1),
+        })
+    } else {
+        Ok(Decision::Allowed)
+    }
+}

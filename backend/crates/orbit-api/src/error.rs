@@ -6,10 +6,10 @@
 //! { "error": { "code": "<stable-id>", "message": "<short>", "details": {...}? } }
 //! ```
 //!
-//! `code` is stable; the SPA switches on it. `message` is a short,
-//! pre-translated ES/EN string the SPA can show without a locale catalog;
-//! Slice 1 ships ES only and the frontend does the locale mapping at the
-//! copy layer since T13a stays backend-focused.
+//! `code` is stable; the SPA switches on it. `message` is a short English
+//! string used as a developer-readable fallback — the SPA renders user
+//! copy from its locale catalogue keyed by `code`, so `message` is never
+//! shown to end users directly.
 //!
 //! Critically: response bodies never carry stack traces, validated input,
 //! or any Financial-Personal field (SEC-051). The `details` payload is
@@ -119,7 +119,7 @@ impl AppError {
             AppError::InvalidCredentials => (
                 StatusCode::UNAUTHORIZED,
                 "auth",
-                "Credenciales inválidas.",
+                "Invalid credentials.",
                 None,
             ),
             AppError::CaptchaRequired => (
