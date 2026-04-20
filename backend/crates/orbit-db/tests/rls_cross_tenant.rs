@@ -360,3 +360,286 @@ async fn seed_rows_are_actually_present_under_migrate_role() {
     cleanup_user(&migrate_pool, user_a).await;
     cleanup_user(&migrate_pool, user_b).await;
 }
+
+// ---------------------------------------------------------------------------
+// Slice 1 T12 — cross-tenant probes for residency_periods, grants, vesting_events
+// ---------------------------------------------------------------------------
+//
+// These follow Probe 1's shape: seed one row per user via the migrate pool
+// (table-owner bypasses the permissive RLS), then assert that a
+// `Tx::for_user(A)` transaction cannot SELECT / UPDATE / DELETE user B's row.
+// Each table is exercised at least on SELECT; `vesting_events` additionally
+// verifies UPDATE and DELETE are no-ops across tenants, because T13 will
+// issue `replace_for_grant` in the hot path and RLS is what keeps that
+// operation owner-scoped.
+
+/// Seed a `residency_periods` row for `user_id`. Table owner bypasses RLS.
+async fn seed_residency(migrate_pool: &PgPool, user_id: Uuid, tag: &str) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO residency_periods (
+            user_id, jurisdiction, sub_jurisdiction, from_date, regime_flags
+        )
+        VALUES ($1, 'ES', 'ES-MD', CURRENT_DATE, ARRAY[]::text[])
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed residency for {user_id} ({tag}) failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("residency_periods.id missing from RETURNING")
+}
+
+/// Seed a `grants` row for `user_id`. RSU to avoid the strike CHECK.
+async fn seed_grant(migrate_pool: &PgPool, user_id: Uuid, tag: &str) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO grants (
+            user_id, instrument, grant_date, share_count,
+            vesting_start, vesting_total_months, cliff_months, vesting_cadence,
+            employer_name
+        )
+        VALUES ($1, 'rsu', DATE '2024-09-15', 1000,
+                DATE '2024-09-15', 48, 12, 'monthly',
+                $2)
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(format!("ACME-{tag}"))
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed grant for {user_id} ({tag}) failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("grants.id missing from RETURNING")
+}
+
+/// Seed a single `vesting_events` row tied to `grant_id` / `user_id`.
+async fn seed_vesting_event(
+    migrate_pool: &PgPool,
+    user_id: Uuid,
+    grant_id: Uuid,
+    tag: &str,
+) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO vesting_events (
+            user_id, grant_id, vest_date,
+            shares_vested_this_event, cumulative_shares_vested, state
+        )
+        VALUES ($1, $2, DATE '2025-09-15',
+                250, 250, 'vested')
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(grant_id)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed vesting_event for {user_id} ({tag}) failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("vesting_events.id missing from RETURNING")
+}
+
+/// Probe 5 — a `Tx::for_user(user_a)` SELECT on `grants` returns only user
+/// A's row; user B's row is invisible. Covers AC-7.3 / SEC-023 for the
+/// grants surface.
+#[tokio::test]
+async fn grants_cross_tenant_select_is_isolated() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_grants").await;
+    ensure_user(&migrate_pool, user_b, "b_grants").await;
+    let gid_a = seed_grant(&migrate_pool, user_a, "a_grants").await;
+    let gid_b = seed_grant(&migrate_pool, user_b, "b_grants").await;
+
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a)");
+
+    let rows = sqlx::query("SELECT id, user_id FROM grants WHERE id IN ($1, $2)")
+        .bind(gid_a)
+        .bind(gid_b)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select grants under RLS");
+
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on grants under Tx::for_user({user_a}) returned {} rows \
+         for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    let seen_user: Uuid = rows[0].try_get("user_id").expect("row user_id");
+    assert_eq!(
+        seen_id, gid_a,
+        "RLS leak: Tx::for_user({user_a}) returned user B's grant id {seen_id} (expected {gid_a})"
+    );
+    assert_eq!(
+        seen_user, user_a,
+        "RLS leak: Tx::for_user({user_a}) returned a grants row for user {seen_user}"
+    );
+
+    tx.rollback().await.expect("rollback");
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Probe 6 — a `Tx::for_user(user_a)` SELECT on `residency_periods` returns
+/// only user A's row.
+#[tokio::test]
+async fn residency_periods_cross_tenant_select_is_isolated() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_residency").await;
+    ensure_user(&migrate_pool, user_b, "b_residency").await;
+    let rid_a = seed_residency(&migrate_pool, user_a, "a_residency").await;
+    let rid_b = seed_residency(&migrate_pool, user_b, "b_residency").await;
+
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a)");
+
+    let rows = sqlx::query("SELECT id, user_id FROM residency_periods WHERE id IN ($1, $2)")
+        .bind(rid_a)
+        .bind(rid_b)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select residency_periods under RLS");
+
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on residency_periods under Tx::for_user({user_a}) returned {} rows \
+         for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    let seen_user: Uuid = rows[0].try_get("user_id").expect("row user_id");
+    assert_eq!(
+        seen_id, rid_a,
+        "RLS leak: Tx::for_user({user_a}) returned user B's residency id {seen_id} (expected {rid_a})"
+    );
+    assert_eq!(
+        seen_user, user_a,
+        "RLS leak: Tx::for_user({user_a}) returned a residency row for user {seen_user}"
+    );
+
+    tx.rollback().await.expect("rollback");
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Probe 7 — `vesting_events` isolation. The handler's hot path
+/// (`replace_for_grant`) runs DELETE + INSERT under a per-user tx; if RLS
+/// ever loosened, a Tx::for_user(B) could wipe user A's events. Verify
+/// SELECT / UPDATE / DELETE are all owner-scoped.
+#[tokio::test]
+async fn vesting_events_cross_tenant_mutation_cannot_touch_other_tenants_rows() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_vesting").await;
+    ensure_user(&migrate_pool, user_b, "b_vesting").await;
+    let gid_a = seed_grant(&migrate_pool, user_a, "a_vesting").await;
+    let gid_b = seed_grant(&migrate_pool, user_b, "b_vesting").await;
+    let eid_a = seed_vesting_event(&migrate_pool, user_a, gid_a, "a_vesting").await;
+    let eid_b = seed_vesting_event(&migrate_pool, user_b, gid_b, "b_vesting").await;
+
+    // --- SELECT probe
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) select");
+    let rows = sqlx::query("SELECT id, user_id FROM vesting_events WHERE id IN ($1, $2)")
+        .bind(eid_a)
+        .bind(eid_b)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select vesting_events under RLS");
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on vesting_events under Tx::for_user({user_a}) returned {} rows \
+         for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    assert_eq!(
+        seen_id, eid_a,
+        "RLS leak: Tx::for_user({user_a}) returned user B's vesting_event id {seen_id}"
+    );
+    tx.rollback().await.expect("rollback select probe");
+
+    // --- UPDATE probe (target user B's row)
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) update");
+    let updated = sqlx::query("UPDATE vesting_events SET state = 'upcoming' WHERE id = $1")
+        .bind(eid_b)
+        .execute(tx.as_executor())
+        .await
+        .expect("cross-tenant UPDATE should return 0 rows, not error");
+    assert_eq!(
+        updated.rows_affected(),
+        0,
+        "RLS leak: UPDATE from Tx::for_user({user_a}) affected {} rows on user B's \
+         vesting_event {eid_b}.",
+        updated.rows_affected()
+    );
+    tx.commit().await.expect("commit empty update");
+
+    // --- DELETE probe (target user B's row)
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) delete");
+    let deleted = sqlx::query("DELETE FROM vesting_events WHERE id = $1")
+        .bind(eid_b)
+        .execute(tx.as_executor())
+        .await
+        .expect("cross-tenant DELETE should return 0 rows, not error");
+    assert_eq!(
+        deleted.rows_affected(),
+        0,
+        "RLS leak: DELETE from Tx::for_user({user_a}) removed {} rows on user B's \
+         vesting_event {eid_b}.",
+        deleted.rows_affected()
+    );
+    tx.commit().await.expect("commit empty delete");
+
+    // Sanity: user B's vesting_event is still present and unmutated. Read via
+    // the migrate pool (owner, bypasses RLS).
+    let surviving = sqlx::query("SELECT state FROM vesting_events WHERE id = $1")
+        .bind(eid_b)
+        .fetch_optional(&migrate_pool)
+        .await
+        .expect("post-check lookup");
+    let surviving =
+        surviving.expect("user B's vesting_event must still exist after cross-tenant DELETE");
+    let state: String = surviving.try_get("state").expect("state");
+    assert_eq!(
+        state, "vested",
+        "RLS leak: user B's vesting_event.state was mutated to {state:?} by \
+         a Tx::for_user(user_a) UPDATE"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}

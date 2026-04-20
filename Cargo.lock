@@ -836,6 +836,8 @@ dependencies = [
 name = "orbit-db"
 version = "0.0.0"
 dependencies = [
+ "chrono",
+ "orbit-core",
  "sqlx",
  "thiserror",
  "tokio",

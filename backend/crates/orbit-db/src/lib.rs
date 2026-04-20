@@ -18,7 +18,10 @@ use std::str::FromStr;
 
 use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions};
 
+pub mod grants;
+pub mod residency;
 mod tx;
+pub mod vesting_events;
 
 pub use tx::Tx;
 
