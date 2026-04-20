@@ -142,6 +142,10 @@ jobs:
         uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
         with:
           run_install: false
+          # pnpm `packageManager` pin lives in frontend/package.json (no root
+          # package.json in this monorepo). Without this override the action
+          # errors "No pnpm version is specified" and fails Setup pnpm.
+          package_json_file: frontend/package.json
 
       - name: Detect pnpm lockfile (at workspace root)
         id: lockfile
@@ -300,6 +304,10 @@ jobs:
         uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
         with:
           run_install: false
+          # pnpm `packageManager` pin lives in frontend/package.json (no root
+          # package.json in this monorepo). Without this override the action
+          # errors "No pnpm version is specified" and fails Setup pnpm.
+          package_json_file: frontend/package.json
 
       - name: Generate frontend SBOM (cdxgen)
         shell: bash
