@@ -14,7 +14,7 @@
 import { t, Trans } from '@lingui/macro';
 import { useLingui } from '@lingui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   deleteGrant,
@@ -25,6 +25,11 @@ import {
   type GrantGetResponse,
   type GrantListResponse,
 } from '../../../api/grants';
+import {
+  listPurchases,
+  type EsppListResponse,
+  type EsppPurchaseDto,
+} from '../../../api/espp';
 import { AppError } from '../../../api/errors';
 import { GrantForm, type GrantFormValues } from '../../../components/grants/GrantForm';
 import { VestingTimeline } from '../../../components/vesting/VestingTimeline';
@@ -42,6 +47,17 @@ export default function GrantDetailPage(): JSX.Element {
   const [timelineMode, setTimelineMode] = useState<'curve' | 'gantt'>('curve');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<'closed' | 'step1' | 'step2'>('closed');
+  const [notesLiftToast, setNotesLiftToast] = useState<string | null>(null);
+
+  // Pop any notes-lift toast that the ESPP-new page stashed in the cache.
+  useEffect(() => {
+    const key = ['grant', grantId, 'notes-lift-toast'];
+    const pending = queryClient.getQueryData<string | null>(key);
+    if (pending) {
+      setNotesLiftToast(pending);
+      queryClient.removeQueries({ queryKey: key });
+    }
+  }, [grantId, queryClient]);
 
   const detailKey = ['grant', grantId ?? ''];
   const q = useQuery<GrantGetResponse, AppError>({
@@ -168,6 +184,8 @@ export default function GrantDetailPage(): JSX.Element {
     );
   }
 
+  const isEspp = grant.instrument === 'espp';
+
   return (
     <>
       <div className="page-title">
@@ -183,6 +201,14 @@ export default function GrantDetailPage(): JSX.Element {
           </p>
         </div>
         <div className="row gap-2">
+          {isEspp ? (
+            <Link
+              className="btn btn--primary btn--sm"
+              to={`/app/grants/${grant.id}/espp-purchases/new`}
+            >
+              <Trans>Registrar compra ESPP</Trans>
+            </Link>
+          ) : null}
           <button
             className="btn btn--ghost btn--sm"
             type="button"
@@ -199,6 +225,12 @@ export default function GrantDetailPage(): JSX.Element {
           </button>
         </div>
       </div>
+
+      {notesLiftToast ? (
+        <div className="alert alert--info" role="status">
+          <strong>{notesLiftToast}</strong>
+        </div>
+      ) : null}
 
       <SummaryTiles grant={grant} />
 
@@ -235,6 +267,8 @@ export default function GrantDetailPage(): JSX.Element {
       </div>
 
       <TimelineCard grant={grant} mode={timelineMode} />
+
+      {isEspp ? <EsppPurchasesSection grantId={grant.id} locale={locale} /> : null}
 
       {grant.doubleTrigger && !grant.liquidityEventDate ? (
         <aside className="alert alert--info">
@@ -483,6 +517,98 @@ function vestedPct(vested: bigint, total: bigint): string {
   if (total === 0n) return '0';
   const n = Number((vested * 10_000n) / total) / 100;
   return n.toFixed(1);
+}
+
+function EsppPurchasesSection({
+  grantId,
+  locale,
+}: {
+  grantId: string;
+  locale: 'es-ES' | 'en';
+}): JSX.Element {
+  const q = useQuery<EsppListResponse>({
+    queryKey: ['espp-purchases', grantId],
+    queryFn: () => listPurchases(grantId),
+    staleTime: 30_000,
+  });
+  const purchases = q.data?.purchases ?? [];
+
+  return (
+    <section className="card mb-8" aria-labelledby="espp-purchases-heading">
+      <div className="section-head">
+        <div className="section-head__title">
+          <h2 id="espp-purchases-heading">
+            <Trans>Compras ESPP</Trans>
+          </h2>
+          <div className="section-head__sub">
+            <Trans>
+              Cada compra registrada queda asociada a este grant. Muestra en moneda
+              nativa; la conversión a EUR llega en Slice 3.
+            </Trans>
+          </div>
+        </div>
+        <div className="row gap-2">
+          <Link className="btn btn--primary btn--sm" to={`/app/grants/${grantId}/espp-purchases/new`}>
+            <Trans>Registrar compra</Trans>
+          </Link>
+        </div>
+      </div>
+
+      {q.isPending ? (
+        <p className="muted text-sm">
+          <Trans>Cargando compras…</Trans>
+        </p>
+      ) : purchases.length === 0 ? (
+        <p className="muted text-sm">
+          <Trans>Aún no has registrado ninguna compra ESPP para este grant.</Trans>
+        </p>
+      ) : (
+        <div className="card card--flush mt-3">
+          {purchases.map((p) => (
+            <PurchaseRow key={p.id} grantId={grantId} purchase={p} locale={locale} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PurchaseRow({
+  grantId,
+  purchase,
+  locale,
+}: {
+  grantId: string;
+  purchase: EsppPurchaseDto;
+  locale: 'es-ES' | 'en';
+}): JSX.Element {
+  return (
+    <div className="purchase-row" data-testid="espp-purchase-row">
+      <div className="purchase-row__date">
+        {formatLongDate(purchase.purchaseDate, locale)}
+      </div>
+      <div className="purchase-row__shares">
+        {purchase.sharesPurchased} {locale === 'es-ES' ? 'acc.' : 'sh'}
+      </div>
+      <div className="purchase-row__price mono">
+        {purchase.purchasePricePerShare} {purchase.currency}
+      </div>
+      <div className="purchase-row__fmv mono">
+        {purchase.fmvAtPurchase} {purchase.currency}
+      </div>
+      <div className="purchase-row__extras">
+        {purchase.employerDiscountPercent
+          ? `${purchase.employerDiscountPercent}%`
+          : null}
+      </div>
+      <Link
+        className="btn btn--ghost btn--sm"
+        to={`/app/grants/${grantId}/espp-purchases/${purchase.id}/edit`}
+      >
+        <Trans>Editar</Trans>
+      </Link>
+    </div>
+  );
 }
 
 function grantToFormValues(g: GrantDto): Partial<GrantFormValues> {

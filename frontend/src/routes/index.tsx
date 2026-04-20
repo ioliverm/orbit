@@ -22,8 +22,14 @@ import DashboardPage from './app/dashboard';
 import GrantsIndexPage from './app/grants';
 import GrantDetailPage from './app/grants/detail';
 import AddGrantPage from './app/grants/new';
+import EsppPurchaseNewPage from './app/grants/espp-new';
+import EsppPurchaseEditPage from './app/grants/espp-edit';
+import TripsIndexPage from './app/trips';
+import TripNewPage from './app/trips/new';
+import TripEditPage from './app/trips/edit';
 import ProximamenteRoute from './app/proximamente';
 import ProfilePage from './account/profile';
+import SessionsPage from './account/sessions';
 
 export function buildRoutes(): RouteObject[] {
   return [
@@ -68,8 +74,20 @@ export function buildRoutes(): RouteObject[] {
             { path: 'grants', element: <GrantsIndexPage /> },
             { path: 'grants/new', element: <AddGrantPage /> },
             { path: 'grants/:grantId', element: <GrantDetailPage /> },
+            {
+              path: 'grants/:grantId/espp-purchases/new',
+              element: <EsppPurchaseNewPage />,
+            },
+            {
+              path: 'grants/:grantId/espp-purchases/:purchaseId/edit',
+              element: <EsppPurchaseEditPage />,
+            },
+            { path: 'trips', element: <TripsIndexPage /> },
+            { path: 'trips/new', element: <TripNewPage /> },
+            { path: 'trips/:tripId/edit', element: <TripEditPage /> },
             { path: 'proximamente', element: <ProximamenteRoute /> },
             { path: 'account/profile', element: <ProfilePage /> },
+            { path: 'account/sessions', element: <SessionsPage /> },
           ],
         },
       ],

@@ -83,7 +83,9 @@ export default function FirstGrantStepPage(): JSX.Element {
         skipLink={{
           label: (
             <Trans>
-              Tengo varios grants — importaré desde Carta o Shareworks después
+              Tengo varios grants — habrá una importación masiva (Carta / Shareworks /
+              ETrade) más adelante; por ahora, puedes añadirlos uno a uno desde el
+              dashboard.
             </Trans>
           ),
           onClick: handleSkip,

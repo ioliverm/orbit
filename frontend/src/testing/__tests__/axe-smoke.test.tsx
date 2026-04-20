@@ -24,6 +24,11 @@ import SignupPage from '../../routes/auth/signup';
 import SigninPage from '../../routes/auth/signin';
 import DashboardPage from '../../routes/app/dashboard';
 import GrantDetailPage from '../../routes/app/grants/detail';
+import EsppPurchaseNewPage from '../../routes/app/grants/espp-new';
+import TripNewPage from '../../routes/app/trips/new';
+import TripsIndexPage from '../../routes/app/trips';
+import SessionsPage from '../../routes/account/sessions';
+import ProfilePage from '../../routes/account/profile';
 import { useAuthStore } from '../../store/auth';
 import { useLocaleStore } from '../../store/locale';
 import type { GrantDto } from '../../api/grants';
@@ -203,5 +208,112 @@ describe('axe-core smoke (G-21) — critical-path screens', () => {
       expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     });
     await assertNoCriticalOrSeriousViolations(container, '/app/grants/:id');
+  });
+
+  it('/app/grants/:id/espp-purchases/new has no critical or serious violations', async () => {
+    seedAuthed();
+    const g = grantFixture({
+      instrument: 'espp',
+      notes: JSON.stringify({ estimated_discount_percent: 15 }),
+    });
+    mockGrantsList([g], {
+      [`/api/v1/grants/${g.id}`]: { grant: g },
+    });
+    const container = renderPage(
+      <Routes>
+        <Route
+          path="/app/grants/:grantId/espp-purchases/new"
+          element={<EsppPurchaseNewPage />}
+        />
+      </Routes>,
+      `/app/grants/${g.id}/espp-purchases/new`,
+    );
+    await waitFor(() => {
+      expect(document.querySelector('input[name="offeringDate"]')).not.toBeNull();
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/grants/:id/espp-purchases/new',
+    );
+  });
+
+  it('/app/trips list has no critical or serious violations', async () => {
+    seedAuthed();
+    mockGrantsList([], {
+      '/api/v1/trips': {
+        trips: [],
+        annualCapTracker: {
+          year: 2026,
+          tripCount: 0,
+          dayCountDeclared: 0,
+          employerPaidTripCount: 0,
+          criteriaMetCountByKey: {
+            services_outside_spain: 0,
+            non_spanish_employer: 0,
+            not_tax_haven: 0,
+            no_double_exemption: 0,
+            within_annual_cap: 0,
+          },
+        },
+      },
+    });
+    const container = renderPage(<TripsIndexPage />, '/app/trips');
+    await waitFor(() => {
+      expect(screen.getByTestId('annual-cap-tracker')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(container, '/app/trips');
+  });
+
+  it('/app/trips/new has no critical or serious violations', async () => {
+    seedAuthed();
+    mockGrantsList([]);
+    const container = renderPage(<TripNewPage />, '/app/trips/new');
+    await waitFor(() => {
+      expect(
+        document.querySelector('select[name="destinationCountry"]'),
+      ).not.toBeNull();
+    });
+    await assertNoCriticalOrSeriousViolations(container, '/app/trips/new');
+  });
+
+  it('/app/account/profile (M720 embedded) has no critical or serious violations', async () => {
+    seedAuthed();
+    mockGrantsList([], {
+      '/modelo-720-inputs?category=bank_accounts': { history: [] },
+      '/modelo-720-inputs?category=real_estate': { history: [] },
+    });
+    const container = renderPage(<ProfilePage />, '/app/account/profile');
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /perfil y residencia/i }),
+      ).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/account/profile (M720)',
+    );
+  });
+
+  it('/app/account/sessions has no critical or serious violations', async () => {
+    seedAuthed();
+    mockGrantsList([], {
+      '/api/v1/auth/sessions': {
+        sessions: [
+          {
+            id: 's-1',
+            userAgent: 'Firefox 128 · macOS',
+            countryIso2: 'ES',
+            createdAt: '2026-04-18T09:12:00Z',
+            lastUsedAt: '2026-04-19T20:00:00Z',
+            isCurrent: true,
+          },
+        ],
+      },
+    });
+    const container = renderPage(<SessionsPage />, '/app/account/sessions');
+    await waitFor(() => {
+      expect(screen.getByTestId('session-row')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(container, '/app/account/sessions');
   });
 });

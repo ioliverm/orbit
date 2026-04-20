@@ -59,7 +59,12 @@ export function Sidebar(): JSX.Element {
         <div className="sidebar__heading">
           <Trans>Cumplimiento</Trans>
         </div>
-        <SoonLink to="/app/proximamente?feature=modelo-720" label={<Trans>Modelo 720</Trans>} />
+        <NavLink className={liveNavClass} to="/app/trips">
+          <Trans>Desplazamientos</Trans>
+        </NavLink>
+        <NavLink className={liveNavClass} to="/app/account/profile#modelo-720">
+          <Trans>Modelo 720</Trans>
+        </NavLink>
         <SoonLink to="/app/proximamente?feature=exports" label={<Trans>Exports</Trans>} />
       </nav>
 
@@ -69,6 +74,9 @@ export function Sidebar(): JSX.Element {
         </div>
         <NavLink className={liveNavClass} to="/app/account/profile">
           <Trans>Perfil y residencia</Trans>
+        </NavLink>
+        <NavLink className={liveNavClass} to="/app/account/sessions">
+          <Trans>Sesiones activas</Trans>
         </NavLink>
         <SoonLink to="/app/proximamente?feature=privacy" label={<Trans>Datos y privacidad</Trans>} />
       </nav>

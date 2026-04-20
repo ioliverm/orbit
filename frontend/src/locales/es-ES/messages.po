@@ -13,13 +13,23 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/components/grants/ResidencyForm.tsx:138
+#: src/components/grants/ResidencyForm.tsx:159
 msgid "— selecciona —"
 msgstr "— selecciona —"
 
-#: src/routes/app/grants/detail.tsx:429
+#: src/routes/account/sessions.tsx:150
+msgid "¿Confirmas cerrar todas las demás sesiones?"
+msgstr "¿Confirmas cerrar todas las demás sesiones?"
+
+#: src/routes/app/grants/detail.tsx:463
+#: src/routes/app/grants/espp-edit.tsx:205
+#: src/routes/app/trips/edit.tsx:169
 msgid "¿Confirmas la eliminación definitiva?"
 msgstr "¿Confirmas la eliminación definitiva?"
+
+#: src/components/trips/TripForm.tsx:248
+msgid "¿Gastos pagados por el empleador?"
+msgstr "¿Gastos pagados por el empleador?"
 
 #: src/routes/auth/signin.tsx:182
 msgid "¿Has olvidado tu contraseña?"
@@ -29,14 +39,29 @@ msgstr "¿Has olvidado tu contraseña?"
 msgid "¿Todavía no tienes cuenta? <0>Regístrate</0>"
 msgstr "¿Todavía no tienes cuenta? <0>Regístrate</0>"
 
+#: src/components/espp/EsppPurchaseForm.tsx:364
+#: src/components/espp/EsppPurchaseForm.tsx:388
+#: src/components/espp/EsppPurchaseForm.tsx:414
 #: src/components/grants/GrantForm.tsx:397
 #: src/components/grants/GrantForm.tsx:605
 msgid "(opcional)"
 msgstr "(opcional)"
 
-#: src/routes/app/dashboard.tsx:86
+#: src/routes/app/dashboard.tsx:101
 msgid "{0} grants"
 msgstr "{0} grants"
+
+#: src/routes/app/dashboard.tsx:241
+msgid "{0} grants · {instrumentMix}"
+msgstr "{0} grants · {instrumentMix}"
+
+#: src/routes/account/sessions.tsx:103
+msgid "{0} sesiones activas."
+msgstr "{0} sesiones activas."
+
+#: src/components/espp/EsppPurchaseForm.tsx:386
+msgid "% de descuento del empleador"
+msgstr "% de descuento del empleador"
 
 #: src/components/grants/GrantForm.tsx:518
 msgid "3 años · sin cliff · mensual"
@@ -50,16 +75,16 @@ msgstr "4 años · cliff 1 año · mensual"
 msgid "4 años · cliff 1 año · trimestral"
 msgstr "4 años · cliff 1 año · trimestral"
 
-#: src/routes/auth/verify-email.tsx:43
+#: src/routes/auth/verify-email.tsx:51
 msgid "Abre el enlace desde el correo que te enviamos."
 msgstr "Abre el enlace desde el correo que te enviamos."
 
-#: src/routes/app/dashboard.tsx:165
+#: src/routes/app/dashboard.tsx:408
 msgid "Acciones"
 msgstr "Acciones"
 
 #: src/components/grants/GrantForm.tsx:659
-#: src/routes/app/grants/detail.tsx:290
+#: src/routes/app/grants/detail.tsx:324
 msgid "Acciones totales"
 msgstr "Acciones totales"
 
@@ -67,15 +92,20 @@ msgstr "Acciones totales"
 msgid "Aceptar y continuar"
 msgstr "Aceptar y continuar"
 
-#: src/routes/account/profile.tsx:55
+#: src/components/modelo720/Modelo720Section.tsx:307
+#: src/routes/account/sessions.tsx:221
+msgid "actual"
+msgstr "actual"
+
+#: src/routes/account/profile.tsx:56
 msgid "Actualiza tu autonomía o tu moneda principal. Al guardar se abre un nuevo período de residencia y se cierra el anterior."
 msgstr "Actualiza tu autonomía o tu moneda principal. Al guardar se abre un nuevo período de residencia y se cierra el anterior."
 
-#: src/routes/app/grants/detail.tsx:211
+#: src/routes/app/grants/detail.tsx:243
 msgid "Acumulado mensual. Acciones que cumplen las dos condiciones (tiempo + liquidez) en sólido; RSU con sólo tiempo cumplido aparecen con trama."
 msgstr "Acumulado mensual. Acciones que cumplen las dos condiciones (tiempo + liquidez) en sólido; RSU con sólo tiempo cumplido aparecen con trama."
 
-#: src/components/grants/ResidencyForm.tsx:192
+#: src/components/grants/ResidencyForm.tsx:213
 msgid "Afecta a cómo se muestran los valores en tu dashboard. En Slice 1 no hay conversión a EUR."
 msgstr "Afecta a cómo se muestran los valores en tu dashboard. En Slice 1 no hay conversión a EUR."
 
@@ -83,26 +113,50 @@ msgstr "Afecta a cómo se muestran los valores en tu dashboard. En Slice 1 no ha
 msgid "Al crear una cuenta aceptas nuestra Política de privacidad. Sólo usamos cookies esenciales; no necesitas aceptar analíticas."
 msgstr "Al crear una cuenta aceptas nuestra Política de privacidad. Sólo usamos cookies esenciales; no necesitas aceptar analíticas."
 
-#: src/routes/app/dashboard.tsx:78
-#: src/routes/app/dashboard.tsx:99
+#: src/routes/app/trips/index.tsx:62
+msgid "Añadir desplazamiento"
+msgstr "Añadir desplazamiento"
+
+#: src/routes/app/dashboard.tsx:93
+#: src/routes/app/dashboard.tsx:114
 #: src/routes/app/grants/new.tsx:53
 msgid "Añadir grant"
 msgstr "Añadir grant"
 
-#: src/routes/app/dashboard.tsx:112
+#: src/routes/app/dashboard.tsx:145
 msgid "Añadir otro grant"
 msgstr "Añadir otro grant"
+
+#: src/routes/app/trips/index.tsx:74
+msgid "Año fiscal"
+msgstr "Año fiscal"
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:74
 msgid "Antes de continuar — lo que Orbit es y no es"
 msgstr "Antes de continuar — lo que Orbit es y no es"
+
+#: src/routes/app/trips/index.tsx:157
+msgid "Apto · 5/5"
+msgstr "Apto · 5/5"
 
 #: src/routes/auth/password-reset-landing.tsx:15
 #: src/routes/auth/password-reset-request.tsx:27
 msgid "Aún no disponible"
 msgstr "Aún no disponible"
 
-#: src/components/grants/ResidencyForm.tsx:121
+#: src/routes/app/trips/index.tsx:127
+msgid "Aún no has registrado ningún desplazamiento para {year}. Pulsa «Añadir desplazamiento» para empezar."
+msgstr "Aún no has registrado ningún desplazamiento para {year}. Pulsa «Añadir desplazamiento» para empezar."
+
+#: src/routes/app/grants/detail.tsx:563
+msgid "Aún no has registrado ninguna compra ESPP para este grant."
+msgstr "Aún no has registrado ninguna compra ESPP para este grant."
+
+#: src/components/trips/TripForm.tsx:409
+msgid "Auto-declaración. Considera todos los desplazamientos Art. 7.p del año, incluido éste."
+msgstr "Auto-declaración. Considera todos los desplazamientos Art. 7.p del año, incluido éste."
+
+#: src/components/grants/ResidencyForm.tsx:142
 msgid "Autonomía (territorio común o foral)"
 msgstr "Autonomía (territorio común o foral)"
 
@@ -110,16 +164,24 @@ msgstr "Autonomía (territorio común o foral)"
 msgid "Bienvenido de nuevo."
 msgstr "Bienvenido de nuevo."
 
+#: src/routes/app/grants/detail.tsx:544
+msgid "Cada compra registrada queda asociada a este grant. Muestra en moneda nativa; la conversión a EUR llega en Slice 3."
+msgstr "Cada compra registrada queda asociada a este grant. Muestra en moneda nativa; la conversión a EUR llega en Slice 3."
+
 #: src/components/Disclaimer/DisclaimerModal.tsx:105
 msgid "Cada export lleva un traceability ID enlazado al audit-log."
 msgstr "Cada export lleva un traceability ID enlazado al audit-log."
+
+#: src/routes/account/sessions.tsx:63
+msgid "Cada inicio de sesión crea una entrada aquí. Si revocas una sesión, ese dispositivo tendrá que volver a iniciar sesión. Nunca mostramos tu dirección IP en claro — sólo una pista aproximada de ubicación."
+msgstr "Cada inicio de sesión crea una entrada aquí. Si revocas una sesión, ese dispositivo tendrá que volver a iniciar sesión. Nunca mostramos tu dirección IP en claro — sólo una pista aproximada de ubicación."
 
 #: src/components/grants/GrantForm.tsx:563
 msgid "Cadencia"
 msgstr "Cadencia"
 
 #: src/components/grants/GrantForm.tsx:509
-#: src/routes/app/grants/detail.tsx:208
+#: src/routes/app/grants/detail.tsx:240
 msgid "Calendario de vesting"
 msgstr "Calendario de vesting"
 
@@ -131,20 +193,64 @@ msgstr "Calendario estimado"
 msgid "Cambiar idioma"
 msgstr "Cambiar idioma"
 
-#: src/routes/app/grants/detail.tsx:151
-#: src/routes/app/grants/detail.tsx:434
+#: src/routes/account/sessions.tsx:159
+#: src/routes/app/grants/detail.tsx:167
+#: src/routes/app/grants/detail.tsx:468
+#: src/routes/app/grants/espp-edit.tsx:210
+#: src/routes/app/trips/edit.tsx:178
 msgid "Cancelar"
 msgstr "Cancelar"
 
+#: src/routes/app/trips/new.tsx:43
+msgid "Captura los datos del desplazamiento y responde a los cinco criterios antes de guardar."
+msgstr "Captura los datos del desplazamiento y responde a los cinco criterios antes de guardar."
+
+#: src/routes/app/trips/index.tsx:159
+msgid "Capturado · {met}/5"
+msgstr "Capturado · {met}/5"
+
+#: src/components/trips/TripForm.tsx:334
+msgid "Capturamos tus respuestas para que el motor fiscal las evalúe en Slice 4. Responde a los cinco criterios antes de guardar."
+msgstr "Capturamos tus respuestas para que el motor fiscal las evalúe en Slice 4. Responde a los cinco criterios antes de guardar."
+
+#: src/routes/app/grants/detail.tsx:559
+msgid "Cargando compras…"
+msgstr "Cargando compras…"
+
+#: src/routes/app/trips/index.tsx:123
+msgid "Cargando desplazamientos…"
+msgstr "Cargando desplazamientos…"
+
+#: src/routes/account/sessions.tsx:79
+msgid "Cargando sesiones…"
+msgstr "Cargando sesiones…"
+
 #: src/components/Spinner.tsx:11
-#: src/routes/app/dashboard.tsx:47
-#: src/routes/app/grants/detail.tsx:124
+#: src/routes/app/dashboard.tsx:62
+#: src/routes/app/grants/detail.tsx:140
+#: src/routes/app/grants/espp-edit.tsx:102
+#: src/routes/app/grants/espp-new.tsx:106
+#: src/routes/app/trips/edit.tsx:96
 msgid "Cargando…"
 msgstr "Cargando…"
 
 #: src/components/Layout/Sidebar.tsx:40
 msgid "Cartera"
 msgstr "Cartera"
+
+#: src/routes/app/dashboard.tsx:174
+msgid "Cartera por empleador"
+msgstr "Cartera por empleador"
+
+#: src/routes/account/sessions.tsx:247
+msgid "Cerrar esta sesión"
+msgstr "Cerrar esta sesión"
+
+#: src/routes/account/sessions.tsx:113
+#: src/routes/account/sessions.tsx:130
+#: src/routes/account/sessions.tsx:176
+msgid "Cerrar las demás sesiones"
+msgstr "Cerrar las demás sesiones"
 
 #: src/components/Layout/Header.tsx:41
 #: src/components/Layout/Header.tsx:43
@@ -159,6 +265,14 @@ msgstr "Cliff (meses)"
 msgid "Completa los campos de vesting para ver la previsualización."
 msgstr "Completa los campos de vesting para ver la previsualización."
 
+#: src/routes/app/grants/espp-edit.tsx:79
+msgid "Compra no encontrada"
+msgstr "Compra no encontrada"
+
+#: src/routes/app/grants/detail.tsx:541
+msgid "Compras ESPP"
+msgstr "Compras ESPP"
+
 #: src/routes/auth/signin.tsx:115
 msgid "Comprobación adicional"
 msgstr "Comprobación adicional"
@@ -167,15 +281,26 @@ msgstr "Comprobación adicional"
 msgid "Comprobación CAPTCHA (integración disponible en Slice 7+)."
 msgstr "Comprobación CAPTCHA (integración disponible en Slice 7+)."
 
-#: src/routes/app/grants/detail.tsx:182
+#: src/routes/app/grants/detail.tsx:200
 msgid "concedida"
 msgstr "concedida"
 
-#: src/routes/app/grants/detail.tsx:294
+#: src/routes/app/grants/detail.tsx:328
 msgid "concedidas"
 msgstr "concedidas"
 
-#: src/routes/app/grants/detail.tsx:443
+#: src/components/espp/EsppPurchaseForm.tsx:448
+msgid "Confirmar y guardar igualmente"
+msgstr "Confirmar y guardar igualmente"
+
+#: src/components/espp/EsppPurchaseForm.tsx:439
+msgid "Confirmo que es una compra distinta; guardar igualmente."
+msgstr "Confirmo que es una compra distinta; guardar igualmente."
+
+#: src/routes/account/sessions.tsx:167
+#: src/routes/app/grants/detail.tsx:477
+#: src/routes/app/grants/espp-edit.tsx:219
+#: src/routes/app/trips/edit.tsx:186
 #: src/routes/auth/signup.tsx:147
 msgid "Continuar"
 msgstr "Continuar"
@@ -184,6 +309,10 @@ msgstr "Continuar"
 #: src/routes/auth/signup.tsx:111
 msgid "Contraseña"
 msgstr "Contraseña"
+
+#: src/routes/app/dashboard.tsx:278
+msgid "Contribución individual"
+msgstr "Contribución individual"
 
 #: src/routes/auth/password-reset-request.tsx:35
 #: src/routes/auth/signin.tsx:124
@@ -203,7 +332,12 @@ msgstr "Credenciales inválidas"
 msgid "Credenciales inválidas. Comprueba tu correo y contraseña."
 msgstr "Credenciales inválidas. Comprueba tu correo y contraseña."
 
-#: src/components/Layout/Sidebar.tsx:68
+#: src/components/trips/TripForm.tsx:331
+#: src/components/trips/TripForm.tsx:348
+msgid "Criterios de elegibilidad Art. 7.p"
+msgstr "Criterios de elegibilidad Art. 7.p"
+
+#: src/components/Layout/Sidebar.tsx:73
 msgid "Cuenta"
 msgstr "Cuenta"
 
@@ -211,15 +345,29 @@ msgstr "Cuenta"
 msgid "Cumplimiento"
 msgstr "Cumplimiento"
 
-#: src/routes/app/grants/detail.tsx:224
+#: src/routes/app/grants/detail.tsx:256
 msgid "Curva"
 msgstr "Curva"
+
+#: src/routes/app/dashboard.tsx:177
+msgid "Curva acumulada por empleador. Haz clic para desplegar el detalle por grant / instrumento."
+msgstr "Curva acumulada por empleador. Haz clic para desplegar el detalle por grant / instrumento."
 
 #: src/components/Layout/Sidebar.tsx:43
 msgid "Dashboard"
 msgstr "Dashboard"
 
-#: src/components/Layout/Sidebar.tsx:73
+#: src/components/espp/EsppPurchaseForm.tsx:231
+#: src/routes/app/grants/espp-edit.tsx:135
+#: src/routes/app/grants/espp-new.tsx:135
+msgid "Datos de la compra"
+msgstr "Datos de la compra"
+
+#: src/components/trips/TripForm.tsx:222
+msgid "Datos del desplazamiento"
+msgstr "Datos del desplazamiento"
+
+#: src/components/Layout/Sidebar.tsx:81
 msgid "Datos y privacidad"
 msgstr "Datos y privacidad"
 
@@ -236,7 +384,7 @@ msgid "Déjalo vacío si aún no ha ocurrido. El timeline mostrará las acciones
 msgstr "Déjalo vacío si aún no ha ocurrido. El timeline mostrará las acciones time-vested con trama de rayas hasta que el evento se cumpla."
 
 #: src/routes/auth/signin.tsx:79
-#: src/routes/auth/verify-email.tsx:64
+#: src/routes/auth/verify-email.tsx:72
 msgid "Demasiados intentos"
 msgstr "Demasiados intentos"
 
@@ -244,29 +392,91 @@ msgstr "Demasiados intentos"
 msgid "Demasiados intentos. Espera unos minutos y vuelve a probar."
 msgstr "Demasiados intentos. Espera unos minutos y vuelve a probar."
 
+#: src/components/trips/TripForm.tsx:407
+msgid "Dentro del tope anual (€60 100)"
+msgstr "Dentro del tope anual (€60 100)"
+
 #: src/components/grants/GrantForm.tsx:476
 msgid "Descuento estimado (%)"
 msgstr "Descuento estimado (%)"
 
-#: src/routes/app/dashboard.tsx:158
+#: src/routes/app/trips/edit.tsx:73
+msgid "Desplazamiento no encontrado"
+msgstr "Desplazamiento no encontrado"
+
+#: src/components/Layout/Sidebar.tsx:63
+msgid "Desplazamientos"
+msgstr "Desplazamientos"
+
+#: src/routes/app/trips/index.tsx:50
+msgid "Desplazamientos Art. 7.p"
+msgstr "Desplazamientos Art. 7.p"
+
+#: src/routes/app/trips/index.tsx:119
+msgid "Desplazamientos registrados"
+msgstr "Desplazamientos registrados"
+
+#: src/components/trips/TripForm.tsx:319
+msgid "Destino dentro de España"
+msgstr "Destino dentro de España"
+
+#: src/routes/app/dashboard.tsx:401
 msgid "Detalle"
 msgstr "Detalle"
+
+#: src/components/espp/EsppPurchaseForm.tsx:355
+msgid "Detalles opcionales"
+msgstr "Detalles opcionales"
+
+#: src/components/espp/EsppPurchaseForm.tsx:259
+msgid "Día en que se ejecuta la compra al precio con descuento. Debe ser igual o posterior a la fecha de oferta."
+msgstr "Día en que se ejecuta la compra al precio con descuento. Debe ser igual o posterior a la fecha de oferta."
+
+#: src/routes/app/trips/index.tsx:96
+msgid "días"
+msgstr "días"
+
+#: src/routes/app/trips/index.tsx:93
+msgid "Días declarados"
+msgstr "Días declarados"
+
+#: src/routes/account/sessions.tsx:60
+msgid "Dispositivos activos"
+msgstr "Dispositivos activos"
 
 #: src/components/grants/GrantForm.tsx:578
 msgid "Double-trigger (sólo RSU)"
 msgstr "Double-trigger (sólo RSU)"
 
-#: src/routes/app/grants/detail.tsx:191
+#: src/routes/app/grants/detail.tsx:217
+#: src/routes/app/grants/detail.tsx:608
 msgid "Editar"
 msgstr "Editar"
 
-#: src/routes/app/grants/detail.tsx:138
+#: src/routes/app/grants/espp-edit.tsx:98
+#: src/routes/app/grants/espp-edit.tsx:113
+msgid "Editar compra ESPP"
+msgstr "Editar compra ESPP"
+
+#: src/routes/app/trips/edit.tsx:92
+msgid "Editar desplazamiento"
+msgstr "Editar desplazamiento"
+
+#: src/routes/app/trips/edit.tsx:107
+msgid "Editar desplazamiento Art. 7.p"
+msgstr "Editar desplazamiento Art. 7.p"
+
+#: src/routes/app/grants/detail.tsx:154
 msgid "Editar grant"
 msgstr "Editar grant"
 
 #: src/components/grants/GrantForm.tsx:216
 msgid "El cliff no puede superar el periodo total de vesting."
 msgstr "El cliff no puede superar el periodo total de vesting."
+
+#: src/components/espp/EsppPurchaseForm.tsx:166
+msgid "El descuento debe estar entre 0 y 100."
+msgstr "El descuento debe estar entre 0 y 100."
 
 #: src/components/grants/GrantForm.tsx:478
 msgid "El descuento ESPP (p. ej. 15%) se usa sólo como referencia; los detalles de la compra se registran en Slice 2."
@@ -288,9 +498,15 @@ msgstr "El descuento ESPP (p. ej. 15%) se usa sólo como referencia; los detalle
 #~ msgid "El formulario del primer grant llega en la siguiente iteración (T14b)."
 #~ msgstr "El formulario del primer grant llega en la siguiente iteración (T14b)."
 
-#: src/routes/app/grants/detail.tsx:377
+#: src/routes/app/grants/detail.tsx:411
+#: src/routes/app/grants/espp-new.tsx:193
 msgid "El grant no existe o no pertenece a tu cuenta."
 msgstr "El grant no existe o no pertenece a tu cuenta."
+
+#: src/routes/app/grants/espp-edit.tsx:84
+#: src/routes/app/trips/edit.tsx:78
+msgid "El registro no existe o no pertenece a tu cuenta."
+msgstr "El registro no existe o no pertenece a tu cuenta."
 
 #: src/routes/auth/password-reset-request.tsx:28
 msgid "El restablecimiento de contraseña se habilitará en una iteración posterior. Mientras tanto, contacta con soporte si necesitas recuperar el acceso."
@@ -308,15 +524,27 @@ msgstr "El strike es obligatorio para NSO / ISO."
 msgid "Elige una contraseña nueva"
 msgstr "Elige una contraseña nueva"
 
-#: src/routes/app/grants/detail.tsx:198
+#: src/routes/app/grants/detail.tsx:224
+#: src/routes/app/grants/espp-edit.tsx:128
+#: src/routes/app/trips/edit.tsx:123
 msgid "Eliminar"
 msgstr "Eliminar"
 
-#: src/routes/app/grants/detail.tsx:453
+#: src/routes/app/grants/espp-edit.tsx:185
+msgid "Eliminar compra ESPP"
+msgstr "Eliminar compra ESPP"
+
+#: src/routes/app/grants/detail.tsx:487
+#: src/routes/app/grants/espp-edit.tsx:229
+#: src/routes/app/trips/edit.tsx:195
 msgid "Eliminar definitivamente"
 msgstr "Eliminar definitivamente"
 
-#: src/routes/app/grants/detail.tsx:409
+#: src/routes/app/trips/edit.tsx:149
+msgid "Eliminar desplazamiento"
+msgstr "Eliminar desplazamiento"
+
+#: src/routes/app/grants/detail.tsx:443
 msgid "Eliminar grant"
 msgstr "Eliminar grant"
 
@@ -328,17 +556,29 @@ msgstr "Eliminar grant"
 msgid "Empleador"
 msgstr "Empleador"
 
+#: src/components/trips/TripForm.tsx:368
+msgid "Empleador no residente en España o establecimiento permanente beneficiario"
+msgstr "Empleador no residente en España o establecimiento permanente beneficiario"
+
 #: src/components/grants/GrantForm.tsx:354
 msgid "Employee Stock Purchase Plan. El descuento tributa como rendimiento del trabajo en la compra."
 msgstr "Employee Stock Purchase Plan. El descuento tributa como rendimiento del trabajo en la compra."
 
-#: src/routes/auth/verify-email.tsx:66
+#: src/routes/auth/verify-email.tsx:74
 msgid "Enlace caducado o ya usado"
 msgstr "Enlace caducado o ya usado"
 
-#: src/routes/auth/verify-email.tsx:40
+#: src/routes/auth/verify-email.tsx:48
 msgid "Enlace de verificación no válido"
 msgstr "Enlace de verificación no válido"
+
+#: src/components/espp/EsppPurchaseForm.tsx:319
+msgid "Entero mayor que 0."
+msgstr "Entero mayor que 0."
+
+#: src/components/espp/EsppPurchaseForm.tsx:392
+msgid "Entre 0 y 100."
+msgstr "Entre 0 y 100."
 
 #: src/routes/auth/password-reset-request.tsx:45
 msgid "Enviar enlace"
@@ -356,48 +596,104 @@ msgstr "Esta contraseña aparece en listas públicas de filtraciones. Elige otra
 msgid "Esta función llega en una iteración posterior. Gracias por tu paciencia."
 msgstr "Esta función llega en una iteración posterior. Gracias por tu paciencia."
 
+#: src/routes/account/sessions.tsx:238
+msgid "Esta sesión"
+msgstr "Esta sesión"
+
+#: src/routes/app/grants/espp-new.tsx:208
+msgid "Este grant no es ESPP"
+msgstr "Este grant no es ESPP"
+
 #: src/components/grants/GrantForm.tsx:591
 msgid "Este grant requiere un evento de liquidez (IPO, adquisición o tender offer) además del tiempo para considerarse totalmente vesting."
 msgstr "Este grant requiere un evento de liquidez (IPO, adquisición o tender offer) además del tiempo para considerarse totalmente vesting."
 
-#: src/routes/app/grants/detail.tsx:422
+#: src/routes/account/sessions.tsx:143
+msgid "Esto cerrará todas tus demás sesiones. Este dispositivo seguirá conectado."
+msgstr "Esto cerrará todas tus demás sesiones. Este dispositivo seguirá conectado."
+
+#: src/routes/app/trips/edit.tsx:162
+msgid "Esto eliminará el desplazamiento. Esta acción no se puede deshacer."
+msgstr "Esto eliminará el desplazamiento. Esta acción no se puede deshacer."
+
+#: src/routes/app/grants/detail.tsx:456
 msgid "Esto eliminará el grant y todo su historial de vesting. Esta acción no se puede deshacer."
 msgstr "Esto eliminará el grant y todo su historial de vesting. Esta acción no se puede deshacer."
+
+#: src/routes/app/grants/espp-edit.tsx:198
+msgid "Esto eliminará el registro de compra. Esta acción no se puede deshacer."
+msgstr "Esto eliminará el registro de compra. Esta acción no se puede deshacer."
 
 #: src/components/Layout/Footer.tsx:27
 msgid "Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja."
 msgstr "Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja."
 
-#: src/routes/auth/verify-email.tsx:102
+#: src/routes/auth/verify-email.tsx:110
 msgid "Esto sólo toma un momento."
 msgstr "Esto sólo toma un momento."
 
-#: src/components/Layout/Sidebar.tsx:63
+#: src/components/Layout/Sidebar.tsx:68
 msgid "Exports"
 msgstr "Exports"
 
-#: src/routes/auth/verify-email.tsx:42
+#: src/routes/auth/verify-email.tsx:50
 msgid "Falta el token"
 msgstr "Falta el token"
+
+#: src/components/espp/EsppPurchaseForm.tsx:257
+msgid "Fecha de compra"
+msgstr "Fecha de compra"
+
+#: src/components/trips/TripForm.tsx:285
+msgid "Fecha de fin"
+msgstr "Fecha de fin"
+
+#: src/components/trips/TripForm.tsx:270
+msgid "Fecha de inicio"
+msgstr "Fecha de inicio"
+
+#: src/components/espp/EsppPurchaseForm.tsx:236
+msgid "Fecha de oferta"
+msgstr "Fecha de oferta"
+
+#: src/components/modelo720/Modelo720Section.tsx:243
+msgid "Fecha de referencia"
+msgstr "Fecha de referencia"
 
 #: src/components/grants/GrantForm.tsx:603
 msgid "Fecha del evento de liquidez"
 msgstr "Fecha del evento de liquidez"
 
 #: src/components/grants/GrantForm.tsx:418
-#: src/routes/app/dashboard.tsx:173
+#: src/routes/app/dashboard.tsx:414
 msgid "Fecha del grant"
 msgstr "Fecha del grant"
+
+#: src/components/espp/EsppPurchaseForm.tsx:281
+msgid "FMV en fecha de compra"
+msgstr "FMV en fecha de compra"
+
+#: src/components/espp/EsppPurchaseForm.tsx:362
+msgid "FMV en fecha de oferta"
+msgstr "FMV en fecha de oferta"
 
 #: src/components/grants/GrantForm.tsx:401
 msgid "Formato inválido."
 msgstr "Formato inválido."
 
+#: src/routes/app/trips/edit.tsx:130
+msgid "Formulario de edición de desplazamiento"
+msgstr "Formulario de edición de desplazamiento"
+
+#: src/routes/app/trips/new.tsx:58
+msgid "Formulario de nuevo desplazamiento"
+msgstr "Formulario de nuevo desplazamiento"
+
 #: src/routes/app/grants/new.tsx:62
 msgid "Formulario de nuevo grant"
 msgstr "Formulario de nuevo grant"
 
-#: src/routes/app/grants/detail.tsx:232
+#: src/routes/app/grants/detail.tsx:264
 msgid "Gantt"
 msgstr "Gantt"
 
@@ -405,36 +701,63 @@ msgstr "Gantt"
 #~ msgid "Gestión de datos disponible a partir de la siguiente iteración."
 #~ msgstr "Gestión de datos disponible a partir de la siguiente iteración."
 
-#: src/routes/app/grants/detail.tsx:103
-#: src/routes/app/grants/detail.tsx:120
+#: src/routes/app/grants/detail.tsx:119
+#: src/routes/app/grants/detail.tsx:136
 msgid "Grant"
 msgstr "Grant"
 
-#: src/routes/app/grants/detail.tsx:372
+#: src/routes/app/grants/detail.tsx:406
+#: src/routes/app/grants/espp-new.tsx:188
 msgid "Grant no encontrado"
 msgstr "Grant no encontrado"
 
 #: src/components/Layout/Sidebar.tsx:46
-#: src/routes/app/dashboard.tsx:104
 msgid "Grants"
 msgstr "Grants"
 
-#: src/routes/app/grants/detail.tsx:158
+#: src/routes/app/dashboard.tsx:125
+#: src/routes/app/dashboard.tsx:129
+msgid "Grants individuales"
+msgstr "Grants individuales"
+
+#: src/routes/app/grants/detail.tsx:174
+#: src/routes/app/grants/espp-edit.tsx:139
+#: src/routes/app/trips/edit.tsx:134
 msgid "Guardar cambios"
 msgstr "Guardar cambios"
+
+#: src/routes/app/grants/espp-new.tsx:139
+msgid "Guardar compra"
+msgstr "Guardar compra"
+
+#: src/routes/app/trips/new.tsx:61
+msgid "Guardar desplazamiento"
+msgstr "Guardar desplazamiento"
 
 #: src/routes/app/grants/new.tsx:65
 #: src/routes/onboarding/first-grant.tsx:80
 msgid "Guardar grant"
 msgstr "Guardar grant"
 
-#: src/routes/account/profile.tsx:73
+#: src/components/modelo720/Modelo720Section.tsx:262
+msgid "Guardar Modelo 720"
+msgstr "Guardar Modelo 720"
+
+#: src/routes/account/profile.tsx:74
 msgid "Guardar residencia"
 msgstr "Guardar residencia"
 
 #: src/routes/onboarding/residency.tsx:59
 msgid "Guardar residencia y continuar"
 msgstr "Guardar residencia y continuar"
+
+#: src/components/espp/EsppPurchaseForm.tsx:418
+msgid "Hasta 2 048 caracteres. Útil para tu asesor fiscal."
+msgstr "Hasta 2 048 caracteres. Útil para tu asesor fiscal."
+
+#: src/components/trips/TripForm.tsx:303
+msgid "Hasta 500 caracteres. Útil para tu asesor fiscal."
+msgstr "Hasta 500 caracteres. Útil para tu asesor fiscal."
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:128
 msgid "He leído y entiendo que Orbit no es asesoramiento fiscal ni financiero. Acepto continuar con ese entendimiento."
@@ -452,15 +775,27 @@ msgstr "Hemos enviado un enlace a {email}. El enlace caduca en 24 horas."
 msgid "Hemos enviado un enlace a tu correo. El enlace caduca en 24 horas."
 msgstr "Hemos enviado un enlace a tu correo. El enlace caduca en 24 horas."
 
+#: src/routes/app/grants/espp-new.tsx:71
+msgid "Hemos migrado el descuento que tenías guardado en las notas del grant al nuevo registro de compra."
+msgstr "Hemos migrado el descuento que tenías guardado en las notas del grant al nuevo registro de compra."
+
+#: src/components/modelo720/Modelo720Section.tsx:268
+msgid "Histórico · cuentas bancarias"
+msgstr "Histórico · cuentas bancarias"
+
+#: src/components/modelo720/Modelo720Section.tsx:275
+msgid "Histórico · inmuebles"
+msgstr "Histórico · inmuebles"
+
 #: src/components/Layout/LocaleSwitcher.tsx:17
 msgid "Idioma"
 msgstr "Idioma"
 
-#: src/routes/app/dashboard.tsx:211
+#: src/routes/app/dashboard.tsx:444
 msgid "Ingresos imponibles hasta la fecha: <0>0 acciones</0>"
 msgstr "Ingresos imponibles hasta la fecha: <0>0 acciones</0>"
 
-#: src/routes/app/grants/detail.tsx:251
+#: src/routes/app/grants/detail.tsx:285
 msgid "Ingresos imponibles hasta la fecha: 0 acciones"
 msgstr "Ingresos imponibles hasta la fecha: 0 acciones"
 
@@ -468,9 +803,17 @@ msgstr "Ingresos imponibles hasta la fecha: 0 acciones"
 msgid "Inicia sesión"
 msgstr "Inicia sesión"
 
+#: src/routes/account/sessions.tsx:227
+msgid "iniciada"
+msgstr "iniciada"
+
 #: src/routes/auth/signin.tsx:169
 msgid "Iniciar sesión"
 msgstr "Iniciar sesión"
+
+#: src/components/espp/EsppPurchaseForm.tsx:238
+msgid "Inicio de la ventana de acumulación. Por defecto usamos la fecha del grant."
+msgstr "Inicio de la ventana de acumulación. Por defecto usamos la fecha del grant."
 
 #: src/components/grants/GrantForm.tsx:499
 msgid "Inicio del vesting"
@@ -480,6 +823,10 @@ msgstr "Inicio del vesting"
 msgid "Inicios de sesión pausados"
 msgstr "Inicios de sesión pausados"
 
+#: src/components/modelo720/Modelo720Section.tsx:132
+msgid "Introduce al menos una cifra antes de guardar."
+msgstr "Introduce al menos una cifra antes de guardar."
+
 #: src/routes/auth/password-reset-request.tsx:21
 msgid "Introduce el correo con el que te registraste. Si la dirección existe en Orbit, recibirás un enlace de un solo uso válido durante 60 minutos."
 msgstr "Introduce el correo con el que te registraste. Si la dirección existe en Orbit, recibirás un enlace de un solo uso válido durante 60 minutos."
@@ -487,6 +834,22 @@ msgstr "Introduce el correo con el que te registraste. Si la dirección existe e
 #: src/components/grants/GrantForm.tsx:232
 msgid "Introduce el nombre del empleador."
 msgstr "Introduce el nombre del empleador."
+
+#: src/components/espp/EsppPurchaseForm.tsx:121
+msgid "Introduce la fecha de compra."
+msgstr "Introduce la fecha de compra."
+
+#: src/components/trips/TripForm.tsx:154
+msgid "Introduce la fecha de fin."
+msgstr "Introduce la fecha de fin."
+
+#: src/components/trips/TripForm.tsx:147
+msgid "Introduce la fecha de inicio."
+msgstr "Introduce la fecha de inicio."
+
+#: src/components/espp/EsppPurchaseForm.tsx:114
+msgid "Introduce la fecha de oferta."
+msgstr "Introduce la fecha de oferta."
 
 #: src/routes/app/grants/new.tsx:56
 msgid "Introduce los datos del grant; la previsualización aparece a la derecha."
@@ -501,10 +864,15 @@ msgstr "Introduce tu contraseña."
 msgid "Introduce un correo válido."
 msgstr "Introduce un correo válido."
 
+#: src/components/espp/EsppPurchaseForm.tsx:157
+msgid "Introduce un FMV mayor que 0 o déjalo vacío."
+msgstr "Introduce un FMV mayor que 0 o déjalo vacío."
+
 #: src/routes/onboarding/first-grant.tsx:72
 msgid "Introduce un grant manualmente. El calendario de vesting se dibuja a la derecha conforme escribes. Si tienes varios grants, puedes saltar este paso y usar el importador CSV más adelante."
 msgstr "Introduce un grant manualmente. El calendario de vesting se dibuja a la derecha conforme escribes. Si tienes varios grants, puedes saltar este paso y usar el importador CSV más adelante."
 
+#: src/components/espp/EsppPurchaseForm.tsx:136
 #: src/components/grants/GrantForm.tsx:202
 msgid "Introduce un número de acciones mayor que 0."
 msgstr "Introduce un número de acciones mayor que 0."
@@ -513,13 +881,37 @@ msgstr "Introduce un número de acciones mayor que 0."
 msgid "Introduce un número de acciones para ver la previsualización."
 msgstr "Introduce un número de acciones para ver la previsualización."
 
-#: src/routes/auth/verify-email.tsx:46
+#: src/components/espp/EsppPurchaseForm.tsx:150
+msgid "Introduce un precio de compra mayor que 0."
+msgstr "Introduce un precio de compra mayor que 0."
+
+#: src/components/espp/EsppPurchaseForm.tsx:143
+msgid "Introduce un valor razonable mayor que 0."
+msgstr "Introduce un valor razonable mayor que 0."
+
+#: src/routes/auth/verify-email.tsx:54
 msgid "Ir a iniciar sesión"
 msgstr "Ir a iniciar sesión"
 
-#: src/components/grants/ResidencyForm.tsx:123
+#: src/components/trips/TripForm.tsx:228
+msgid "ISO 3166-1 alfa-2. Se muestra en tu idioma."
+msgstr "ISO 3166-1 alfa-2. Se muestra en tu idioma."
+
+#: src/components/grants/ResidencyForm.tsx:144
 msgid "La autonomía determina los tramos autonómicos de IRPF. Los regímenes forales se guardan pero no activan cálculos fiscales en v1."
 msgstr "La autonomía determina los tramos autonómicos de IRPF. Los regímenes forales se guardan pero no activan cálculos fiscales en v1."
+
+#: src/routes/app/dashboard.tsx:195
+msgid "La curva muestra número de acciones, no valor monetario. La conversión a EUR llega con el pipeline FX (Slice 3)."
+msgstr "La curva muestra número de acciones, no valor monetario. La conversión a EUR llega con el pipeline FX (Slice 3)."
+
+#: src/components/espp/EsppPurchaseForm.tsx:128
+msgid "La fecha de compra debe ser igual o posterior a la de oferta."
+msgstr "La fecha de compra debe ser igual o posterior a la de oferta."
+
+#: src/components/trips/TripForm.tsx:162
+msgid "La fecha de fin no puede ser anterior a la de inicio."
+msgstr "La fecha de fin no puede ser anterior a la de inicio."
 
 #: src/components/grants/GrantForm.tsx:299
 msgid "La fecha es futura. ¿Estás seguro?"
@@ -533,7 +925,7 @@ msgstr "La fecha es futura. ¿Estás seguro?"
 msgid "La trama rayada indica acciones time-vested pendientes de evento de liquidez."
 msgstr "La trama rayada indica acciones time-vested pendientes de evento de liquidez."
 
-#: src/routes/app/grants/detail.tsx:245
+#: src/routes/app/grants/detail.tsx:279
 msgid "Las acciones time-vested aparecen con trama diagonal: están vested por tiempo pero no cuentan como rendimiento del trabajo hasta que ocurra el evento de liquidez."
 msgstr "Las acciones time-vested aparecen con trama diagonal: están vested por tiempo pero no cuentan como rendimiento del trabajo hasta que ocurra el evento de liquidez."
 
@@ -545,7 +937,7 @@ msgstr "Las ISO se tratan como NSO a efectos fiscales españoles en v1."
 msgid "Los cálculos llevan la versión del rule set y la fecha de guía AEAT."
 msgstr "Los cálculos llevan la versión del rule set y la fecha de guía AEAT."
 
-#: src/routes/auth/verify-email.tsx:70
+#: src/routes/auth/verify-email.tsx:78
 msgid "Los enlaces de verificación caducan a las 24 horas y sólo pueden usarse una vez."
 msgstr "Los enlaces de verificación caducan a las 24 horas y sólo pueden usarse una vez."
 
@@ -553,7 +945,7 @@ msgstr "Los enlaces de verificación caducan a las 24 horas y sólo pueden usars
 msgid "Los meses totales deben estar entre 1 y 240."
 msgstr "Los meses totales deben estar entre 1 y 240."
 
-#: src/routes/app/grants/detail.tsx:317
+#: src/routes/app/grants/detail.tsx:351
 msgid "mensual"
 msgstr "mensual"
 
@@ -573,33 +965,84 @@ msgstr "Mínimo 12 caracteres."
 msgid "Mínimo 12 caracteres. Comprobamos tu contraseña contra bases de datos públicas de filtraciones (HIBP k-anonymity)."
 msgstr "Mínimo 12 caracteres. Comprobamos tu contraseña contra bases de datos públicas de filtraciones (HIBP k-anonymity)."
 
-#: src/components/Layout/Sidebar.tsx:62
+#: src/components/Layout/Sidebar.tsx:66
 msgid "Modelo 720"
 msgstr "Modelo 720"
 
-#: src/routes/app/grants/detail.tsx:217
+#: src/components/modelo720/Modelo720Section.tsx:144
+msgid "Modelo 720 — entradas del usuario"
+msgstr "Modelo 720 — entradas del usuario"
+
+#: src/components/modelo720/Modelo720Section.tsx:332
+msgid "Modelo 720: actualizado para la misma fecha de referencia."
+msgstr "Modelo 720: actualizado para la misma fecha de referencia."
+
+#: src/components/modelo720/Modelo720Section.tsx:328
+msgid "Modelo 720: actualizado. Hemos cerrado el período anterior y abierto uno nuevo."
+msgstr "Modelo 720: actualizado. Hemos cerrado el período anterior y abierto uno nuevo."
+
+#: src/components/modelo720/Modelo720Section.tsx:325
+msgid "Modelo 720: guardado."
+msgstr "Modelo 720: guardado."
+
+#: src/components/modelo720/Modelo720Section.tsx:335
+msgid "Modelo 720: sin cambios respecto al valor anterior."
+msgstr "Modelo 720: sin cambios respecto al valor anterior."
+
+#: src/routes/app/grants/detail.tsx:249
 msgid "Modo de vista"
 msgstr "Modo de vista"
+
+#: src/components/espp/EsppPurchaseForm.tsx:335
+msgid "Moneda de la compra"
+msgstr "Moneda de la compra"
+
+#: src/components/espp/EsppPurchaseForm.tsx:340
+msgid "Moneda de la compra."
+msgstr "Moneda de la compra."
 
 #: src/components/grants/GrantForm.tsx:461
 msgid "Moneda del strike"
 msgstr "Moneda del strike"
 
-#: src/components/grants/ResidencyForm.tsx:189
+#: src/components/grants/ResidencyForm.tsx:210
 msgid "Moneda principal"
 msgstr "Moneda principal"
 
-#: src/components/grants/ResidencyForm.tsx:169
+#: src/components/trips/TripForm.tsx:302
+msgid "Motivo / descripción"
+msgstr "Motivo / descripción"
+
+#: src/components/grants/ResidencyForm.tsx:190
+#: src/components/trips/TripForm.tsx:260
+#: src/components/trips/TripForm.tsx:475
+#: src/routes/app/trips/index.tsx:179
 msgid "No"
 msgstr "No"
 
-#: src/routes/auth/verify-email.tsx:58
+#: src/routes/app/trips/index.tsx:110
+msgid "No aplicado en esta fase. El motor fiscal lo evaluará en Slice 4."
+msgstr "No aplicado en esta fase. El motor fiscal lo evaluará en Slice 4."
+
+#: src/components/trips/TripForm.tsx:395
+msgid "No aplicas otra exención equivalente"
+msgstr "No aplicas otra exención equivalente"
+
+#: src/routes/auth/verify-email.tsx:66
 msgid "No pudimos verificar el enlace"
 msgstr "No pudimos verificar el enlace"
 
-#: src/routes/app/grants/detail.tsx:108
+#: src/routes/account/sessions.tsx:84
+msgid "No se pudieron cargar las sesiones."
+msgstr "No se pudieron cargar las sesiones."
+
+#: src/routes/app/grants/detail.tsx:124
 msgid "No se pudo cargar el grant."
 msgstr "No se pudo cargar el grant."
+
+#: src/routes/account/sessions.tsx:137
+msgid "No se pudo completar. Inténtalo de nuevo."
+msgstr "No se pudo completar. Inténtalo de nuevo."
 
 #: src/routes/auth/signup.tsx:88
 msgid "No se pudo crear la cuenta"
@@ -609,19 +1052,38 @@ msgstr "No se pudo crear la cuenta"
 msgid "No se pudo crear la cuenta. Inténtalo de nuevo."
 msgstr "No se pudo crear la cuenta. Inténtalo de nuevo."
 
-#: src/routes/app/grants/detail.tsx:416
+#: src/routes/app/grants/detail.tsx:450
+#: src/routes/app/grants/espp-edit.tsx:192
+#: src/routes/app/trips/edit.tsx:156
 msgid "No se pudo eliminar. Inténtalo de nuevo."
 msgstr "No se pudo eliminar. Inténtalo de nuevo."
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:116
 #: src/components/grants/GrantForm.tsx:317
-#: src/components/grants/ResidencyForm.tsx:116
+#: src/components/grants/ResidencyForm.tsx:137
 msgid "No se pudo guardar"
 msgstr "No se pudo guardar"
 
-#: src/routes/account/profile.tsx:34
-#: src/routes/app/grants/detail.tsx:74
+#: src/components/trips/TripForm.tsx:216
+msgid "No se pudo guardar el desplazamiento"
+msgstr "No se pudo guardar el desplazamiento"
+
+#: src/components/modelo720/Modelo720Section.tsx:163
+msgid "No se pudo guardar el Modelo 720"
+msgstr "No se pudo guardar el Modelo 720"
+
+#: src/components/espp/EsppPurchaseForm.tsx:215
+msgid "No se pudo guardar la compra"
+msgstr "No se pudo guardar la compra"
+
+#: src/components/modelo720/Modelo720Section.tsx:103
+#: src/routes/account/profile.tsx:35
+#: src/routes/app/grants/detail.tsx:90
+#: src/routes/app/grants/espp-edit.tsx:57
+#: src/routes/app/grants/espp-new.tsx:90
 #: src/routes/app/grants/new.tsx:43
+#: src/routes/app/trips/edit.tsx:51
+#: src/routes/app/trips/new.tsx:31
 #: src/routes/onboarding/first-grant.tsx:47
 #: src/routes/onboarding/first-grant.tsx:49
 #: src/routes/onboarding/residency.tsx:39
@@ -643,6 +1105,15 @@ msgstr "No se pudo registrar la aceptación. Inténtalo de nuevo."
 msgid "Non-qualified Stock Options. Bargain element como rendimiento del trabajo al ejercer."
 msgstr "Non-qualified Stock Options. Bargain element como rendimiento del trabajo al ejercer."
 
+#: src/components/espp/EsppPurchaseForm.tsx:412
+msgid "Notas"
+msgstr "Notas"
+
+#: src/routes/app/trips/new.tsx:40
+msgid "Nuevo desplazamiento Art. 7.p"
+msgstr "Nuevo desplazamiento Art. 7.p"
+
+#: src/components/espp/EsppPurchaseForm.tsx:318
 #: src/components/grants/GrantForm.tsx:426
 msgid "Número de acciones"
 msgstr "Número de acciones"
@@ -668,6 +1139,26 @@ msgstr "Orbit necesita saber dónde tributas antes de modelar tus grants. Guarda
 msgid "Orbit no es asesoramiento fiscal ni financiero."
 msgstr "Orbit no es asesoramiento fiscal ni financiero."
 
+#: src/components/trips/TripForm.tsx:385
+msgid "Orbit no resuelve la lista por ti — responde según tu criterio o el de tu asesor."
+msgstr "Orbit no resuelve la lista por ti — responde según tu criterio o el de tu asesor."
+
+#: src/components/trips/TripForm.tsx:227
+msgid "País de destino"
+msgstr "País de destino"
+
+#: src/components/trips/TripForm.tsx:383
+msgid "País de destino no clasificado como paraíso fiscal"
+msgstr "País de destino no clasificado como paraíso fiscal"
+
+#: src/routes/account/sessions.tsx:206
+msgid "Para cerrar esta sesión, usa \"Cerrar sesión\"."
+msgstr "Para cerrar esta sesión, usa \"Cerrar sesión\"."
+
+#: src/components/espp/EsppPurchaseForm.tsx:221
+msgid "Parece un duplicado"
+msgstr "Parece un duplicado"
+
 #: src/routes/onboarding/residency.tsx:13
 #~ msgid "Paso 4 — Tu residencia fiscal"
 #~ msgstr "Paso 4 — Tu residencia fiscal"
@@ -676,16 +1167,17 @@ msgstr "Orbit no es asesoramiento fiscal ni financiero."
 #~ msgid "Paso 5 — Añade tu primer grant"
 #~ msgstr "Paso 5 — Añade tu primer grant"
 
-#: src/routes/app/grants/detail.tsx:304
+#: src/routes/app/grants/detail.tsx:338
 msgid "Pendiente de evento de liquidez"
 msgstr "Pendiente de evento de liquidez"
 
 #: src/components/vesting/VestingTimeline.tsx:57
+#: src/routes/app/dashboard.tsx:282
 msgid "Pendiente de liquidez"
 msgstr "Pendiente de liquidez"
 
-#: src/components/Layout/Sidebar.tsx:71
-#: src/routes/account/profile.tsx:52
+#: src/components/Layout/Sidebar.tsx:76
+#: src/routes/account/profile.tsx:53
 msgid "Perfil y residencia"
 msgstr "Perfil y residencia"
 
@@ -693,19 +1185,40 @@ msgstr "Perfil y residencia"
 msgid "Personalizado…"
 msgstr "Personalizado…"
 
-#: src/routes/app/grants/detail.tsx:310
+#: src/routes/app/grants/detail.tsx:344
 msgid "Plan de vesting"
 msgstr "Plan de vesting"
+
+#: src/components/modelo720/Modelo720Section.tsx:244
+msgid "Por defecto, 31 de diciembre del año actual."
+msgstr "Por defecto, 31 de diciembre del año actual."
+
+#: src/components/espp/EsppPurchaseForm.tsx:338
+msgid "Por defecto, la moneda del grant padre ({employerLabel})."
+msgstr "Por defecto, la moneda del grant padre ({employerLabel})."
+
+#: src/components/trips/TripForm.tsx:373
+msgid "Por ejemplo, la matriz extranjera del grupo que se beneficia del trabajo durante el viaje."
+msgstr "Por ejemplo, la matriz extranjera del grupo que se beneficia del trabajo durante el viaje."
 
 #: src/routes/auth/signin.tsx:82
 msgid "Por tu seguridad, hemos pausado los inicios de sesión durante unos minutos. Inténtalo de nuevo en ~{mins} min. Si no reconoces esta actividad, restablece tu contraseña."
 msgstr "Por tu seguridad, hemos pausado los inicios de sesión durante unos minutos. Inténtalo de nuevo en ~{mins} min. Si no reconoces esta actividad, restablece tu contraseña."
 
-#: src/routes/app/dashboard.tsx:202
+#: src/components/espp/EsppPurchaseForm.tsx:298
+msgid "Precio de compra por acción"
+msgstr "Precio de compra por acción"
+
+#: src/components/espp/EsppPurchaseForm.tsx:299
+msgid "Precio que pagaste tras aplicar el descuento del empleador."
+msgstr "Precio que pagaste tras aplicar el descuento del empleador."
+
+#: src/routes/app/dashboard.tsx:439
 msgid "Progreso"
 msgstr "Progreso"
 
 #: src/components/Layout/Sidebar.tsx:21
+#: src/components/modelo720/Modelo720Section.tsx:183
 msgid "próx."
 msgstr "próx."
 
@@ -713,25 +1226,43 @@ msgstr "próx."
 msgid "Próximamente"
 msgstr "Próximamente"
 
-#: src/routes/auth/verify-email.tsx:85
+#: src/routes/auth/verify-email.tsx:93
 msgid "Reenviar enlace (próximamente)"
 msgstr "Reenviar enlace (próximamente)"
 
-#: src/components/grants/ResidencyForm.tsx:163
+#: src/components/grants/ResidencyForm.tsx:184
 msgid "Régimen de impatriados (Beckham)"
 msgstr "Régimen de impatriados (Beckham)"
 
-#: src/components/grants/ResidencyForm.tsx:147
+#: src/components/grants/ResidencyForm.tsx:168
 msgid "Régimen foral (no soportado en v1)"
 msgstr "Régimen foral (no soportado en v1)"
 
-#: src/routes/account/profile.tsx:28
+#: src/routes/app/trips/index.tsx:53
+msgid "Registra aquí tus desplazamientos profesionales al extranjero. Orbit guarda los hechos y tu lista de verificación; el motor fiscal los evaluará en Slice 4."
+msgstr "Registra aquí tus desplazamientos profesionales al extranjero. Orbit guarda los hechos y tu lista de verificación; el motor fiscal los evaluará en Slice 4."
+
+#: src/routes/app/grants/detail.tsx:552
+msgid "Registrar compra"
+msgstr "Registrar compra"
+
+#: src/routes/app/grants/detail.tsx:209
+#: src/routes/app/grants/espp-new.tsx:102
+#: src/routes/app/grants/espp-new.tsx:122
+msgid "Registrar compra ESPP"
+msgstr "Registrar compra ESPP"
+
+#: src/routes/account/profile.tsx:29
 msgid "Residencia actualizada. Los cambios aplicarán a los próximos períodos."
 msgstr "Residencia actualizada. Los cambios aplicarán a los próximos períodos."
 
-#: src/routes/account/profile.tsx:69
+#: src/routes/account/profile.tsx:70
 msgid "Residencia fiscal"
 msgstr "Residencia fiscal"
+
+#: src/components/trips/TripForm.tsx:178
+msgid "Responde a los cinco criterios antes de guardar."
+msgstr "Responde a los cinco criterios antes de guardar."
 
 #: src/routes/auth/password-reset-request.tsx:18
 msgid "Restablecer contraseña"
@@ -741,62 +1272,141 @@ msgstr "Restablecer contraseña"
 msgid "Restricted Stock Units. Tributan como rendimiento del trabajo al vestear."
 msgstr "Restricted Stock Units. Tributan como rendimiento del trabajo al vestear."
 
-#: src/routes/account/profile.tsx:32
-#: src/routes/app/grants/detail.tsx:71
+#: src/routes/account/profile.tsx:33
+#: src/routes/app/grants/detail.tsx:87
+#: src/routes/app/grants/espp-edit.tsx:54
+#: src/routes/app/grants/espp-new.tsx:87
 #: src/routes/app/grants/new.tsx:40
+#: src/routes/app/trips/edit.tsx:48
+#: src/routes/app/trips/new.tsx:28
 #: src/routes/auth/signup.tsx:58
 #: src/routes/onboarding/first-grant.tsx:44
 #: src/routes/onboarding/residency.tsx:37
 msgid "Revisa el formulario e inténtalo de nuevo."
 msgstr "Revisa el formulario e inténtalo de nuevo."
 
+#: src/components/modelo720/Modelo720Section.tsx:100
+msgid "Revisa los campos del Modelo 720 e inténtalo de nuevo."
+msgstr "Revisa los campos del Modelo 720 e inténtalo de nuevo."
+
 #: src/routes/auth/signup-verify-sent.tsx:20
 msgid "Revisa tu correo"
 msgstr "Revisa tu correo"
 
-#: src/routes/app/grants/detail.tsx:242
+#: src/routes/app/grants/detail.tsx:276
 msgid "RSU double-trigger — estado actual"
 msgstr "RSU double-trigger — estado actual"
+
+#: src/components/modelo720/Modelo720Section.tsx:189
+msgid "Saldo total de cuentas bancarias en el extranjero"
+msgstr "Saldo total de cuentas bancarias en el extranjero"
 
 #: src/components/Layout/AppShell.tsx:17
 #: src/components/Layout/AuthShell.tsx:17
 msgid "Saltar al contenido"
 msgstr "Saltar al contenido"
 
-#: src/components/grants/ResidencyForm.tsx:87
+#: src/components/modelo720/Modelo720Section.tsx:179
+msgid "Se calculará cuando actives seguimiento fiscal"
+msgstr "Se calculará cuando actives seguimiento fiscal"
+
+#: src/components/trips/TripForm.tsx:239
+msgid "selecciona"
+msgstr "selecciona"
+
+#: src/components/trips/TripForm.tsx:140
+msgid "Selecciona un país de destino."
+msgstr "Selecciona un país de destino."
+
+#: src/components/grants/ResidencyForm.tsx:108
 msgid "Selecciona una autonomía."
 msgstr "Selecciona una autonomía."
 
-#: src/components/grants/ResidencyForm.tsx:94
+#: src/components/grants/ResidencyForm.tsx:115
 msgid "Selecciona una moneda."
 msgstr "Selecciona una moneda."
+
+#: src/routes/app/trips/index.tsx:80
+msgid "Seleccionar año fiscal"
+msgstr "Seleccionar año fiscal"
 
 #: src/components/Layout/Sidebar.tsx:54
 msgid "Sell-now"
 msgstr "Sell-now"
 
-#: src/components/grants/ResidencyForm.tsx:180
+#: src/components/trips/TripForm.tsx:355
+msgid "Servicios prestados fuera de España"
+msgstr "Servicios prestados fuera de España"
+
+#: src/components/Layout/Sidebar.tsx:79
+#: src/routes/account/sessions.tsx:74
+msgid "Sesiones activas"
+msgstr "Sesiones activas"
+
+#: src/components/trips/TripForm.tsx:254
+#: src/components/trips/TripForm.tsx:463
+#: src/routes/app/trips/index.tsx:179
+msgid "Sí"
+msgstr "Sí"
+
+#: src/components/grants/ResidencyForm.tsx:201
 msgid "Si aplicas el régimen especial de impatriados (Beckham), v1 no calcula tu IRPF bajo ese régimen. Guardamos tu respuesta para cuando lleguen los cálculos."
 msgstr "Si aplicas el régimen especial de impatriados (Beckham), v1 no calcula tu IRPF bajo ese régimen. Guardamos tu respuesta para cuando lleguen los cálculos."
+
+#: src/components/trips/TripForm.tsx:357
+msgid "Si durante esos días trabajaste físicamente fuera de España, marca Sí. Teletrabajo desde España no cuenta."
+msgstr "Si durante esos días trabajaste físicamente fuera de España, marca Sí. Teletrabajo desde España no cuenta."
 
 #: src/routes/auth/signup-verify-sent.tsx:30
 msgid "Si no recibiste el correo, comprueba la carpeta de spam. No puedes entrar en la app hasta verificar tu email."
 msgstr "Si no recibiste el correo, comprueba la carpeta de spam. No puedes entrar en la app hasta verificar tu email."
 
-#: src/components/grants/ResidencyForm.tsx:175
+#: src/components/trips/TripForm.tsx:397
+msgid "Si para esos días ya aplicas exención por expatriación u otro régimen equivalente, marca No."
+msgstr "Si para esos días ya aplicas exención por expatriación u otro régimen equivalente, marca No."
+
+#: src/components/grants/ResidencyForm.tsx:196
 msgid "Sí, estoy bajo el régimen"
 msgstr "Sí, estoy bajo el régimen"
 
+#: src/routes/app/grants/espp-new.tsx:213
+msgid "Solo los grants ESPP admiten registros de compra."
+msgstr "Solo los grants ESPP admiten registros de compra."
+
+#: src/components/espp/EsppPurchaseForm.tsx:368
+msgid "Sólo si tu plan tiene lookback."
+msgstr "Sólo si tu plan tiene lookback."
+
 #: src/components/grants/GrantForm.tsx:446
-#: src/routes/app/dashboard.tsx:190
+#: src/routes/app/dashboard.tsx:427
 msgid "Strike"
 msgstr "Strike"
 
-#: src/routes/onboarding/first-grant.tsx:85
-msgid "Tengo varios grants — importaré desde Carta o Shareworks después"
-msgstr "Tengo varios grants — importaré desde Carta o Shareworks después"
+#: src/routes/app/trips/index.tsx:99
+msgid "Suma de días de los desplazamientos del año, ambos extremos incluidos."
+msgstr "Suma de días de los desplazamientos del año, ambos extremos incluidos."
 
-#: src/components/grants/ResidencyForm.tsx:139
+#: src/routes/app/dashboard.tsx:274
+msgid "Suma del empleador"
+msgstr "Suma del empleador"
+
+#: src/components/modelo720/Modelo720Section.tsx:224
+msgid "Suma del valor de adquisición."
+msgstr "Suma del valor de adquisición."
+
+#: src/components/modelo720/Modelo720Section.tsx:197
+msgid "Suma en EUR de todas tus cuentas no residentes."
+msgstr "Suma en EUR de todas tus cuentas no residentes."
+
+#: src/routes/onboarding/first-grant.tsx:85
+msgid "Tengo varios grants — habrá una importación masiva (Carta / Shareworks / ETrade) más adelante; por ahora, puedes añadirlos uno a uno desde el dashboard."
+msgstr "Tengo varios grants — habrá una importación masiva (Carta / Shareworks / ETrade) más adelante; por ahora, puedes añadirlos uno a uno desde el dashboard."
+
+#: src/routes/onboarding/first-grant.tsx:85
+#~ msgid "Tengo varios grants — importaré desde Carta o Shareworks después"
+#~ msgstr "Tengo varios grants — importaré desde Carta o Shareworks después"
+
+#: src/components/grants/ResidencyForm.tsx:160
 msgid "Territorio común (soportado)"
 msgstr "Territorio común (soportado)"
 
@@ -808,11 +1418,11 @@ msgstr "This is not tax or financial advice — Orbit calculates, it doesn't rec
 msgid "Ticker"
 msgstr "Ticker"
 
-#: src/routes/app/dashboard.tsx:181
+#: src/routes/app/dashboard.tsx:420
 msgid "Time-vested"
 msgstr "Time-vested"
 
-#: src/routes/app/grants/detail.tsx:299
+#: src/routes/app/grants/detail.tsx:333
 msgid "Time-vested (pendiente)"
 msgstr "Time-vested (pendiente)"
 
@@ -820,11 +1430,19 @@ msgstr "Time-vested (pendiente)"
 msgid "Tipo de instrumento"
 msgstr "Tipo de instrumento"
 
-#: src/routes/app/dashboard.tsx:62
+#: src/routes/app/dashboard.tsx:77
 msgid "Todavía no has añadido ningún grant."
 msgstr "Todavía no has añadido ningún grant."
 
-#: src/routes/app/grants/detail.tsx:319
+#: src/routes/app/trips/index.tsx:106
+msgid "Tope anual (referencia)"
+msgstr "Tope anual (referencia)"
+
+#: src/routes/app/trips/index.tsx:69
+msgid "Tope anual Art. 7.p"
+msgstr "Tope anual Art. 7.p"
+
+#: src/routes/app/grants/detail.tsx:353
 msgid "trimestral"
 msgstr "trimestral"
 
@@ -832,13 +1450,13 @@ msgstr "trimestral"
 msgid "Trimestral"
 msgstr "Trimestral"
 
-#: src/routes/app/dashboard.tsx:43
-#: src/routes/app/dashboard.tsx:59
-#: src/routes/app/dashboard.tsx:93
+#: src/routes/app/dashboard.tsx:58
+#: src/routes/app/dashboard.tsx:74
+#: src/routes/app/dashboard.tsx:108
 msgid "Tu cartera"
 msgstr "Tu cartera"
 
-#: src/routes/app/dashboard.tsx:68
+#: src/routes/app/dashboard.tsx:83
 msgid "Tu cartera está vacía"
 msgstr "Tu cartera está vacía"
 
@@ -850,13 +1468,29 @@ msgstr "Tu primer grant"
 msgid "Tu residencia fiscal"
 msgstr "Tu residencia fiscal"
 
+#: src/components/modelo720/Modelo720Section.tsx:147
+msgid "Tus totales declarados (o a declarar) en el Modelo 720 por categoría. Cada guardado abre un nuevo período y cierra el anterior; no hay alerta de umbrales ni conversión FX en Slice 2."
+msgstr "Tus totales declarados (o a declarar) en el Modelo 720 por categoría. Cada guardado abre un nuevo período y cierra el anterior; no hay alerta de umbrales ni conversión FX en Slice 2."
+
+#: src/routes/account/sessions.tsx:228
+msgid "última actividad"
+msgstr "última actividad"
+
+#: src/components/trips/TripForm.tsx:322
+msgid "Un desplazamiento dentro de España no suele cumplir el Art. 7.p; revisa las respuestas de la lista de verificación antes de guardar."
+msgstr "Un desplazamiento dentro de España no suele cumplir el Art. 7.p; revisa las respuestas de la lista de verificación antes de guardar."
+
 #: src/routes/app/dashboard.tsx:27
 #~ msgid "Un grant es la concesión de acciones de una empresa (RSU, NSO, ISO, ESPP). Registrarlo en Orbit te permite visualizar tu vesting."
 #~ msgstr "Un grant es la concesión de acciones de una empresa (RSU, NSO, ISO, ESPP). Registrarlo en Orbit te permite visualizar tu vesting."
 
-#: src/routes/app/dashboard.tsx:71
+#: src/routes/app/dashboard.tsx:86
 msgid "Un grant es una concesión de equity — las acciones u opciones que te asigna tu empleador. Añade la primera para empezar a ver tu calendario de vesting."
 msgstr "Un grant es una concesión de equity — las acciones u opciones que te asigna tu empleador. Añade la primera para empezar a ver tu calendario de vesting."
+
+#: src/routes/app/dashboard.tsx:132
+msgid "Una tile por grant. Haz clic en una para ver el calendario completo."
+msgstr "Una tile por grant. Haz clic en una para ver el calendario completo."
 
 #: src/routes/auth/signup.tsx:94
 msgid "Usaremos esta dirección para verificarte y para avisos de seguridad."
@@ -870,37 +1504,88 @@ msgstr "v1 no presenta ningún modelo: ni 100, ni 720, ni 721."
 msgid "v1 no soporta País Vasco, Navarra ni el régimen Beckham para cálculos."
 msgstr "v1 no soporta País Vasco, Navarra ni el régimen Beckham para cálculos."
 
-#: src/routes/auth/verify-email.tsx:97
+#: src/components/modelo720/Modelo720Section.tsx:192
+#: src/components/modelo720/Modelo720Section.tsx:219
+msgid "Valor actual: €{0} desde {1}."
+msgstr "Valor actual: €{0} desde {1}."
+
+#: src/components/espp/EsppPurchaseForm.tsx:282
+msgid "Valor razonable del activo el día de la compra."
+msgstr "Valor razonable del activo el día de la compra."
+
+#: src/components/modelo720/Modelo720Section.tsx:216
+msgid "Valor total de inmuebles en el extranjero"
+msgstr "Valor total de inmuebles en el extranjero"
+
+#: src/components/modelo720/Modelo720Section.tsx:175
+msgid "Valores / participaciones en el extranjero"
+msgstr "Valores / participaciones en el extranjero"
+
+#: src/components/modelo720/Modelo720Section.tsx:169
+msgid "Valores en la fecha de referencia"
+msgstr "Valores en la fecha de referencia"
+
+#: src/routes/auth/verify-email.tsx:105
 msgid "Verificando tu correo…"
 msgstr "Verificando tu correo…"
 
-#: src/routes/app/dashboard.tsx:181
+#: src/routes/app/dashboard.tsx:255
+msgid "vested"
+msgstr "vested"
+
+#: src/routes/app/dashboard.tsx:420
 msgid "Vested"
 msgstr "Vested"
 
-#: src/routes/app/grants/detail.tsx:299
+#: src/routes/app/dashboard.tsx:251
+msgid "vested · {0} pendientes"
+msgstr "vested · {0} pendientes"
+
+#: src/routes/app/grants/detail.tsx:333
 msgid "Vested hasta la fecha"
 msgstr "Vested hasta la fecha"
+
+#: src/components/modelo720/Modelo720Section.tsx:302
+msgid "vigente hasta {0}"
+msgstr "vigente hasta {0}"
 
 #: src/components/grants/GrantForm.tsx:649
 #: src/components/grants/GrantForm.tsx:653
 msgid "Vista previa del vesting"
 msgstr "Vista previa del vesting"
 
+#: src/routes/app/trips/edit.tsx:116
 #: src/routes/auth/password-reset-request.tsx:42
 #: src/routes/auth/signin.tsx:95
 msgid "Volver"
 msgstr "Volver"
 
+#: src/routes/app/trips/edit.tsx:81
+#: src/routes/app/trips/new.tsx:51
+msgid "Volver a desplazamientos"
+msgstr "Volver a desplazamientos"
+
 #: src/routes/auth/password-reset-landing.tsx:22
 #: src/routes/auth/signup-verify-sent.tsx:37
-#: src/routes/auth/verify-email.tsx:88
+#: src/routes/auth/verify-email.tsx:96
 msgid "Volver a iniciar sesión"
 msgstr "Volver a iniciar sesión"
 
-#: src/routes/app/grants/detail.tsx:380
+#: src/routes/app/grants/detail.tsx:414
+#: src/routes/app/grants/espp-new.tsx:196
 msgid "Volver al dashboard"
 msgstr "Volver al dashboard"
+
+#: src/routes/app/grants/espp-edit.tsx:87
+#: src/routes/app/grants/espp-edit.tsx:121
+#: src/routes/app/grants/espp-new.tsx:128
+#: src/routes/app/grants/espp-new.tsx:216
+msgid "Volver al grant"
+msgstr "Volver al grant"
+
+#: src/components/espp/EsppPurchaseForm.tsx:222
+msgid "Ya existe una compra con la misma fecha de oferta, fecha de compra y número de acciones. Si es correcto, marca la casilla para confirmar y guarda de nuevo."
+msgstr "Ya existe una compra con la misma fecha de oferta, fecha de compra y número de acciones. Si es correcto, marca la casilla para confirmar y guarda de nuevo."
 
 #: src/routes/auth/signup.tsx:144
 msgid "Ya tengo cuenta"

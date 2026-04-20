@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { createResidency, type ResidencyBody } from '../../api/residency';
 import { AppError } from '../../api/errors';
 import { ResidencyForm } from '../../components/grants/ResidencyForm';
+import { Modelo720Section } from '../../components/modelo720/Modelo720Section';
 import { ME_QUERY_KEY } from '../../hooks/useAuth';
 import { useAuthStore } from '../../store/auth';
 
@@ -80,6 +81,8 @@ export default function ProfilePage(): JSX.Element {
           }}
         />
       </section>
+
+      <Modelo720Section />
     </>
   );
 }
