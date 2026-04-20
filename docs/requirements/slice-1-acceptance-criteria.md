@@ -20,7 +20,7 @@ This document is implementation-ready. Every AC below is testable as-written. Wh
 | **US-003 — Visualise vesting incl. double-trigger** | ACs 1, 2, 4 apply | AC 3 is scenario-mode and ships in Slice 4. |
 | **US-006 — Autonomía selection** | ACs 1, 2, 4 apply | AC 3 (mid-year autonomía change) ships in Slice 4 when tax math arrives; data model stores the `residency_periods` row correctly in Slice 1. |
 | **US-011 — GDPR DSR self-service** | Partial: data-minimization in analytics only | Full DSR self-service ships in Slice 7. |
-| **US-002 — CSV import** | No | Slice 2. |
+| **US-002 — CSV import** | No | Slice 8 (deferred from Slice 2 per v1.3 plan decision 2026-04-20). |
 | **US-004..US-009, US-012, US-013** | No | Later slices. |
 
 ## 2. Persona & demo context
@@ -112,7 +112,7 @@ Reference screen: `grant-detail.html` edit-mode section; see also UX §4.1 step 
 - **AC-4.2.8 — strike required conditional.** Given instrument in {NSO, ISO}, when the user submits without a strike, then inline rejection. RSU/ESPP do not require strike.
 - **AC-4.2.9 — grant date future.** Given `grant_date > today + 1 day`, when submit, then a non-blocking warning: `La fecha es futura. ¿Estás seguro?` (ES) / `That date is in the future. Are you sure?` (EN). User may proceed.
 - **AC-4.2.10 — successful create (US-001 AC #1).** Given a valid grant, when submit, then a `grants` row is created under the current user_id via `Tx::for_user`, and derived `vesting_events` are populated for rendering. Audit-log row written.
-- **AC-4.2.11 — "I have many grants" link.** Below the first-grant form, a link reads `Tengo varios grants — importaré desde Carta o Shareworks después` (ES) / `I have multiple grants — I'll import from Carta or Shareworks later` (EN). In Slice 1 this link **dismisses the form and advances to an empty dashboard**; CSV import itself does not exist until Slice 2. The dashboard then shows an empty-state tile directing the user to "Añadir grant". (This is a Slice 1 compromise: the link is necessary UX per §4.1 but the destination is Slice 2.)
+- **AC-4.2.11 — "I have many grants" link.** Below the first-grant form, a link reads `Tengo varios grants — importaré desde Carta o Shareworks después` (ES) / `I have multiple grants — I'll import from Carta or Shareworks later` (EN). In Slice 1 this link **dismisses the form and advances to an empty dashboard**; CSV import itself does not exist until Slice 8 (deferred from Slice 2 per v1.3). The dashboard then shows an empty-state tile directing the user to "Añadir grant". (This is a Slice 1 compromise: the link is necessary UX per §4.1 but the destination is Slice 8.)
 
 ### 4.3 Vesting-derivation algorithm (implementation constraint, not UI)
 
@@ -233,7 +233,7 @@ The following are **correct** behaviours in Slice 1 and must not be written up a
 - No "you will owe X" number appears anywhere.
 - No rule-set version chip in the footer.
 - The sidebar entries "Sell-now", "Escenarios", "Modelo 720", "Exports" render but route to a "próximamente" page. **No `[paid]` badges — v1.2 PoC has no paid tier.** No blurred-layout preview state at any slice (the UX D-9 pattern was scrapped in v1.2 along with the paid gate).
-- CSV import is not offered. The "Tengo varios grants" link dismisses the form to an empty dashboard.
+- CSV import is not offered (deferred to Slice 8 per v1.3). The "Tengo varios grants" link dismisses the form to an empty dashboard.
 - País Vasco / Navarra selection produces no tax-calc block because there is no tax-calc surface to block.
 - Beckham = Sí produces no tax-calc block for the same reason.
 - Art. 7.p trip entry is not offered.

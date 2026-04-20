@@ -2,13 +2,14 @@
 
 | Field       | Value                                                      |
 |-------------|------------------------------------------------------------|
-| Version     | 1.2                                                        |
-| Date        | 2026-04-19                                                 |
+| Version     | 1.3                                                        |
+| Date        | 2026-04-20                                                 |
 | Owner       | requirements-analyst (Ivan Oliver)                         |
 | Sources     | `docs/specs/orbit-v1-persona-b-spain.md`, ADR-001..ADR-008, ADR-015 (local-first split), `docs/design/orbit-v1-ui-proposal.md`, `docs/requirements/open-questions-resolved.md` |
 | Purpose     | Break v1 into ordered, independently shippable vertical slices. Each ends in a demo-able state. No layers; every slice crosses frontend + backend + data + ops. |
 | v1.1 change | Product owner decision 2026-04-19: defer cloud deployment to the end. Slices 1–7 build and demo against the local stack established in Slice 0a. Everything deferred from ADR-015 §0b, plus the pen-test and legal-surface publication previously in Slice 7, consolidate into a new **Slice 8 — Production deployment & launch gate**. No feature work changes. |
 | v1.2 change | Product owner decision 2026-04-19 (same day, follow-up): **this is a PoC; no Stripe, no paid tier.** The free/paid distinction is removed everywhere. Every account is the same account; every feature is available to every user. Slice 3 collapses from "Paid shell + Modelo 720 passive UX" to just "FX pipeline + Modelo 720 passive UX + dashboard EUR conversion". Billing, subscription state, VAT handling, feature-matrix screen, preview-only blurred state, and `subscriptions` table all drop out. TOTP 2FA becomes optional for every user in Slice 7 (no "mandatory for paid"). Stripe live-mode cutover and professional indemnity insurance drop out of Slice 8. |
+| v1.3 change | Product owner decision 2026-04-20: **defer bulk-import tooling (CSV Carta + Shareworks, ETrade PDF) to the end of v1**, immediately before cloud deployment. Slice 2 trims to the non-import surfaces (ESPP purchases, Art. 7.p trips, multi-grant dashboard, Modelo 720 category inputs, session-device UI). A new **Slice 8 — Portfolio bulk import** is inserted between the old Slice 7 and the old Slice 8; the deploy slice renumbers to **Slice 9 — Production deployment & launch gate**. Rationale: hand-entry through Slice 7 is the minimum viable path for Ivan's own dogfooding; import tooling has a long-tail QA story (column-mapping edge cases, vendor CSV drift) that is safer to build in one concentrated batch just before production users arrive. Neither the "Tengo varios grants" link (AC-4.2.11) nor the bulk-import affordance in Slice 2 is moved — both defer to Slice 8. Internal-readiness gate shifts: **end of Slice 8** is now the feature-complete mark (was end of Slice 7); end of Slice 7 is the "hand-entry-only MVP" mark. |
 
 ## Principles
 
@@ -17,7 +18,7 @@
 3. **Non-goals are load-bearing.** Each slice explicitly lists what it does not ship; this is how scope creep is caught at the boundary.
 4. **Respect the ADRs.** Tech stack, cloud, data-model outline, versioning scheme, FX source, vendor, and export traceability are all decided (ADR-001..ADR-008). Slices do not re-litigate these.
 5. **No paid tier in the PoC (v1.2).** Every account gets every feature. No Stripe integration, no subscription state, no feature gating, no preview-only UX, no `subscriptions` table. If monetization is ever reopened, it is a post-v1 initiative with its own spec and its own slice.
-6. **Local-first, deploy last (v1.1).** Slices 0a–7 run against the local Docker Compose Postgres + Vite dev server stack from ADR-015 §0a. Cloud deployment is a single concentrated slice at the end, once the app is feature-complete and polished. No external user ever touches a Slice 0a–7 build; public launch happens only after Slice 8 closes.
+6. **Local-first, deploy last (v1.1, broadened in v1.3).** Slices 0a–8 run against the local Docker Compose Postgres + Vite dev server stack from ADR-015 §0a. Cloud deployment is a single concentrated slice at the end, once the app is feature-complete and polished. No external user ever touches a Slice 0a–8 build; public launch happens only after Slice 9 closes.
 
 ## Summary table
 
@@ -25,19 +26,22 @@
 |---|-------|-----------|---------|------|
 | 0a | Foundation shell (local) | Bootable local app, auth, empty dashboard, CI, observability skeleton, cookie banner. | M | Log in on `localhost`, land on empty dashboard, log out. |
 | 1 | **First portfolio** | Sign up → residency → first grant → see vesting schedule. | L | Persona B enters one grant, sees vesting timeline. Nothing else. |
-| 2 | Portfolio completeness | Multiple grants, CSV import, dashboard tiles, Art. 7.p trip entry. | L | Persona B imports 10 grants from Carta, views dashboard. |
+| 2 | Portfolio completeness (hand-entry) | Multiple grants, dashboard tiles, ESPP purchases, Art. 7.p trip entry, Modelo 720 category inputs, session-device UI. **No bulk import** (Slice 8). | M | Persona B adds several grants by hand, records an ESPP purchase, logs a trip. |
 | 3 | FX + Modelo 720 passive UX | ECB FX pipeline, dashboard EUR conversion (paper-gains tile), Modelo 720 threshold alert, rule-set chip in footer. | M | Paper-gains tile shows EUR with bands; M720 threshold alert fires; footer chip shows ECB FX date + engine version. |
 | 4 | Tax engine + autonomía + scenario modeler | First tax numbers. Rule-set versioning goes live. Ranges-and-sensitivity NFR activates. | XL | Persona B runs the IPO/lockup/hold scenario and sees net proceeds with sensitivity. |
 | 5 | Sell-now calculator (post-IPO leg) | Finnhub (dev tier) + ECB pipeline + US-013. | L | Persona B opens sell-now, enters lots, sees net-EUR-landing range. |
 | 6 | Exports + Modelo 720 worksheet + recompute | Gestor PDF, CSV, traceability IDs, recompute-under-current-rules. | L | Persona B exports a scenario PDF; tests recompute after a rule-set bump. |
-| 7 | GDPR DSR self-service + optional 2FA | Data export, erasure, TOTP optional for all users. Internal-readiness gate. | M | User enables TOTP; exports their data archive; deletes account; 30-day grace works. |
-| 8 | **Production deployment & launch gate** | Hetzner stack, TLS/HSTS/nftables, offsite backups, MFA on live accounts, published legal surface, Finnhub commercial cutover, third-party pen-test. Everything deferred from ADR-015 §0b. | L | Deploy to `app.orbit.<tld>`; run the Slice-7 demo on production; uptime + alert route + pen-test report green. |
+| 7 | GDPR DSR self-service + optional 2FA | Data export, erasure, TOTP optional for all users. | M | User enables TOTP; exports their data archive; deletes account; 30-day grace works. |
+| 8 | **Portfolio bulk import** | Carta + Shareworks CSV import, ETrade PDF import, column-mapping preview, row-level error report, rejected-rows CSV download. Internal-readiness gate. | L | Persona B imports 10 grants from Carta; rejects fix via a second pass; dashboard renders the imported portfolio. |
+| 9 | **Production deployment & launch gate** | Hetzner stack, TLS/HSTS/nftables, offsite backups, MFA on live accounts, published legal surface, Finnhub commercial cutover, third-party pen-test. Everything deferred from ADR-015 §0b. | L | Deploy to `app.orbit.<tld>`; run the Slice-8 demo on production; uptime + alert route + pen-test report green. |
 
-**Internal-readiness gate = end of Slice 7.** Orbit is feature-complete, polished, and locally testable end-to-end; still no external user.
+**Hand-entry-only MVP gate = end of Slice 7.** Every decision-support surface works end-to-end against hand-entered grants; no bulk import yet.
 
-**Public launch gate = end of Slice 8.** Cloud deployment, legal surface, third-party pen-test, and commercial contracts (Finnhub commercial-tier) all green. First external user onboards after Slice 8 closes.
+**Internal-readiness gate = end of Slice 8.** Orbit is feature-complete (including import), polished, and locally testable end-to-end; still no external user.
 
-Slices 0a–5 are internal / closed-beta-acceptable on local only. Slice 6 is needed for the gestor promise. Slice 7 raises the GDPR/security bar. Slice 8 is the production bar.
+**Public launch gate = end of Slice 9.** Cloud deployment, legal surface, third-party pen-test, and commercial contracts (Finnhub commercial-tier) all green. First external user onboards after Slice 9 closes.
+
+Slices 0a–5 are internal / closed-beta-acceptable on local only. Slice 6 is needed for the gestor promise. Slice 7 raises the GDPR/security bar. Slice 8 adds the import surface. Slice 9 is the production bar.
 
 ---
 
@@ -46,7 +50,7 @@ Slices 0a–5 are internal / closed-beta-acceptable on local only. Slice 6 is ne
 ### Scope one-liner
 The smallest bootable Orbit that a developer can sign up to and log in to **on localhost**. No product features, no cloud.
 
-> **Relationship to ADR-015.** This slice is exactly ADR-015 §0a. ADR-015 §0b — the deploy-green checkpoint — used to be the second half of Slice 0; per the 2026-04-19 product-owner decision it has been **moved to Slice 8** and no longer gates Slice 1.
+> **Relationship to ADR-015.** This slice is exactly ADR-015 §0a. ADR-015 §0b — the deploy-green checkpoint — used to be the second half of Slice 0; per the 2026-04-19 product-owner decision it has been **moved to Slice 9** and no longer gates Slice 1.
 
 ### Entry state
 Empty git repo + the accepted ADRs.
@@ -59,15 +63,15 @@ Empty git repo + the accepted ADRs.
 - Persistent footer strip renders on every page. **Footer in Slice 0a shows only the "Esto no es asesoramiento fiscal ni financiero" copy** — no rule-set chip yet (see C-3 in open-questions-resolved).
 - Cookie banner live (AEPD 2023, analytics opt-in default off).
 - `/healthz` and `/readyz` endpoints respond.
-- Baseline observability skeleton: structured logs via `orbit_log::event!` (JSON to stdout in 0a; off-VM shipping deferred to Slice 8). No uptime monitor yet.
-- CI pipeline: `cargo test`, `cargo clippy -D warnings`, `cargo audit`, `cargo deny`, frontend `pnpm build` + unit tests + `axe` a11y smoke on the sign-in page. `deploy.yaml` is committed but disabled (`workflow_dispatch`-only) until Slice 8.
+- Baseline observability skeleton: structured logs via `orbit_log::event!` (JSON to stdout in 0a; off-VM shipping deferred to Slice 9). No uptime monitor yet.
+- CI pipeline: `cargo test`, `cargo clippy -D warnings`, `cargo audit`, `cargo deny`, frontend `pnpm build` + unit tests + `axe` a11y smoke on the sign-in page. `deploy.yaml` is committed but disabled (`workflow_dispatch`-only) until Slice 9.
 - Migrations framework in place (`orbit migrate`), `users`, `sessions`, `audit_log`, `dsr_requests` tables created per ADR-005. `orbit_app` + `orbit_support` Postgres roles provisioned in the init migration; `audit_log` is INSERT-only for `orbit_app` and SELECT-only for `orbit_support` (see ADR-015 §"Additional decisions").
 - Postgres RLS scaffolded and enforced: the `Tx::for_user(user_id)` helper is the only connection-acquisition path; CI lint rejects direct `pool.acquire`.
-- Response headers (CSP, X-CTO, X-Frame, Referrer, Permissions, COOP) verified against the local dev server via `curl -I`. HSTS is declared but only observable at Slice 8.
+- Response headers (CSP, X-CTO, X-Frame, Referrer, Permissions, COOP) verified against the local dev server via `curl -I`. HSTS is declared but only observable at Slice 9.
 - Locale switcher (ES/EN) works at the page-chrome level (LinguiJS per ADR-009).
 
 ### Explicit non-goals
-- **No cloud deploy.** No Hetzner VMs, no Caddy, no TLS/HSTS end-to-end, no nftables, no Postgres private-network binding, no offsite backups, no uptime monitor, no published legal surface. All of this moves to Slice 8.
+- **No cloud deploy.** No Hetzner VMs, no Caddy, no TLS/HSTS end-to-end, no nftables, no Postgres private-network binding, no offsite backups, no uptime monitor, no published legal surface. All of this moves to Slice 9.
 - No grants, no vesting, no calculations, no scenarios, no sell-now. **No billing ever in v1** (v1.2 PoC scope).
 - No TOTP (deferred to Slice 7 as an optional-for-all setting).
 - No device/session management UI (backend exists, UI deferred to C-7 resolution).
@@ -82,7 +86,7 @@ Empty git repo + the accepted ADRs.
 ### Dependencies
 - ADR-001, ADR-002, ADR-015 accepted.
 - ADR-005 entity outline (for the auth tables). Full DDL is in ADR-014; Slice 0a ships `users`, `sessions`, `audit_log`, `dsr_requests` from that DDL.
-- No cloud account procurement in this slice (pushed to Slice 8).
+- No cloud account procurement in this slice (pushed to Slice 9).
 
 ### Demo script
 1. `docker compose up -d && cargo run -p orbit -- api &` and `pnpm --filter frontend dev` on a developer machine.
@@ -147,24 +151,24 @@ See `slice-1-acceptance-criteria.md` for the ceremony; at a high level:
 
 ---
 
-## Slice 2 — Portfolio completeness
+## Slice 2 — Portfolio completeness (hand-entry)
 
 ### Scope one-liner
-The user can load a realistic portfolio — multiple grants, CSV imports, Art. 7.p trip entry, ESPP purchase records — without any tax calculation yet.
+The user can hand-build a realistic portfolio — multiple grants, ESPP purchase records, Art. 7.p trips — without any tax calculation yet. **Bulk import (CSV / PDF) is deferred to Slice 9 per v1.3.**
 
 ### Entry state
 End of Slice 1.
 
 ### Exit state
-- **CSV import** from Carta and Shareworks (US-002 Musts). Column-mapping preview, row-level error report, rejected-rows CSV download. 1,000-row / 5 MB cap (OQ-04).
-- ETrade PDF import (US-002 AC #5).
-- **ESPP purchases** captured alongside their parent grant (backs US-008 and US-013 basis lookup). Lookback FMV input optional.
-- **Art. 7.p trip entry** (US-005 AC form side only — no calculation yet). Trips stored; inline checklist visible.
+- **ESPP purchases** captured alongside their parent grant (backs US-008 and US-013 basis lookup). Lookback FMV input optional. Retires the Slice-1 compromise where `estimated_discount_percent` rode inside `grants.notes` JSON — a dedicated `espp_purchases` table lands instead (ADR-005).
+- **Art. 7.p trip entry** (US-005 AC form side only — no calculation yet). Trips stored in `art_7p_trips`; inline checklist visible.
 - **Dashboard** now renders multiple grant tiles, stacked refresh-grant cumulative view (US-003 AC #4).
-- **Modelo 720 category inputs** on the profile (user-self-reports current bank-account total foreign value and real-estate total foreign value; securities are derived from grants once FX is live — which it is not yet, so securities line is "calculation requires activar seguimiento fiscal"). See `modelo_720_check` calculation kind in ADR-005 — that is Slice 3's job.
+- **Modelo 720 category inputs** on the profile (user-self-reports current bank-account total foreign value and real-estate total foreign value; securities are derived from grants once FX is live — which it is not yet, so the securities line still reads "calculation requires activar seguimiento fiscal"). See `modelo_720_check` calculation kind in ADR-005 — that is Slice 3's job.
 - **Session/device list UI** in Account (closes C-7 backend/UI phase-gap).
+- **"Tengo varios grants" link (AC-4.2.11) wording updated** to reflect Slice 8 as the target, instead of Slice 2. In Slice 2 the link still dismisses to an empty dashboard; copy explains bulk import ships late.
 
 ### Explicit non-goals
+- **No CSV import. No ETrade PDF import.** Both deferred to Slice 9 per v1.3.
 - Still **no tax numbers**.
 - Still **no FX conversion**.
 - Still **no Modelo 720 threshold-crossing alert** (the passive banner pattern ships in Slice 3).
@@ -172,12 +176,11 @@ End of Slice 1.
 - No sell-now, no scenarios.
 
 ### T-shirt
-**L.** CSV import is the big one (column mapping, validation, error reporting); the rest is incremental forms and lists.
+**M.** Two new small entities (ESPP purchases, Art. 7.p trips), one list/tiles expansion, two account-side UIs. The big pre-v1.3 item (CSV import) moved to Slice 9.
 
 ### Dependencies
 - Slice 1 complete.
 - `espp_purchases`, `art_7p_trips` tables in Postgres (ADR-005).
-- Real Carta + Shareworks CSV exports as test fixtures (owner: Ivan to supply).
 
 ---
 
@@ -259,7 +262,7 @@ US-013 fully delivered: post-IPO user enters lots, sees net-EUR-landing with ban
 End of Slice 4.
 
 ### Exit state
-- **Finnhub** integration per ADR-006, **on the free/dev tier** for this slice. 15-min cache in `market_quotes_cache`. Staleness UX wired (ADR-006 + UX §4.2). Commercial-tier contract + ToS-confirmed-for-SaaS-redistribution is a Slice 8 launch-blocker (same for the Twelve Data standby contract).
+- **Finnhub** integration per ADR-006, **on the free/dev tier** for this slice. 15-min cache in `market_quotes_cache`. Staleness UX wired (ADR-006 + UX §4.2). Commercial-tier contract + ToS-confirmed-for-SaaS-redistribution is a Slice 9 launch-blocker (same for the Twelve Data standby contract).
 - **Sell-now screen** (US-013). All ACs.
 - **ESPP Spanish-tax calculator** (US-008), called by both scenario modeler retroactively (if needed) and sell-now at compute time.
 - **NSO same-day exercise-and-sell** bargain-element computation (US-013 AC #4).
@@ -282,8 +285,8 @@ End of Slice 4.
 ### Dependencies
 - Slice 4 complete.
 - Finnhub free/dev API key (sufficient for this slice).
-- Finnhub commercial-tier contract signed and ToS-confirmed for SaaS redistribution (ADR-006 launch-blocker; OQ-13 escalation) — **moved to Slice 8**, since it gates real-user exposure, not local development.
-- Twelve Data standby contract also in place (ADR-006 resilience) — **moved to Slice 8** for the same reason.
+- Finnhub commercial-tier contract signed and ToS-confirmed for SaaS redistribution (ADR-006 launch-blocker; OQ-13 escalation) — **moved to Slice 9**, since it gates real-user exposure, not local development.
+- Twelve Data standby contract also in place (ADR-006 resilience) — **moved to Slice 9** for the same reason.
 
 ---
 
@@ -321,7 +324,7 @@ End of Slice 5.
 ## Slice 7 — GDPR DSR self-service + 2FA mandatory
 
 ### Scope one-liner
-The code-side compliance and security bar. Internal-readiness gate. Everything that requires a production environment or a published legal surface moves to Slice 8.
+The code-side compliance and security bar. **Hand-entry-only MVP gate** (internal-readiness gate shifts to end of Slice 8 after bulk import lands). Everything that requires a production environment or a published legal surface moves to Slice 9.
 
 ### Entry state
 End of Slice 6.
@@ -331,15 +334,15 @@ End of Slice 6.
 - **Account → Data & privacy screen** (UX §4.5) delivers all four DSR actions.
 - **TOTP 2FA optional for every user** (v1.2 PoC scope; OQ-01 mandatory-for-paid resolution is moot now that there is no paid tier). Recovery-code flow implemented. Users can enable, disable, and reset TOTP from the Account screen.
 - **Audit-log pseudonymization on erasure** verified (ADR-005 + security-engineer follow-up).
-- **DPA draft** written and reviewed; **sub-processor register draft** written and reviewed. Publication is Slice 8 (once the public surface exists to publish on).
-- **Breach-notification runbook draft** written; ES/EN templates drafted. Tabletop exercise is Slice 8.
+- **DPA draft** written and reviewed; **sub-processor register draft** written and reviewed. Publication is Slice 9 (once the public surface exists to publish on).
+- **Breach-notification runbook draft** written; ES/EN templates drafted. Tabletop exercise is Slice 9.
 
 ### Explicit non-goals
 - No additional jurisdictions.
 - No additional personas.
 - No additional instruments.
-- **No third-party pen-test** — moved to Slice 8 because a pen-test requires the production stack (Hetzner + Caddy + nftables + real Postgres networking), not a developer laptop.
-- **No DPA publication, no sub-processor list publication, no breach-notification tabletop** — all moved to Slice 8 for the same reason (public surface + operational stack).
+- **No third-party pen-test** — moved to Slice 9 because a pen-test requires the production stack (Hetzner + Caddy + nftables + real Postgres networking), not a developer laptop.
+- **No DPA publication, no sub-processor list publication, no breach-notification tabletop** — all moved to Slice 9 for the same reason (public surface + operational stack).
 
 ### T-shirt
 **M.** Mostly wiring known pieces together.
@@ -349,13 +352,54 @@ End of Slice 6.
 
 ---
 
-## Slice 8 — Production deployment & launch gate
+## Slice 8 — Portfolio bulk import
+
+### Scope one-liner
+Bulk-import tooling for brokers that Persona B actually uses: Carta + Shareworks CSV import, ETrade PDF import. Everything else deferred from Slice 2 on the import axis. No new calculation, no new jurisdiction. Internal-readiness gate.
+
+### Entry state
+End of Slice 7. Every feature surface except bulk import is live against hand-entered data.
+
+### Exit state
+- **CSV import** from Carta and Shareworks (US-002 Musts). Column-mapping preview, row-level error report, rejected-rows CSV download. 1,000-row / 5 MB cap (OQ-04). Both happy-path and malformed-row scenarios land in the Playwright E2E suite.
+- **ETrade PDF import** (US-002 AC #5). Vendor-specific parser lives under `orbit-api/src/import/etrade/`; the parsing boundary is well-tested and isolated from the grants CRUD path.
+- **"Tengo varios grants" link (AC-4.2.11 update)** routes to the import landing page; copy updated in ES/EN.
+- **Post-import reconciliation UI**: after a successful import, Persona B lands on a review screen that shows the imported rows, lets them correct any field, and one-click commits — the same hand-entry form from Slice 1/2 is the edit fallback.
+- **Audit log additions**: `grant.import.csv.*` and `grant.import.pdf.*` actions with `payload_summary` carrying only non-sensitive metadata (source, row count, rejected-row count) per SEC-101.
+- **Integration tests** against real Carta + Shareworks + ETrade fixtures (owner: Ivan to supply).
+- **Internal-readiness gate closes here.** Orbit is feature-complete; still no external user has touched the system.
+
+### Explicit non-goals
+- Still **no cloud deploy** (that is Slice 9).
+- No new grant instruments, no new brokers beyond Carta / Shareworks / ETrade.
+- No post-launch ops tooling.
+- No new legal surface (that is Slice 9).
+
+### T-shirt
+**L.** CSV import was always the big one from the pre-v1.3 plan; it carries the same weight here (column mapping, validation, error reporting, reconciliation UI). ETrade PDF adds parsing complexity for a vendor-specific format.
+
+### Dependencies
+- Slice 7 complete.
+- Real Carta, Shareworks, and ETrade exports as test fixtures (owner: Ivan to supply). Synthetic fixtures exercised first; real ones used for acceptance.
+
+### Demo script
+1. Start from an empty dashboard on `localhost`.
+2. Upload a 30-row Carta CSV. Column-mapping preview renders; defaults accepted.
+3. Confirm. Review screen shows 28 rows green, 2 rows red with per-row reasons.
+4. Download the rejected-rows CSV, fix the two rows, re-upload. All 30 rows land.
+5. Dashboard renders 30 grant tiles.
+6. Upload an ETrade quarterly PDF as a second import; confirm the grants append (no duplicates heuristic documents the match key).
+7. `audit_log` carries two `grant.import.csv.success` rows and one `grant.import.pdf.success` row; no share counts or employer names in any payload summary.
+
+---
+
+## Slice 9 — Production deployment & launch gate
 
 ### Scope one-liner
 Stand up the Hetzner production stack, close every ADR-015 §0b item, complete the commercial/legal cutovers deferred from Slices 3/5/7, run the pen-test, and open to external users. No feature work.
 
 ### Entry state
-End of Slice 7. Orbit runs end-to-end on a developer machine against Docker Compose Postgres + Vite dev server. Every feature is built, tested, and polished locally. No external user has touched the system.
+End of Slice 8. Orbit runs end-to-end on a developer machine against Docker Compose Postgres + Vite dev server. Every feature — including bulk import — is built, tested, and polished locally. No external user has touched the system.
 
 ### Exit state — ADR-015 §0b closed
 - **Hetzner Cloud Falkenstein** VMs provisioned per ADR-002 (CX22 API+worker+Caddy, CX32 self-managed Postgres). At-rest encryption enabled (S0-11).
@@ -395,7 +439,7 @@ End of Slice 7. Orbit runs end-to-end on a developer machine against Docker Comp
 ### Demo script
 1. Merge-to-main triggers `deploy.yaml` (now enabled); atomic symlink swap rolls HEAD to `app.orbit.<tld>`.
 2. Open `https://app.orbit.<tld>` from an EU IP; TLS 1.3 + HSTS verified with `curl -I` from a clean session.
-3. Run the Slice 7 demo (DSR export, account deletion with 30-day grace, optional TOTP enabled on the demo account) end-to-end against the production stack.
+3. Run the Slice 8 demo (bulk import Carta CSV + ETrade PDF) end-to-end against the production stack, followed by the Slice 7 demo (DSR export, account deletion with 30-day grace, optional TOTP enabled on the demo account).
 4. Trigger a DSR export; confirm the archive lands in Object Storage with traceability stamped and that the download link honours the 7-day self-service SLA.
 5. `systemctl stop orbit-api` on the production host; confirm the uptime monitor alert fires on the chosen route within its configured threshold; restart; confirm resolve-notification.
 6. Perform a restore-drill from the latest `pg_basebackup` + WAL into a scratch instance; compare row counts; date the drill in the runbook.
@@ -416,19 +460,21 @@ End of Slice 7. Orbit runs end-to-end on a developer machine against Docker Comp
                                                          ↓
                                               [Slice 6: exports + recompute]
                                                          ↓
-                                              [Slice 7: DSR + 2FA]  ← internal-readiness gate
+                                              [Slice 7: DSR + 2FA]  ← hand-entry-only MVP gate
                                                          ↓
-                                              [Slice 8: production deploy + pen-test + cutovers]
+                                              [Slice 8: bulk import (Carta/Shareworks/ETrade)]  ← internal-readiness gate
+                                                         ↓
+                                              [Slice 9: production deploy + pen-test + cutovers]
                                                          ↓
                                                   PUBLIC LAUNCH GATE
 ```
 
 No parallelism in the critical path; this is a single-engineer v1 (ADR-001 rationale). Parallelizable items, if a second engineer ever joins, or that Ivan can interleave solo:
 
-- Slice 2 CSV import can run in parallel with the Slice 3 ECB FX pipeline.
 - Slice 6 PDF generator can start during Slice 5.
-- Slice 8 pen-test vendor engagement and Finnhub commercial negotiation should start during Slice 6 or 7 because they have long external lead times; code-side Slice 8 work only begins once Slice 7 is green.
-- Slice 8 procurement (Hetzner/DNS/registrar/email/uptime) can be staged during Slice 7 without blocking Slice 7's code-side work.
+- Slice 8 fixture gathering (real Carta + Shareworks + ETrade exports) can happen any time from Slice 2 onward; collect them early so Slice 8 doesn't stall on data acquisition.
+- Slice 9 pen-test vendor engagement and Finnhub commercial negotiation should start during Slice 7 or 8 because they have long external lead times; code-side Slice 9 work only begins once Slice 8 is green.
+- Slice 9 procurement (Hetzner/DNS/registrar/email/uptime) can be staged during Slice 7–8 without blocking code-side work.
 
 ## Cross-slice acceptance checks
 
@@ -436,13 +482,13 @@ These apply to every slice from the moment they become relevant:
 
 1. **"No es asesoramiento fiscal" disclaimer**: footer on every page from Slice 0a onward; modal at signup from Slice 0a onward; export confirm from Slice 6 onward; artefact stamping from Slice 6 onward.
 2. **Ranges-and-sensitivity**: from Slice 4 onward, every projected tax number renders per UX §7 patterns.
-3. **GDPR**: data-minimization in analytics applies from Slice 0a. DSR self-service is Slice 7. **Public legal surface (privacy policy, sub-processor list, DPA) is Slice 8** — before Slice 8, there is no public surface to publish on and no external user to be covered.
+3. **GDPR**: data-minimization in analytics applies from Slice 0a. DSR self-service is Slice 7. **Public legal surface (privacy policy, sub-processor list, DPA) is Slice 9** — before Slice 9, there is no public surface to publish on and no external user to be covered.
 4. **Accessibility**: every slice's new screens must pass `axe` smoke in CI and keyboard-tab-order review.
 5. **i18n**: every UI string shipped in ES first; EN fallback before the slice closes.
 6. **Rule-set stamping**: every calculation from Slice 4 onward stamps `(rule_set_id, content_hash, inputs_hash, result_hash, engine_version)` per ADR-004.
-7. **EU-only data plane**: no service added inside a slice without confirming EEA-only data-path (§7.2). Particular scrutiny for Finnhub (Slices 5/8) as a US-headquartered processor — SCCs + processor map updated. Dev-tier Finnhub usage in Slice 5 does not ship PII (only tickers + API key); the full processor-map sign-off is a Slice 8 gate before external users onboard. Stripe is no longer in scope (v1.2 PoC: no billing, no Stripe integration).
-8. **No external user before Slice 8.** Slices 0a–7 are for the product owner's own use on `localhost` only. The moment external users (beta testers, paying customers, anyone not Ivan) need access, Slice 8 must have closed.
+7. **EU-only data plane**: no service added inside a slice without confirming EEA-only data-path (§7.2). Particular scrutiny for Finnhub (Slices 5/9) as a US-headquartered processor — SCCs + processor map updated. Dev-tier Finnhub usage in Slice 5 does not ship PII (only tickers + API key); the full processor-map sign-off is a Slice 9 gate before external users onboard. Stripe is no longer in scope (v1.2 PoC: no billing, no Stripe integration).
+8. **No external user before Slice 9.** Slices 0a–8 are for the product owner's own use on `localhost` only. The moment external users (beta testers, paying customers, anyone not Ivan) need access, Slice 9 must have closed.
 
 ## Handoff
 
-> **Next:** Slice 0a is in flight and largely landed against ADR-014. When Slice 0a is fully green, begin Slice 1 per `slice-1-acceptance-criteria.md` and ADR-014. Slices 2+ can be designed lazily as each approaches. Slice 8 planning (procurement + vendor engagement) can start during Slice 6–7; Slice 8 *execution* begins only once Slice 7 is green.
+> **Next:** Slice 1 is landed; Slice 2 is the next piece of work (hand-entry portfolio completeness per v1.3). Slices 3+ can be designed lazily as each approaches. Slice 9 planning (procurement + vendor engagement) can start during Slice 7–8; Slice 9 *execution* begins only once Slice 8 is green.
