@@ -11,3 +11,9 @@ chrono.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+# Property-based testing for the vesting algorithm (ADR-014 §7, AC-4.3.5).
+# Lives in `tests/vesting_property.rs`; not wired into the main compile.
+proptest.workspace = true
+serde_json.workspace = true

@@ -617,3 +617,183 @@ async fn residency_rejects_bad_inputs() {
     let fields = body["error"]["details"]["fields"].as_array().unwrap();
     assert!(fields.iter().any(|f| f["code"] == "foral_mismatch"));
 }
+
+// ---------------------------------------------------------------------------
+// T15 — additional acceptance-criteria probes (SEC-101 audit payload-summary
+// allowlist, disclaimer payload shape, onboarding-stage transitions).
+// ---------------------------------------------------------------------------
+
+/// Helper: fetch the latest `payload_summary` row as an owned JSON object,
+/// so the caller can assert the exact key set (SEC-101).
+async fn audit_last_payload_keys(user_id: Uuid, action: &str) -> Vec<String> {
+    let payload = audit_last_payload(user_id, action).await;
+    payload
+        .as_object()
+        .map(|o| o.keys().cloned().collect())
+        .unwrap_or_default()
+}
+
+/// AC G-9: the `dsr.consent.disclaimer_accepted` audit row carries only
+/// `{ version }` — no PII, no grant data (SEC-101 / G-26).
+#[tokio::test]
+async fn disclaimer_audit_payload_is_version_only() {
+    let (state, app) = app().await;
+    let (user_id, cookie_header, csrf) = signup_verified(&state, &app, "disc-pl").await;
+
+    let r = post(
+        &app,
+        "/api/v1/consent/disclaimer",
+        json!({ "version": "v1-2026-04" }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header),
+            ("x-csrf-token", csrf),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::NO_CONTENT);
+
+    let payload = audit_last_payload(user_id, "dsr.consent.disclaimer_accepted").await;
+    assert_eq!(payload["version"], "v1-2026-04", "version field present");
+
+    let keys = audit_last_payload_keys(user_id, "dsr.consent.disclaimer_accepted").await;
+    assert_eq!(keys, vec!["version".to_string()], "exactly one key allowed");
+}
+
+/// AC-G-32 / SEC-101: the `grant.create` audit row carries only
+/// `{ instrument, double_trigger, cadence }`. No share count, no strike, no
+/// employer name, no ticker, no notes.
+#[tokio::test]
+async fn grant_create_audit_payload_allowlist_is_strict() {
+    let (state, app) = app().await;
+    let (user_id, cookie_header, csrf) = signup_verified(&state, &app, "gc-pl").await;
+
+    // Walk through to first-grant stage.
+    post(
+        &app,
+        "/api/v1/consent/disclaimer",
+        json!({ "version": "v1-2026-04" }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header.clone()),
+            ("x-csrf-token", csrf.clone()),
+        ],
+    )
+    .await;
+    post(
+        &app,
+        "/api/v1/residency",
+        json!({
+            "jurisdiction": "ES",
+            "subJurisdiction": "ES-MD",
+            "primaryCurrency": "EUR",
+            "regimeFlags": []
+        }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header.clone()),
+            ("x-csrf-token", csrf.clone()),
+        ],
+    )
+    .await;
+
+    // Create an NSO grant with a strike — the payload MUST not leak strike.
+    let r = post(
+        &app,
+        "/api/v1/grants",
+        json!({
+            "instrument": "nso",
+            "grantDate": "2024-09-15",
+            "shareCount": 30000,
+            "strikeAmount": "8.00",
+            "strikeCurrency": "USD",
+            "vestingStart": "2024-09-15",
+            "vestingTotalMonths": 48,
+            "cliffMonths": 12,
+            "vestingCadence": "monthly",
+            "doubleTrigger": false,
+            "employerName": "ACME Inc.",
+            "ticker": "ACME",
+            "notes": "internal grant note — must not leak"
+        }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header),
+            ("x-csrf-token", csrf),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::CREATED);
+
+    let payload = audit_last_payload(user_id, "grant.create").await;
+    // Whitelisted keys present with the expected values.
+    assert_eq!(payload["instrument"], "nso");
+    assert_eq!(payload["double_trigger"], false);
+    assert_eq!(payload["cadence"], "monthly");
+
+    // Strict key set.
+    let mut keys = audit_last_payload_keys(user_id, "grant.create").await;
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec![
+            "cadence".to_string(),
+            "double_trigger".to_string(),
+            "instrument".to_string(),
+        ],
+        "SEC-101 allowlist violated — extra keys in payload_summary"
+    );
+
+    // Belt-and-braces negative assertions for the sensitive fields callers
+    // most often forget (share_count, strike, employer, ticker, notes).
+    for forbidden in [
+        "share_count",
+        "shareCount",
+        "strike_amount",
+        "strikeAmount",
+        "strike_currency",
+        "strikeCurrency",
+        "employer_name",
+        "employerName",
+        "ticker",
+        "notes",
+    ] {
+        assert!(
+            payload.get(forbidden).is_none(),
+            "SEC-101: forbidden key `{forbidden}` present in grant.create payload"
+        );
+    }
+}
+
+/// AC-G-8: a user past disclaimer but without residency gets 403
+/// `onboarding.required` with `stage = residency` when hitting a gated
+/// endpoint. Covers the second transition of the onboarding-gate state
+/// machine (the first — `disclaimer` — is already asserted by
+/// `undisclaimed_user_hitting_grants_is_blocked_with_stage`).
+#[tokio::test]
+async fn post_disclaimer_pre_residency_user_is_blocked_with_residency_stage() {
+    let (state, app) = app().await;
+    let (_uid, cookie_header, csrf) = signup_verified(&state, &app, "gate-res").await;
+
+    // Accept the disclaimer only.
+    let r = post(
+        &app,
+        "/api/v1/consent/disclaimer",
+        json!({ "version": "v1-2026-04" }),
+        vec![
+            (header::COOKIE.as_str(), cookie_header.clone()),
+            ("x-csrf-token", csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::NO_CONTENT);
+
+    // GET /grants should 403 with stage=residency (user still hasn't
+    // submitted residency).
+    let r = get(
+        &app,
+        "/api/v1/grants",
+        vec![(header::COOKIE.as_str(), cookie_header.clone())],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(body["error"]["code"], "onboarding.required");
+    assert_eq!(body["error"]["details"]["stage"], "residency");
+}

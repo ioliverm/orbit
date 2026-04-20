@@ -70,3 +70,8 @@ validator = { version = "0.18", features = ["derive"] }
 utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
 async-trait = "0.1"
 futures-util = "0.3"
+# --- Slice 1 (T15 QA) additions.
+# proptest 1.11 declares `rust-version = 1.85`; compatible with the workspace
+# MSRV (1.86). Used as a dev-dependency on orbit-core only (property suite
+# for derive_vesting_events — ADR-014 §7).
+proptest = "1"

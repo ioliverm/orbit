@@ -1,0 +1,223 @@
+{
+  "_comment": "Shared fixture for derive_vesting_events. Consumed by both the Rust tests (backend/crates/orbit-core/tests/vesting_fixtures.rs) and the TypeScript tests (frontend/src/lib/__tests__/vesting.fixtures.test.ts). Any drift between the two implementations (AC-4.3.5) fails both suites. Closes ADR-014 §Consequences 'client/server drift-risk' mitigation.",
+  "_sharesScale": 10000,
+  "cases": [
+    {
+      "name": "canonical-rsu-30k-48m-12m-monthly",
+      "inputs": {
+        "shareCountScaled": 300000000000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 48,
+        "cliffMonths": 12,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 37,
+        "sumScaled": 300000000000,
+        "firstVestDate": "2025-09-15",
+        "lastVestDate": "2028-09-15",
+        "firstSharesScaled": 75000000000,
+        "lastCumulativeScaled": 300000000000,
+        "allStates": ["vested"]
+      }
+    },
+    {
+      "name": "quarterly-12m-no-cliff",
+      "inputs": {
+        "shareCountScaled": 10000000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "quarterly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 4,
+        "sumScaled": 10000000,
+        "firstVestDate": "2024-12-15",
+        "lastVestDate": "2025-09-15",
+        "firstSharesScaled": 2500000,
+        "lastCumulativeScaled": 10000000,
+        "allStates": ["vested"],
+        "eventDates": ["2024-12-15", "2025-03-15", "2025-06-15", "2025-09-15"]
+      }
+    },
+    {
+      "name": "fractional-1234567-scaled-48m-12m",
+      "inputs": {
+        "shareCountScaled": 1234567,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 48,
+        "cliffMonths": 12,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 37,
+        "sumScaled": 1234567,
+        "firstVestDate": "2025-09-15",
+        "lastVestDate": "2028-09-15",
+        "lastCumulativeScaled": 1234567,
+        "allStates": ["vested"]
+      }
+    },
+    {
+      "name": "cliff-equals-total-single-event",
+      "inputs": {
+        "shareCountScaled": 10000000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 48,
+        "cliffMonths": 48,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 1,
+        "sumScaled": 10000000,
+        "firstVestDate": "2028-09-15",
+        "lastVestDate": "2028-09-15",
+        "firstSharesScaled": 10000000,
+        "lastCumulativeScaled": 10000000,
+        "allStates": ["vested"]
+      }
+    },
+    {
+      "name": "jan-31-leap-year-day-clamp-monthly-3m",
+      "inputs": {
+        "shareCountScaled": 3000000,
+        "vestingStart": "2024-01-31",
+        "vestingTotalMonths": 3,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 3,
+        "sumScaled": 3000000,
+        "firstVestDate": "2024-02-29",
+        "lastVestDate": "2024-04-30",
+        "firstSharesScaled": 1000000,
+        "lastCumulativeScaled": 3000000,
+        "allStates": ["vested"],
+        "eventDates": ["2024-02-29", "2024-03-31", "2024-04-30"]
+      }
+    },
+    {
+      "name": "double-trigger-liquidity-in-past",
+      "inputs": {
+        "shareCountScaled": 48000000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 48,
+        "cliffMonths": 12,
+        "cadence": "monthly",
+        "doubleTrigger": true,
+        "liquidityEventDate": "2025-01-01"
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 37,
+        "sumScaled": 48000000,
+        "firstVestDate": "2025-09-15",
+        "lastVestDate": "2028-09-15",
+        "lastCumulativeScaled": 48000000,
+        "allStates": ["vested"]
+      }
+    },
+    {
+      "name": "double-trigger-liquidity-in-future",
+      "inputs": {
+        "shareCountScaled": 48000000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 48,
+        "cliffMonths": 12,
+        "cadence": "monthly",
+        "doubleTrigger": true,
+        "liquidityEventDate": "2035-01-01"
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 37,
+        "sumScaled": 48000000,
+        "firstVestDate": "2025-09-15",
+        "lastVestDate": "2028-09-15",
+        "lastCumulativeScaled": 48000000,
+        "allStates": ["time_vested_awaiting_liquidity"]
+      }
+    },
+    {
+      "name": "double-trigger-null-liquidity",
+      "inputs": {
+        "shareCountScaled": 48000000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 48,
+        "cliffMonths": 12,
+        "cadence": "monthly",
+        "doubleTrigger": true,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 37,
+        "sumScaled": 48000000,
+        "firstVestDate": "2025-09-15",
+        "lastVestDate": "2028-09-15",
+        "lastCumulativeScaled": 48000000,
+        "allStates": ["time_vested_awaiting_liquidity"]
+      }
+    },
+    {
+      "name": "single-month-no-cliff-monthly",
+      "inputs": {
+        "shareCountScaled": 1000000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 1,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "expected": {
+        "eventCount": 1,
+        "sumScaled": 1000000,
+        "firstVestDate": "2024-10-15",
+        "lastVestDate": "2024-10-15",
+        "firstSharesScaled": 1000000,
+        "lastCumulativeScaled": 1000000,
+        "allStates": ["vested"]
+      }
+    },
+    {
+      "name": "large-240m-24m-cliff-monthly",
+      "inputs": {
+        "shareCountScaled": 1000000000000000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 240,
+        "cliffMonths": 24,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2060-01-01",
+      "expected": {
+        "eventCount": 217,
+        "sumScaled": 1000000000000000,
+        "firstVestDate": "2026-09-15",
+        "lastVestDate": "2044-09-15",
+        "lastCumulativeScaled": 1000000000000000,
+        "allStates": ["vested"]
+      }
+    }
+  ]
+}
