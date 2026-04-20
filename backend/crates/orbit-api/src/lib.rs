@@ -20,6 +20,7 @@ pub mod error;
 pub mod handlers;
 pub mod hibp;
 pub mod middleware;
+pub mod residency;
 pub mod router;
 pub mod state;
 

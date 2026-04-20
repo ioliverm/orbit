@@ -1,16 +1,17 @@
 //! Auth endpoints (ADR-011 §Flows, SEC-003..SEC-010).
 //!
-//! Scope T13a:
+//! Scope:
 //!   - `POST /auth/signup`
 //!   - `POST /auth/verify-email`
 //!   - `POST /auth/signin`
 //!   - `POST /auth/signout`
-//!   - `GET  /auth/me`
+//!   - `GET  /auth/me` (extended in T13b with full onboarding stage
+//!     resolution + residency summary)
 //!   - `POST /auth/mfa/*` → 501
 //!
-//! Not in scope (land in T13b):
-//!   - `POST /consent/disclaimer`, `/residency/*`, `/grants/*`, `/auth/me`
-//!     extended onboarding stage resolution.
+//! Wizard endpoints (`/consent/disclaimer`, `/residency/*`, `/grants/*`)
+//! live in their own handler modules — see `handlers::{consent, residency,
+//! grants}`.
 
 use axum::extract::{ConnectInfo, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
@@ -82,6 +83,7 @@ pub struct MeResponse {
     pub user: MeUser,
     pub residency: Option<Value>,
     pub onboarding_stage: &'static str,
+    pub disclaimer_accepted: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -523,9 +525,9 @@ pub async fn signout(
 
 /// `GET /api/v1/auth/me` — identity for the SPA on boot.
 ///
-/// T13a returns residency=null and stage in {"disclaimer", "residency"}.
-/// T13b extends this to full onboarding stage resolution (first_grant,
-/// complete).
+/// Returns the user record, the current residency period (or `null`),
+/// the onboarding stage `disclaimer | residency | first_grant | complete`,
+/// and whether the disclaimer has been accepted.
 pub async fn me(
     State(state): State<AppState>,
     Extension(auth): Extension<SessionAuth>,
@@ -554,12 +556,14 @@ pub async fn me(
     let disclaimer: Option<chrono::DateTime<chrono::Utc>> = row
         .try_get("disclaimer_accepted_at")
         .map_err(|_| AppError::Internal)?;
+    let disclaimer_accepted = disclaimer.is_some();
 
-    let stage = if disclaimer.is_none() {
-        "disclaimer"
-    } else {
-        "residency"
-    };
+    let (stage, residency) = crate::handlers::residency::stage_and_summary(
+        &state.pool,
+        auth.user_id,
+        disclaimer_accepted,
+    )
+    .await?;
 
     Ok(Json(MeResponse {
         user: MeUser {
@@ -568,8 +572,9 @@ pub async fn me(
             locale,
             primary_currency,
         },
-        residency: None,
+        residency,
         onboarding_stage: stage,
+        disclaimer_accepted,
     }))
 }
 

@@ -65,6 +65,12 @@ pub enum AppError {
     #[error("csrf mismatch")]
     CsrfMismatch,
 
+    /// 403 — the user is trying to reach a route beyond their current
+    /// onboarding stage. The SPA uses `details.stage` to route them to the
+    /// correct wizard step (ADR-014 §3, AC G-8).
+    #[error("onboarding required")]
+    OnboardingRequired { stage: &'static str },
+
     /// 404 — resource not found or not owned (RLS fail-closed, AC-7.3).
     #[error("not found")]
     NotFound,
@@ -123,6 +129,12 @@ impl AppError {
                 None,
             ),
             AppError::CsrfMismatch => (StatusCode::FORBIDDEN, "csrf", "CSRF token mismatch.", None),
+            AppError::OnboardingRequired { stage } => (
+                StatusCode::FORBIDDEN,
+                "onboarding.required",
+                "Complete the onboarding step before continuing.",
+                Some(json!({ "stage": stage })),
+            ),
             AppError::NotFound => (
                 StatusCode::NOT_FOUND,
                 "not_found",

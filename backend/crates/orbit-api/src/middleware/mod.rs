@@ -15,6 +15,7 @@
 //! 9. Rate limit — per-route.
 
 pub mod csrf;
+pub mod onboarding;
 pub mod rate_limit;
 pub mod request_id;
 pub mod security_headers;
