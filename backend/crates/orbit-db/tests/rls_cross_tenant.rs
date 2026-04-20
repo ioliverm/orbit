@@ -643,3 +643,463 @@ async fn vesting_events_cross_tenant_mutation_cannot_touch_other_tenants_rows() 
     cleanup_user(&migrate_pool, user_a).await;
     cleanup_user(&migrate_pool, user_b).await;
 }
+
+// ---------------------------------------------------------------------------
+// Slice 2 T20 — cross-tenant probes for espp_purchases, art_7p_trips,
+// modelo_720_user_inputs, and the new session-revoke path. Same shape as
+// the Slice-1 probes above: seed one row per user via the migrate pool,
+// then assert Tx::for_user(A) cannot SELECT / UPDATE / DELETE user B's row.
+// Additionally, the notes-lift helper has its own probe (Probe 12).
+// ---------------------------------------------------------------------------
+
+/// Seed an ESPP `grants` row for `user_id`. Unlike `seed_grant` (RSU), the
+/// ESPP instrument is the one `espp_purchases` accepts per the Slice-2
+/// trigger.
+async fn seed_espp_grant(
+    migrate_pool: &PgPool,
+    user_id: Uuid,
+    tag: &str,
+    notes: Option<&str>,
+) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO grants (
+            user_id, instrument, grant_date, share_count,
+            vesting_start, vesting_total_months, cliff_months, vesting_cadence,
+            employer_name, notes
+        )
+        VALUES ($1, 'espp', DATE '2024-09-15', 1000,
+                DATE '2024-09-15', 24, 0, 'monthly',
+                $2, $3)
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(format!("ACME-{tag}"))
+    .bind(notes)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed espp grant for {user_id} ({tag}) failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("grants.id missing from RETURNING")
+}
+
+/// Seed an `espp_purchases` row tied to `grant_id` for `user_id`. Table
+/// owner bypasses the permissive RLS; the grant-instrument trigger
+/// nonetheless fires — `grant_id` must point at an ESPP grant.
+async fn seed_espp_purchase(
+    migrate_pool: &PgPool,
+    user_id: Uuid,
+    grant_id: Uuid,
+    tag: &str,
+) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO espp_purchases (
+            user_id, grant_id, offering_date, purchase_date,
+            fmv_at_purchase, purchase_price_per_share,
+            shares_purchased, currency
+        )
+        VALUES ($1, $2, DATE '2025-03-01', DATE '2025-09-01',
+                30.00, 25.50, 100, 'USD')
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(grant_id)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed espp purchase for {user_id} ({tag}) failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("espp_purchases.id missing from RETURNING")
+}
+
+/// Seed an `art_7p_trips` row for `user_id`.
+async fn seed_art_7p_trip(migrate_pool: &PgPool, user_id: Uuid, tag: &str) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO art_7p_trips (
+            user_id, destination_country, from_date, to_date,
+            employer_paid, purpose, eligibility_criteria
+        )
+        VALUES ($1, 'FR', DATE '2026-03-10', DATE '2026-03-17',
+                true, $2, '{}'::jsonb)
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(format!("trip-{tag}"))
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed art_7p_trip for {user_id} ({tag}) failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("art_7p_trips.id missing from RETURNING")
+}
+
+/// Seed a `modelo_720_user_inputs` row for `user_id` × `category`. The
+/// partial unique index requires at most one `to_date IS NULL` row per
+/// (user, category), so the `tag` merely discriminates logs.
+async fn seed_m720_input(migrate_pool: &PgPool, user_id: Uuid, category: &str, tag: &str) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO modelo_720_user_inputs (
+            user_id, category, amount_eur, reference_date, from_date, to_date
+        )
+        VALUES ($1, $2, 123456.78, CURRENT_DATE, CURRENT_DATE, NULL)
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(category)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed m720 input for {user_id} ({tag}) failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("modelo_720_user_inputs.id missing from RETURNING")
+}
+
+/// Probe 8 — `espp_purchases` isolation. Seed one ESPP grant per user, one
+/// purchase per grant, then verify `Tx::for_user(A)` cannot SEE user B's
+/// purchase row.
+#[tokio::test]
+async fn espp_purchases_cross_tenant_select_is_isolated() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_espp").await;
+    ensure_user(&migrate_pool, user_b, "b_espp").await;
+    let ga = seed_espp_grant(&migrate_pool, user_a, "a_espp", None).await;
+    let gb = seed_espp_grant(&migrate_pool, user_b, "b_espp", None).await;
+    let pa = seed_espp_purchase(&migrate_pool, user_a, ga, "a_espp").await;
+    let pb = seed_espp_purchase(&migrate_pool, user_b, gb, "b_espp").await;
+
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a)");
+
+    let rows = sqlx::query("SELECT id, user_id FROM espp_purchases WHERE id IN ($1, $2)")
+        .bind(pa)
+        .bind(pb)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select espp_purchases under RLS");
+
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on espp_purchases under Tx::for_user({user_a}) returned {} rows \
+         for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    let seen_user: Uuid = rows[0].try_get("user_id").expect("row user_id");
+    assert_eq!(
+        seen_id, pa,
+        "RLS leak: Tx::for_user({user_a}) returned user B's purchase id {seen_id} (expected {pa})"
+    );
+    assert_eq!(
+        seen_user, user_a,
+        "RLS leak: Tx::for_user({user_a}) returned an espp_purchases row for user {seen_user}"
+    );
+
+    tx.rollback().await.expect("rollback");
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Probe 9 — `art_7p_trips` isolation. Same shape as Probe 8.
+#[tokio::test]
+async fn art_7p_trips_cross_tenant_select_is_isolated() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_trip").await;
+    ensure_user(&migrate_pool, user_b, "b_trip").await;
+    let tid_a = seed_art_7p_trip(&migrate_pool, user_a, "a_trip").await;
+    let tid_b = seed_art_7p_trip(&migrate_pool, user_b, "b_trip").await;
+
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a)");
+
+    let rows = sqlx::query("SELECT id, user_id FROM art_7p_trips WHERE id IN ($1, $2)")
+        .bind(tid_a)
+        .bind(tid_b)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select art_7p_trips under RLS");
+
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on art_7p_trips under Tx::for_user({user_a}) returned {} rows \
+         for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    let seen_user: Uuid = rows[0].try_get("user_id").expect("row user_id");
+    assert_eq!(
+        seen_id, tid_a,
+        "RLS leak: Tx::for_user({user_a}) returned user B's trip id {seen_id} (expected {tid_a})"
+    );
+    assert_eq!(
+        seen_user, user_a,
+        "RLS leak: Tx::for_user({user_a}) returned an art_7p_trips row for user {seen_user}"
+    );
+
+    tx.rollback().await.expect("rollback");
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Probe 10 — `modelo_720_user_inputs` cross-tenant mutation is blocked.
+/// The close-and-create helper runs UPDATE + INSERT; if RLS ever loosened,
+/// a Tx::for_user(B) could close user A's open row. RLS USING gates the
+/// UPDATE's row-set to zero matches; RLS WITH CHECK gates a sneaky
+/// successor INSERT pointing at another user.
+#[tokio::test]
+async fn modelo_720_inputs_cross_tenant_mutation_cannot_touch_other_tenants_rows() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_m720").await;
+    ensure_user(&migrate_pool, user_b, "b_m720").await;
+    let rid_a = seed_m720_input(&migrate_pool, user_a, "bank_accounts", "a_m720").await;
+    let rid_b = seed_m720_input(&migrate_pool, user_b, "bank_accounts", "b_m720").await;
+
+    // --- SELECT probe
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) select");
+    let rows = sqlx::query("SELECT id, user_id FROM modelo_720_user_inputs WHERE id IN ($1, $2)")
+        .bind(rid_a)
+        .bind(rid_b)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select m720 under RLS");
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on modelo_720_user_inputs under Tx::for_user({user_a}) returned {} rows \
+         for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    assert_eq!(
+        seen_id, rid_a,
+        "RLS leak: Tx::for_user({user_a}) returned user B's m720 row {seen_id}"
+    );
+    tx.rollback().await.expect("rollback select probe");
+
+    // --- UPDATE probe (cross-tenant UPDATE of the open-row's to_date)
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) update");
+    let updated =
+        sqlx::query("UPDATE modelo_720_user_inputs SET to_date = CURRENT_DATE WHERE id = $1")
+            .bind(rid_b)
+            .execute(tx.as_executor())
+            .await
+            .expect("cross-tenant UPDATE should return 0 rows, not error");
+    assert_eq!(
+        updated.rows_affected(),
+        0,
+        "RLS leak: UPDATE from Tx::for_user({user_a}) affected {} rows on user B's m720 row {rid_b}.",
+        updated.rows_affected()
+    );
+    tx.commit().await.expect("commit empty update");
+
+    // --- DELETE probe
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) delete");
+    let deleted = sqlx::query("DELETE FROM modelo_720_user_inputs WHERE id = $1")
+        .bind(rid_b)
+        .execute(tx.as_executor())
+        .await
+        .expect("cross-tenant DELETE should return 0 rows, not error");
+    assert_eq!(
+        deleted.rows_affected(),
+        0,
+        "RLS leak: DELETE from Tx::for_user({user_a}) removed {} rows on user B's m720 row {rid_b}.",
+        deleted.rows_affected()
+    );
+    tx.commit().await.expect("commit empty delete");
+
+    // Sanity: user B's row is still open (to_date IS NULL) and untouched.
+    let surviving = sqlx::query("SELECT to_date FROM modelo_720_user_inputs WHERE id = $1")
+        .bind(rid_b)
+        .fetch_optional(&migrate_pool)
+        .await
+        .expect("post-check lookup");
+    let surviving =
+        surviving.expect("user B's m720 row must still exist after cross-tenant DELETE");
+    let to_date: Option<chrono::NaiveDate> = surviving.try_get("to_date").expect("to_date");
+    assert!(
+        to_date.is_none(),
+        "RLS leak: user B's m720 row to_date was mutated to {to_date:?} by a Tx::for_user(user_a) UPDATE"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Probe 11 — session revoke cannot cross tenants. Exercises the Slice-2
+/// `sessions_mgmt::revoke_other` and `revoke_all_others` helpers: a
+/// Tx::for_user(A) call targeting user B's session must return NotFound
+/// (single revoke) or skip user B's row entirely (bulk revoke), and user
+/// B's session must remain active.
+#[tokio::test]
+async fn sessions_revoke_other_cannot_cross_tenant() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_rev").await;
+    ensure_user(&migrate_pool, user_b, "b_rev").await;
+    // User A's own current session + a target session belonging to user B.
+    let _sid_a_current = seed_session(&migrate_pool, user_a, "a_rev_current").await;
+    let sid_b_target = seed_session(&migrate_pool, user_b, "b_rev_target").await;
+
+    // Call the revoke helper as user A targeting user B's session id. Pass
+    // a distinct current_session_id (not the target, not nil) so we
+    // exercise the cross-tenant RLS guard rather than the self-revoke
+    // early return.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a)");
+    let outcome =
+        orbit_db::sessions_mgmt::revoke_other(&mut tx, user_a, sid_b_target, Uuid::new_v4())
+            .await
+            .expect("revoke_other cross-tenant call");
+    assert_eq!(
+        outcome,
+        orbit_db::sessions_mgmt::RevokeOtherOutcome::NotFound,
+        "RLS leak: revoke_other({user_a}, target=user B's {sid_b_target}) reported {outcome:?}; \
+         expected NotFound (0 rows updated under RLS)."
+    );
+    tx.commit().await.expect("commit empty revoke");
+
+    // Sanity: user B's session is still active (revoked_at IS NULL).
+    let row = sqlx::query("SELECT revoked_at FROM sessions WHERE id = $1")
+        .bind(sid_b_target)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("post-check lookup");
+    let revoked_at: Option<chrono::DateTime<chrono::Utc>> =
+        row.try_get("revoked_at").expect("revoked_at");
+    assert!(
+        revoked_at.is_none(),
+        "RLS leak: user B's session {sid_b_target} was revoked by a Tx::for_user(user_a) call; \
+         revoked_at = {revoked_at:?}"
+    );
+
+    // Also verify revoke_all_others from user A's tx does not touch user
+    // B's session. Pass nil as the current-session-id so the predicate
+    // `id <> $2` matches every row in user A's RLS scope; the count must
+    // include only user A's own seeded session (1), never user B's.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) bulk");
+    let count = orbit_db::sessions_mgmt::revoke_all_others(&mut tx, user_a, Uuid::nil())
+        .await
+        .expect("revoke_all_others");
+    assert_eq!(
+        count, 1,
+        "revoke_all_others under Tx::for_user({user_a}) revoked {count} sessions; expected 1. \
+         If this is 2, user B's session leaked into the RLS scope."
+    );
+    tx.commit().await.expect("commit bulk revoke");
+
+    let row = sqlx::query("SELECT revoked_at FROM sessions WHERE id = $1")
+        .bind(sid_b_target)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("post-check lookup 2");
+    let revoked_at: Option<chrono::DateTime<chrono::Utc>> =
+        row.try_get("revoked_at").expect("revoked_at");
+    assert!(
+        revoked_at.is_none(),
+        "RLS leak: user B's session {sid_b_target} was revoked by \
+         Tx::for_user(user_a)::revoke_all_others; revoked_at = {revoked_at:?}"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Probe 12 — ESPP notes-lift on first purchase. Seed a Slice-1 ESPP grant
+/// with `grants.notes = '{"estimated_discount_percent": 15}'`; call
+/// [`orbit_db::espp_purchases::migrate_notes_on_first_purchase`]; assert the
+/// helper returns `Some(NotesMigration { lifted_discount_percent = "15.00",
+/// preserved_user_note = None })` and `grants.notes` is now NULL.
+///
+/// This is the integration-side check for AC-4.5.1 / ADR-016 §2. The parser
+/// half is already covered by unit tests in `espp_purchases.rs`; this probe
+/// closes the SQL-round-trip half (RLS scoping, UPDATE visibility,
+/// transaction boundary).
+#[tokio::test]
+async fn espp_notes_lift_first_purchase_rewrites_grant_notes() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    ensure_user(&migrate_pool, user_a, "a_lift").await;
+    let grant_id = seed_espp_grant(
+        &migrate_pool,
+        user_a,
+        "a_lift",
+        Some(r#"{"estimated_discount_percent":15}"#),
+    )
+    .await;
+
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a)");
+    let migration =
+        orbit_db::espp_purchases::migrate_notes_on_first_purchase(&mut tx, user_a, grant_id)
+            .await
+            .expect("migrate_notes_on_first_purchase");
+    tx.commit().await.expect("commit lift");
+
+    let migration = migration.expect("Slice-1 JSON should parse and trigger the lift");
+    assert_eq!(
+        migration.lifted_discount_percent, "15.00",
+        "lifted_discount_percent should normalize to 15.00 (NUMERIC(5,2) shape)"
+    );
+    assert_eq!(
+        migration.preserved_user_note, None,
+        "no `note` key in the source JSON → preserved_user_note must be None"
+    );
+
+    // grants.notes should now be NULL. Read via the migrate pool (owner,
+    // bypasses RLS) so a misconfigured RLS policy cannot mask a NOT-NULL
+    // surviving payload.
+    let row = sqlx::query("SELECT notes FROM grants WHERE id = $1")
+        .bind(grant_id)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("post-lift grants lookup");
+    let notes: Option<String> = row.try_get("notes").expect("notes column");
+    assert_eq!(
+        notes, None,
+        "grants.notes must be NULL after the lift; got {notes:?}"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+}

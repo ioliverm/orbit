@@ -19,8 +19,12 @@ use std::time::Duration;
 
 use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions};
 
+pub mod art_7p_trips;
+pub mod espp_purchases;
 pub mod grants;
+pub mod modelo_720_inputs;
 pub mod residency;
+pub mod sessions_mgmt;
 mod tx;
 pub mod vesting_events;
 

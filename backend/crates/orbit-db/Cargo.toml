@@ -16,6 +16,10 @@ sqlx.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
 chrono.workspace = true
+# art_7p_trips.eligibility_criteria is a JSONB column carried across the
+# crate boundary as a serde_json::Value (handler-layer shape validation per
+# ADR-016 §9.1). Already in the tree via orbit-api → audit.rs.
+serde_json.workspace = true
 orbit-core = { path = "../orbit-core" }
 
 [dev-dependencies]

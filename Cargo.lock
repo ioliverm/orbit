@@ -1405,6 +1405,7 @@ version = "0.0.0"
 dependencies = [
  "chrono",
  "orbit-core",
+ "serde_json",
  "sqlx",
  "thiserror",
  "tokio",
