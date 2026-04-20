@@ -22,7 +22,15 @@ export default function VerifyEmailPage(): JSX.Element {
   const mutation = useMutation<void, AppError, string>({
     mutationFn: (t: string) => verifyEmail({ token: t }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
+      // Refresh the auth store so the disclaimer route sees a user. Wait at
+      // most 1 s for the refetch to avoid the spinner-forever state the
+      // user hit when /auth/me itself 401'd (e.g. Secure cookie dropped on
+      // http://localhost). Whatever happens, advance onward — the
+      // onboarding-gate on /app/disclaimer will redirect appropriately.
+      await Promise.race([
+        queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY }),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ]);
       navigate('/app/disclaimer', { replace: true });
     },
   });

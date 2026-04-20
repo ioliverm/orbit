@@ -236,7 +236,7 @@ pub async fn signup(
 
         // Slice 1 dev surface: log the verification link instead of sending
         // email. `SafeString` is the explicit opt-in per SEC-050.
-        let link = format!("http://localhost:5173/signup/verify-email?token={raw_token}");
+        let link = format!("http://localhost:5173/verify-email?token={raw_token}");
         orbit_log::event!(
             orbit_log::Level::Info,
             "auth.signup.verification_link",

@@ -15,6 +15,7 @@
 //!     `app.user_id` GUC used by RLS policies. Defined in [`tx`].
 
 use std::str::FromStr;
+use std::time::Duration;
 
 use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions};
 
@@ -64,8 +65,18 @@ pub enum Error {
 pub async fn connect(database_url: &str) -> Result<PgPool, Error> {
     let options = PgConnectOptions::from_str(database_url).map_err(Error::InvalidUrl)?;
 
+    // Pool sizing: keep a warm floor of 2 connections so single-user dev
+    // doesn't churn new TCP+TLS handshakes on every bursty request cycle
+    // (the Postgres log spammed one "connection authorized" per /auth/me
+    // round trip). Idle timeout of 10 min + max lifetime of 30 min match
+    // what sqlx documents as sane defaults; making them explicit here puts
+    // the tuning in one place for Slice 2+ tightening.
     PgPoolOptions::new()
         .max_connections(16)
+        .min_connections(2)
+        .idle_timeout(Duration::from_secs(600))
+        .max_lifetime(Duration::from_secs(1800))
+        .acquire_timeout(Duration::from_secs(5))
         .connect_with(options)
         .await
         .map_err(Error::Connect)

@@ -14,6 +14,7 @@
 import { t, Trans } from '@lingui/macro';
 import { useLingui } from '@lingui/react';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { listAutonomias, type Autonomia, type ResidencyBody } from '../../api/residency';
 import { ErrorBanner } from '../feedback/ErrorBanner';
@@ -76,6 +77,26 @@ export function ResidencyForm({
       primaryCurrency: initial?.primaryCurrency ?? 'EUR',
     },
   });
+
+  // RHF's defaultValues are captured on mount — if the parent hydrates
+  // `initial` later (e.g. Profile waits for /auth/me before residency lands
+  // in the auth store), we have to `reset()` to pick the stored values up.
+  // Without this, the autonomía selector stays on its fallback ES-MD even
+  // after a user's real selection is available.
+  const initialSub = initial?.subJurisdiction;
+  const initialBeckham = initial?.beckhamLaw;
+  const initialCurrency = initial?.primaryCurrency;
+  useEffect(() => {
+    if (!initial) return;
+    form.reset({
+      subJurisdiction: initialSub ?? 'ES-MD',
+      beckham: initialBeckham ? 'si' : 'no',
+      primaryCurrency: initialCurrency ?? 'EUR',
+    });
+    // `form` identity is stable per RHF; depend on the three fields we care
+    // about rather than the `initial` object to avoid re-resetting on every
+    // parent render when the backing data hasn't changed.
+  }, [form, initialSub, initialBeckham, initialCurrency]);
 
   const errors = form.formState.errors;
 
