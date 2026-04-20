@@ -5,3 +5,63 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+
+[features]
+# Gates tests that need a live Postgres. Mirrors orbit-db's convention so a
+# fresh `cargo test --workspace` stays Postgres-free.
+integration-tests = []
+
+[dependencies]
+# Workspace crates.
+orbit-auth = { path = "../orbit-auth" }
+orbit-core = { path = "../orbit-core" }
+orbit-db   = { path = "../orbit-db" }
+orbit-log  = { path = "../orbit-log" }
+
+# HTTP / axum stack.
+axum.workspace = true
+axum-extra.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+http.workspace = true
+
+# Async runtime + IO.
+tokio.workspace = true
+async-trait.workspace = true
+
+# DB + domain primitives.
+sqlx.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+
+# Serde / validation.
+serde.workspace = true
+serde_json.workspace = true
+validator.workspace = true
+
+# Crypto / tokens (T13a: HIBP k-anonymity + session lookup + ip_hash).
+sha1.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+hex.workspace = true
+subtle.workspace = true
+base64.workspace = true
+rand.workspace = true
+
+# HIBP outbound call.
+reqwest.workspace = true
+
+# Error handling + cookies.
+thiserror.workspace = true
+cookie.workspace = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+http-body-util.workspace = true
+tower = { workspace = true, features = ["util"] }
+reqwest.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+# orbit-db is used via `Tx::for_user` in the integration test harness so
+# helper inserts pass RLS WITH CHECK.
+orbit-db = { path = "../orbit-db" }
