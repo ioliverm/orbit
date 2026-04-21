@@ -228,8 +228,13 @@ function EmployerRow({
     .map((g) => instrumentLabel(g))
     .reduce<string[]>((acc, x) => (acc.includes(x) ? acc : [...acc, x]), [])
     .join(' + ');
-  const subId = `employer-sub-${employer.employerKey}`;
-  const nameId = `employer-name-${employer.employerKey}`;
+  // T23 a11y fix: employerKey is the normalized (trimmed + lowercased)
+  // employer name, which may contain spaces or punctuation. HTML5 IDs
+  // must not contain whitespace, and aria-controls inherits that
+  // constraint, so slugify to `[a-z0-9-]+` here.
+  const slug = employer.employerKey.replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  const subId = `employer-sub-${slug}`;
+  const nameId = `employer-name-${slug}`;
 
   return (
     <div className="portfolio-row" role="group" aria-labelledby={nameId}>

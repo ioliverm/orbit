@@ -316,4 +316,93 @@ describe('axe-core smoke (G-21) — critical-path screens', () => {
     });
     await assertNoCriticalOrSeriousViolations(container, '/app/account/sessions');
   });
+
+  // T23 extension: a populated dashboard with two employers + three
+  // grants (one mixed-instrument pair at ACME + one NSO at Bravo). This
+  // exercises the per-employer panel, the drill-down rows, and the
+  // multi-tile grid in one render — the Slice-1 axe test above covered
+  // only the single-grant case.
+  it('/app/dashboard with seeded multi-employer multi-instrument state has no violations', async () => {
+    seedAuthed();
+    const g1 = grantFixture({
+      id: 'g-acme-rsu',
+      instrument: 'rsu',
+      shareCount: '30000',
+      shareCountScaled: 30_000 * 10_000,
+      employerName: 'ACME Inc.',
+    });
+    const g2 = grantFixture({
+      id: 'g-acme-nso',
+      instrument: 'nso',
+      shareCount: '10000',
+      shareCountScaled: 10_000 * 10_000,
+      strikeAmount: '8.00',
+      strikeCurrency: 'USD',
+      employerName: 'ACME Inc.',
+      grantDate: '2024-08-15',
+      vestingStart: '2024-08-15',
+    });
+    const g3 = grantFixture({
+      id: 'g-bravo-nso',
+      instrument: 'nso',
+      shareCount: '5000',
+      shareCountScaled: 5_000 * 10_000,
+      strikeAmount: '10.00',
+      strikeCurrency: 'USD',
+      employerName: 'Bravo Corp.',
+      grantDate: '2025-01-15',
+      vestingStart: '2025-01-15',
+    });
+    // Provide a populated /dashboard/stacked response so the
+    // `EmployerPortfolioPanel` actually renders its rows. Shapes match
+    // `WireEmployerStack` + `WireStackedPoint` (scaled numeric fields as
+    // plain numbers — the wrapper coerces them with `toBigInt`).
+    const stackedPayload = {
+      byEmployer: [
+        {
+          employerName: 'ACME Inc.',
+          employerKey: 'acme inc.',
+          grantIds: [g1.id, g2.id],
+          points: [
+            {
+              date: '2024-10-15',
+              cumulativeSharesVested: 30_000 * 10_000,
+              cumulativeTimeVestedAwaitingLiquidity: 0,
+              perGrantBreakdown: [
+                {
+                  grantId: g1.id,
+                  instrument: 'rsu',
+                  sharesVestedThisEvent: 30_000 * 10_000,
+                  cumulativeForThisGrant: 30_000 * 10_000,
+                  state: 'vested' as const,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          employerName: 'Bravo Corp.',
+          employerKey: 'bravo corp.',
+          grantIds: [g3.id],
+          points: [],
+        },
+      ],
+      combined: [],
+    };
+    mockGrantsList([g1, g2, g3], {
+      '/dashboard/stacked': stackedPayload,
+    });
+    const container = renderPage(<DashboardPage />, '/app/dashboard');
+    await waitFor(() => {
+      // `ACME Inc.` appears twice (employer-panel header + grant-tile
+      // employer line), and Bravo Corp. appears twice too. `getAllByText`
+      // + a length check is the stable shape.
+      expect(screen.getAllByText('ACME Inc.').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Bravo Corp.').length).toBeGreaterThan(0);
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/dashboard (seeded multi-grant)',
+    );
+  });
 });

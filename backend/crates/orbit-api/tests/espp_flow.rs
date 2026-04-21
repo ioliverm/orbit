@@ -122,24 +122,38 @@ async fn espp_purchase_crud_happy_path_and_audit_allowlist() {
     assert_eq!(create_payload["had_discount"], true);
     assert_eq!(create_payload["had_lookback"], true);
     assert_eq!(create_payload["notes_lift"], false);
-    // Allowlist: exactly 4 keys, no leakage.
+    // Allowlist (positive): exactly these 4 keys.
     let obj = create_payload.as_object().unwrap();
     assert_eq!(obj.len(), 4);
-    for forbidden in [
-        "fmv_at_purchase",
-        "purchase_price_per_share",
-        "shares_purchased",
-        "notes",
-    ] {
-        assert!(obj.get(forbidden).is_none(), "leaked key {forbidden}");
-    }
+    let got_keys: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+    let want_keys: std::collections::BTreeSet<&str> =
+        ["currency", "had_discount", "had_lookback", "notes_lift"]
+            .iter()
+            .copied()
+            .collect();
+    assert_eq!(got_keys, want_keys, "espp_purchase.create key set");
+    // Forbidden-fields sweep (T23, SEC-101).
+    assert_no_forbidden_keys(&create_payload, "espp_purchase.create");
 
     let update_payload = audit_last_payload(&pool, s.user_id, "espp_purchase.update").await;
-    assert_eq!(update_payload.as_object().unwrap().len(), 4);
+    let upd_obj = update_payload.as_object().unwrap();
+    assert_eq!(upd_obj.len(), 4);
+    let got_keys: std::collections::BTreeSet<&str> = upd_obj.keys().map(String::as_str).collect();
+    assert_eq!(got_keys, want_keys, "espp_purchase.update key set");
+    assert_no_forbidden_keys(&update_payload, "espp_purchase.update");
 
     let delete_payload = audit_last_payload(&pool, s.user_id, "espp_purchase.delete").await;
     assert_eq!(delete_payload["currency"], "USD");
     assert_eq!(delete_payload.as_object().unwrap().len(), 1);
+    assert_no_forbidden_keys(&delete_payload, "espp_purchase.delete");
+
+    // Cross-action sweep: every ESPP-purchase audit row for this user
+    // passes the forbidden-keys walk (three rows: create + update + delete).
+    let scanned = assert_all_audit_payloads_clean(&pool, s.user_id, "espp_purchase.").await;
+    assert!(
+        scanned >= 3,
+        "expected ≥3 espp_purchase.* rows for this user, got {scanned}"
+    );
 }
 
 #[tokio::test]
@@ -370,6 +384,140 @@ async fn espp_notes_lift_on_first_purchase() {
     let pool = audit_pool().await;
     let payload = audit_last_payload(&pool, s.user_id, "espp_purchase.create").await;
     assert_eq!(payload["notes_lift"], true);
+}
+
+#[tokio::test]
+async fn espp_update_after_lift_does_not_refire_notes_migration() {
+    // Edge case (T23): once the first-purchase notes lift has cleared
+    // `grants.notes`, every subsequent PUT on any purchase for that grant
+    // must surface `migratedFromNotes: false` on the response and NEVER
+    // fire a second `grant.update` audit row tied to the lift.
+    let (state, app) = app().await;
+    let s = onboarded_with_grant(&state, &app, "espp-lift-reedit").await;
+
+    // Grant with Slice-1 JSON notes.
+    let r = post(
+        &app,
+        "/api/v1/grants",
+        json!({
+            "instrument": "espp",
+            "grantDate": "2024-09-15",
+            "shareCount": 500,
+            "vestingStart": "2024-09-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "vestingCadence": "monthly",
+            "doubleTrigger": false,
+            "employerName": "ACME Inc.",
+            "esppEstimatedDiscountPct": 15,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (_st, _c, body) = body_json(r).await;
+    let grant_id = body["grant"]["id"].as_str().unwrap().to_string();
+
+    // First purchase — lift fires.
+    let r = post(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/espp-purchases"),
+        json!({
+            "offeringDate": "2025-01-15",
+            "purchaseDate": "2025-06-30",
+            "fmvAtPurchase": "45.00",
+            "purchasePricePerShare": "38.25",
+            "sharesPurchased": 100,
+            "currency": "USD"
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(body["migratedFromNotes"], true);
+    let purchase_id = body["purchase"]["id"].as_str().unwrap().to_string();
+
+    // Baseline audit counts AFTER the lift.
+    let pool = audit_pool().await;
+    let baseline_create = audit_count(&pool, s.user_id, "espp_purchase.create").await;
+    let baseline_grant_update = audit_count(&pool, s.user_id, "grant.update").await;
+
+    // PUT the same purchase with a different shares count. The lift has
+    // already run; this must not produce a second `grant.update` row.
+    let r = put(
+        &app,
+        &format!("/api/v1/espp-purchases/{purchase_id}"),
+        json!({
+            "offeringDate": "2025-01-15",
+            "purchaseDate": "2025-06-30",
+            "fmvAtPurchase": "45.00",
+            "purchasePricePerShare": "38.25",
+            "sharesPurchased": 200,
+            "currency": "USD"
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["purchase"]["sharesPurchased"], "200");
+
+    // grants.notes still null (no regression from an update path writing back).
+    let r = get(
+        &app,
+        &format!("/api/v1/grants/{grant_id}"),
+        vec![(header::COOKIE.as_str(), s.cookie.clone())],
+    )
+    .await;
+    let (_st, _c, body) = body_json(r).await;
+    assert!(body["grant"]["notes"].is_null());
+
+    // Audit shape: no new `grant.update` row; +1 `espp_purchase.update`;
+    // the update's `notes_lift` flag is false.
+    assert_eq!(
+        audit_count(&pool, s.user_id, "grant.update").await,
+        baseline_grant_update,
+        "update path must not fire a second grant.update audit row"
+    );
+    // Sanity: create count unchanged.
+    assert_eq!(
+        audit_count(&pool, s.user_id, "espp_purchase.create").await,
+        baseline_create
+    );
+    let update_payload = audit_last_payload(&pool, s.user_id, "espp_purchase.update").await;
+    assert_eq!(update_payload["notes_lift"], false);
+    assert_no_forbidden_keys(&update_payload, "espp_purchase.update-after-lift");
+
+    // A second purchase (distinct) must not fire the lift either.
+    let r = post(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/espp-purchases"),
+        json!({
+            "offeringDate": "2025-07-01",
+            "purchaseDate": "2025-12-15",
+            "fmvAtPurchase": "48.00",
+            "purchasePricePerShare": "40.00",
+            "sharesPurchased": 50,
+            "currency": "USD"
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(body["migratedFromNotes"], false);
 }
 
 #[tokio::test]

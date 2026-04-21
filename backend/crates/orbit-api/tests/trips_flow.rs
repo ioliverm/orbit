@@ -135,18 +135,30 @@ async fn trip_crud_happy_path_and_annual_tracker_embedded() {
     assert_eq!(payload["country"], "US");
     assert_eq!(payload["criteria_answered"], 5);
     assert_eq!(payload["employer_paid"], true);
-    for forbidden in [
-        "from_date",
-        "to_date",
-        "purpose",
-        "services_outside_spain",
-        "eligibility_criteria",
-    ] {
-        assert!(obj.get(forbidden).is_none(), "leaked key {forbidden}");
-    }
-    // Delete payload is empty.
+    // Positive allowlist: keys-set equals expected.
+    let got_keys: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+    let want_keys: std::collections::BTreeSet<&str> =
+        ["country", "criteria_answered", "employer_paid"]
+            .iter()
+            .copied()
+            .collect();
+    assert_eq!(got_keys, want_keys, "trip.create key set");
+    // Forbidden-fields sweep (T23, SEC-101).
+    assert_no_forbidden_keys(&payload, "trip.create");
+
+    // Update payload obeys the same shape.
+    let upd_payload = audit_last_payload(&pool, s.user_id, "trip.update").await;
+    assert_eq!(upd_payload.as_object().unwrap().len(), 3);
+    assert_no_forbidden_keys(&upd_payload, "trip.update");
+
+    // Delete payload is empty (no detail surface at all).
     let del_payload = audit_last_payload(&pool, s.user_id, "trip.delete").await;
     assert_eq!(del_payload.as_object().unwrap().len(), 0);
+    assert_no_forbidden_keys(&del_payload, "trip.delete");
+
+    // Cross-action sweep: every trip.* row for this user passes.
+    let scanned = assert_all_audit_payloads_clean(&pool, s.user_id, "trip.").await;
+    assert!(scanned >= 3, "expected ≥3 trip.* rows, got {scanned}");
 }
 
 #[tokio::test]
@@ -214,6 +226,84 @@ async fn trip_validation_rejects_bad_eligibility() {
     // bad country length.
     let mut b = trip_body();
     b["destinationCountry"] = json!("USA");
+    let r = post(
+        &app,
+        "/api/v1/trips",
+        b,
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn trip_criteria_shape_strict_validation() {
+    // Edge cases (T23, AC-5.2.3):
+    //   - extra key beyond the five allowed → 422 `unknown_key`.
+    //   - non-boolean value → 422.
+    //   - exactly-five expected keys all present → accepted.
+    let (state, app) = app().await;
+    let s = onboarded_with_grant(&state, &app, "trip-criteria").await;
+
+    // Extra key (above the five-key allowlist).
+    let mut b = trip_body();
+    b["eligibilityCriteria"]
+        .as_object_mut()
+        .unwrap()
+        .insert("fabricated_criterion".into(), json!(true));
+    let r = post(
+        &app,
+        "/api/v1/trips",
+        b,
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let fields = body["error"]["details"]["fields"].as_array().unwrap();
+    // Field path is `eligibilityCriteria.{key}` for per-key errors; the
+    // unknown-key error surfaces the offending key in the field path.
+    assert!(
+        fields.iter().any(|f| f["code"] == "unknown_key"
+            && f["field"]
+                .as_str()
+                .unwrap_or("")
+                .starts_with("eligibilityCriteria")),
+        "expected unknown_key error scoped to eligibilityCriteria.*: {body}"
+    );
+
+    // Non-boolean value (string instead of bool).
+    let mut b = trip_body();
+    b["eligibilityCriteria"]["not_tax_haven"] = json!("yes");
+    let r = post(
+        &app,
+        "/api/v1/trips",
+        b,
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let fields = body["error"]["details"]["fields"].as_array().unwrap();
+    assert!(
+        fields
+            .iter()
+            .any(|f| f["field"].as_str().unwrap_or("").contains("not_tax_haven")),
+        "non-boolean criterion must surface the offending field"
+    );
+
+    // Non-boolean (number). Should also reject.
+    let mut b = trip_body();
+    b["eligibilityCriteria"]["within_annual_cap"] = json!(1);
     let r = post(
         &app,
         "/api/v1/trips",

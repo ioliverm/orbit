@@ -221,6 +221,504 @@
         "finalCumulativeVestedScaled": 1234567,
         "finalCumulativeAwaitingScaled": 0
       }
+    },
+    {
+      "_comment": "Slice 2 T23 — three employers; Alpha carries a double-trigger RSU (awaiting-liquidity) plus an NSO (vested). Exercises per-employer sum-equals-total + the mixed-instrument drill-down + the combined vested+awaiting partition at once.",
+      "name": "three-employers-mixed-instrument-and-double-trigger",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "77777777-7777-4777-8777-777777777701",
+          "employerName": "Alpha",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 480000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 48,
+            "cliffMonths": 12,
+            "cadence": "monthly",
+            "doubleTrigger": true,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "77777777-7777-4777-8777-777777777702",
+          "employerName": "Alpha",
+          "instrument": "nso",
+          "createdAt": "2024-02-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-02-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "77777777-7777-4777-8777-777777777703",
+          "employerName": "Bravo",
+          "instrument": "rsu",
+          "createdAt": "2024-03-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 240000000,
+            "vestingStart": "2024-03-15",
+            "vestingTotalMonths": 24,
+            "cliffMonths": 6,
+            "cadence": "quarterly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "77777777-7777-4777-8777-777777777704",
+          "employerName": "Charlie",
+          "instrument": "espp",
+          "createdAt": "2024-04-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 50000000,
+            "vestingStart": "2024-04-15",
+            "vestingTotalMonths": 6,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 3,
+        "employerNames": ["Alpha", "Bravo", "Charlie"],
+        "employerGrantIdCounts": [2, 1, 1],
+        "combinedPointCount": 47,
+        "finalCumulativeVestedScaled": 410000000,
+        "finalCumulativeAwaitingScaled": 480000000,
+        "instrumentsPresentInBreakdown": ["rsu", "nso", "espp"]
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — two grants with identical created_at. The stacker's tie-break is (vest_date, created_at, grant_id); with the first two fields tied, grant_id is the deciding key. Output order must be stable.",
+      "name": "tie-break-same-created-at-grant-id-orders",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "88888888-8888-4888-8888-888888888801",
+          "employerName": "TieBreak",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 60000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 6,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "88888888-8888-4888-8888-888888888802",
+          "employerName": "TieBreak",
+          "instrument": "nso",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 60000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 6,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["TieBreak"],
+        "employerGrantIdCounts": [2],
+        "combinedPointCount": 6,
+        "finalCumulativeVestedScaled": 120000000,
+        "finalCumulativeAwaitingScaled": 0,
+        "instrumentsPresentInBreakdown": ["rsu", "nso"]
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — cliff == total_months, quarterly. Single event at the end; drives the degenerate-single-point branch in the stacker.",
+      "name": "single-grant-cliff-equals-total-quarterly",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "99999999-9999-4999-8999-999999999901",
+          "employerName": "CliffCo",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 100000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 24,
+            "cliffMonths": 24,
+            "cadence": "quarterly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["CliffCo"],
+        "employerGrantIdCounts": [1],
+        "combinedPointCount": 1,
+        "finalCumulativeVestedScaled": 100000000,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — one employer, two double-trigger RSUs. One has past liquidity → Vested; the other is pending → awaiting. The partition invariant is visible at the last point.",
+      "name": "mixed-double-trigger-liquidity-past-vs-pending",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01",
+          "employerName": "Mixed",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": true,
+            "liquidityEventDate": "2025-01-01"
+          }
+        },
+        {
+          "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02",
+          "employerName": "Mixed",
+          "instrument": "rsu",
+          "createdAt": "2024-03-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-03-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": true,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["Mixed"],
+        "employerGrantIdCounts": [2],
+        "combinedPointCount": 14,
+        "finalCumulativeVestedScaled": 120000000,
+        "finalCumulativeAwaitingScaled": 120000000
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — max fan-out: five disjoint employers, one minimal grant each. Exercises the top-level by_employer sort + single-grant-employer branch.",
+      "name": "five-employers-disjoint-minimal",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01",
+          "employerName": "Eco1",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 10000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 1,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb02",
+          "employerName": "Eco2",
+          "instrument": "rsu",
+          "createdAt": "2024-02-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 10000000,
+            "vestingStart": "2024-02-15",
+            "vestingTotalMonths": 1,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb03",
+          "employerName": "Eco3",
+          "instrument": "rsu",
+          "createdAt": "2024-03-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 10000000,
+            "vestingStart": "2024-03-15",
+            "vestingTotalMonths": 1,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb04",
+          "employerName": "Eco4",
+          "instrument": "rsu",
+          "createdAt": "2024-04-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 10000000,
+            "vestingStart": "2024-04-15",
+            "vestingTotalMonths": 1,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb05",
+          "employerName": "Eco5",
+          "instrument": "rsu",
+          "createdAt": "2024-05-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 10000000,
+            "vestingStart": "2024-05-15",
+            "vestingTotalMonths": 1,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 5,
+        "employerNames": ["Eco1", "Eco2", "Eco3", "Eco4", "Eco5"],
+        "employerGrantIdCounts": [1, 1, 1, 1, 1],
+        "combinedPointCount": 5,
+        "finalCumulativeVestedScaled": 50000000,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — two grants at the same employer sharing a vesting_start, so every vest_date has two events that must be grouped into one StackedPoint with a 2-row breakdown.",
+      "name": "identical-vest-dates-same-employer",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc01",
+          "employerName": "SameStart",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc02",
+          "employerName": "SameStart",
+          "instrument": "rsu",
+          "createdAt": "2024-02-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 240000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["SameStart"],
+        "employerGrantIdCounts": [2],
+        "combinedPointCount": 12,
+        "finalCumulativeVestedScaled": 360000000,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — share_count at the scaled NUMERIC(20,4) ceiling (1e16). Validates no overflow in the per-grant or per-employer sums.",
+      "name": "stress-max-scale-share-count",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
+          "employerName": "MaxScale",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 10000000000000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 48,
+            "cliffMonths": 12,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["MaxScale"],
+        "employerGrantIdCounts": [1],
+        "combinedPointCount": 37,
+        "finalCumulativeVestedScaled": 10000000000000000,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — today before the cliff. Every event is Upcoming; the dashboard still emits points (chart renders the future axis) but vested + awaiting both stay at zero.",
+      "name": "upcoming-only-events-before-cliff",
+      "today": "2024-01-16",
+      "grants": [
+        {
+          "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee01",
+          "employerName": "FutureCo",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 120000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 48,
+            "cliffMonths": 12,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["FutureCo"],
+        "employerGrantIdCounts": [1],
+        "combinedPointCount": 37,
+        "finalCumulativeVestedScaled": 0,
+        "finalCumulativeAwaitingScaled": 0
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — two employers both with RSU+NSO. Reinforces the mixed-instrument-preserves-per-instrument-totals property across more than one employer.",
+      "name": "two-employers-both-mixed-rsu-nso",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "ffffffff-ffff-4fff-8fff-ffffffffff01",
+          "employerName": "X",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 60000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "ffffffff-ffff-4fff-8fff-ffffffffff02",
+          "employerName": "X",
+          "instrument": "nso",
+          "createdAt": "2024-02-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 60000000,
+            "vestingStart": "2024-02-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "ffffffff-ffff-4fff-8fff-ffffffffff03",
+          "employerName": "Y",
+          "instrument": "rsu",
+          "createdAt": "2024-03-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 60000000,
+            "vestingStart": "2024-03-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        },
+        {
+          "id": "ffffffff-ffff-4fff-8fff-ffffffffff04",
+          "employerName": "Y",
+          "instrument": "nso",
+          "createdAt": "2024-04-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 60000000,
+            "vestingStart": "2024-04-15",
+            "vestingTotalMonths": 12,
+            "cliffMonths": 0,
+            "cadence": "monthly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 2,
+        "employerNames": ["X", "Y"],
+        "employerGrantIdCounts": [2, 2],
+        "combinedPointCount": 15,
+        "finalCumulativeVestedScaled": 240000000,
+        "finalCumulativeAwaitingScaled": 0,
+        "instrumentsPresentInBreakdown": ["rsu", "nso"]
+      }
+    },
+    {
+      "_comment": "Slice 2 T23 — 13 months quarterly. Tests the remainder-event branch (cadence doesn't divide total_months evenly).",
+      "name": "non-divisible-quarterly-13m-remainder",
+      "today": "2030-01-01",
+      "grants": [
+        {
+          "id": "12121212-1212-4121-8121-121212121201",
+          "employerName": "Quarterly13",
+          "instrument": "rsu",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "vesting": {
+            "shareCountScaled": 10000000,
+            "vestingStart": "2024-01-15",
+            "vestingTotalMonths": 13,
+            "cliffMonths": 0,
+            "cadence": "quarterly",
+            "doubleTrigger": false,
+            "liquidityEventDate": null
+          }
+        }
+      ],
+      "expected": {
+        "employerCount": 1,
+        "employerNames": ["Quarterly13"],
+        "employerGrantIdCounts": [1],
+        "combinedPointCount": 5,
+        "finalCumulativeVestedScaled": 10000000,
+        "finalCumulativeAwaitingScaled": 0
+      }
     }
   ]
 }

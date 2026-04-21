@@ -425,3 +425,152 @@ pub async fn audit_pool() -> PgPool {
         pool_from_env("DATABASE_URL").await
     }
 }
+
+// ---------------------------------------------------------------------------
+// Forbidden-fields registry (SEC-101 cross-action sweep)
+// ---------------------------------------------------------------------------
+
+/// Keys that MUST NOT appear in any Slice-2 `audit_log.payload_summary`.
+///
+/// Consolidates the per-file allowlist assertions into one registry so a
+/// regression that leaks (for example) `raw_ip` into `session.revoke`
+/// trips every sweep, not just the handler that introduced it. The list
+/// is intentionally inclusive of both camelCase and snake_case spellings
+/// because `payload_summary` is authored by handlers as JSON objects;
+/// the audit-log serializer does not re-case.
+///
+/// Walk the JSON recursively (objects + arrays) and assert NONE of these
+/// keys appear anywhere. Slice-1 "allowlist" probes asserted a positive
+/// set ("exactly these 4 keys"); this registry asserts the negative
+/// space — catches regressions where a handler adds a new field without
+/// any of the existing tests noticing.
+pub const FORBIDDEN_IN_ANY_AUDIT_PAYLOAD: &[&str] = &[
+    // ESPP purchase detail (AC-4.3.2).
+    "share_count",
+    "shares_purchased",
+    "sharesPurchased",
+    "strike_amount",
+    "strikeAmount",
+    "fmv_at_purchase",
+    "fmvAtPurchase",
+    "fmv_at_offering",
+    "fmvAtOffering",
+    "purchase_price_per_share",
+    "purchasePricePerShare",
+    "employer_discount_percent",
+    "employerDiscountPercent",
+    "offering_date",
+    "offeringDate",
+    "purchase_date",
+    "purchaseDate",
+    // Trip detail (AC-5.2.8, §13 step 18).
+    "from_date",
+    "fromDate",
+    "to_date",
+    "toDate",
+    "destination_country",
+    "destinationCountry",
+    "purpose",
+    "eligibility_criteria",
+    "eligibilityCriteria",
+    "services_outside_spain",
+    "non_spanish_employer",
+    "not_tax_haven",
+    "no_double_exemption",
+    "within_annual_cap",
+    // M720 detail (AC-6.2.4).
+    "amount_eur",
+    "amountEur",
+    "total_eur",
+    "totalEur",
+    "reference_date",
+    "referenceDate",
+    // User identity / PII.
+    "email",
+    "email_hash",
+    "emailHash",
+    "notes",
+    // Session detail (AC-7.3.2, SEC-054).
+    "ip",
+    "raw_ip",
+    "rawIp",
+    "ip_address",
+    "ipAddress",
+    "ip_hash",
+    "ipHash",
+    "session_id_hash",
+    "sessionIdHash",
+    "refresh_token_hash",
+    "refreshTokenHash",
+    "family_id",
+    "familyId",
+    "user_agent",
+    "userAgent",
+];
+
+/// Recursively walk a JSON value and assert none of the
+/// [`FORBIDDEN_IN_ANY_AUDIT_PAYLOAD`] keys appear anywhere.
+///
+/// `context` is a human-readable label (usually the action name) surfaced
+/// on failure so the test report points at the offending row without
+/// requiring a debugger.
+pub fn assert_no_forbidden_keys(payload: &Value, context: &str) {
+    let mut path = Vec::<String>::new();
+    walk(payload, &mut path, context);
+
+    fn walk(v: &Value, path: &mut Vec<String>, context: &str) {
+        match v {
+            Value::Object(obj) => {
+                for (k, child) in obj {
+                    for forbidden in FORBIDDEN_IN_ANY_AUDIT_PAYLOAD {
+                        assert!(
+                            k != forbidden,
+                            "[{context}] forbidden key '{forbidden}' at path {}{k}",
+                            if path.is_empty() {
+                                String::new()
+                            } else {
+                                format!("{}.", path.join("."))
+                            },
+                        );
+                    }
+                    path.push(k.clone());
+                    walk(child, path, context);
+                    path.pop();
+                }
+            }
+            Value::Array(arr) => {
+                for (i, child) in arr.iter().enumerate() {
+                    path.push(format!("[{i}]"));
+                    walk(child, path, context);
+                    path.pop();
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Fetch every row of `(action, payload_summary)` for this user and run
+/// [`assert_no_forbidden_keys`] against each. Returns the number of rows
+/// scanned for the caller's own sanity check.
+pub async fn assert_all_audit_payloads_clean(
+    pool: &PgPool,
+    user_id: Uuid,
+    action_prefix: &str,
+) -> usize {
+    let rows: Vec<(String, Value)> = sqlx::query_as(
+        "SELECT action, payload_summary FROM audit_log \
+         WHERE user_id = $1 AND action LIKE $2 \
+         ORDER BY occurred_at ASC",
+    )
+    .bind(user_id)
+    .bind(format!("{action_prefix}%"))
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    let n = rows.len();
+    for (action, payload) in &rows {
+        assert_no_forbidden_keys(payload, action);
+    }
+    n
+}

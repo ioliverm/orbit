@@ -224,3 +224,153 @@ async fn revoke_all_others_preserves_current_and_reports_count() {
     assert_eq!(payload["count"], 2);
     assert_eq!(payload.as_object().unwrap().len(), 3);
 }
+
+#[tokio::test]
+async fn session_revoke_audit_payload_allowlist_is_strict() {
+    // SEC-101 + T23: revoke-one + revoke-all-others each write exactly-
+    // key-set payloads per ADR-016 §3. No raw IP, no hash values, no
+    // country strings, no session id.
+    let (state, app) = app().await;
+    let primary = signup_verified(&state, &app, "s-allow").await;
+    let _sec_a = second_session_for(&state, &app, &primary).await;
+    let _sec_b = second_session_for(&state, &app, &primary).await;
+
+    // Revoke one.
+    let body = list_sessions_raw(&app, &primary).await;
+    let target = body["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["isCurrent"] == false)
+        .unwrap();
+    let target_id = target["id"].as_str().unwrap().to_string();
+    let r = delete(
+        &app,
+        &format!("/api/v1/auth/sessions/{target_id}"),
+        vec![
+            (header::COOKIE.as_str(), primary.cookie.clone()),
+            ("x-csrf-token", primary.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::NO_CONTENT);
+
+    // Revoke all others (the remaining non-current).
+    let r = post(
+        &app,
+        "/api/v1/auth/sessions/revoke-all-others",
+        json!({}),
+        vec![
+            (header::COOKIE.as_str(), primary.cookie.clone()),
+            ("x-csrf-token", primary.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::OK);
+
+    let pool = audit_pool().await;
+
+    // Single-revoke payload: exactly {kind, initiator}.
+    let rows: Vec<(String, serde_json::Value)> = sqlx::query_as(
+        "SELECT action, payload_summary FROM audit_log \
+         WHERE user_id = $1 AND action = 'session.revoke' \
+         ORDER BY occurred_at ASC",
+    )
+    .bind(primary.user_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(rows.len(), 2, "expected 2 session.revoke rows");
+
+    // Row 0: single.
+    let single = &rows[0].1;
+    let obj = single.as_object().unwrap();
+    assert_eq!(obj.len(), 2, "single payload should be exactly 2 keys");
+    let got: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+    let want: std::collections::BTreeSet<&str> = ["kind", "initiator"].iter().copied().collect();
+    assert_eq!(got, want, "session.revoke (single) key set");
+    assert_eq!(single["kind"], "single");
+    assert_eq!(single["initiator"], "self");
+    assert_no_forbidden_keys(single, "session.revoke.single");
+
+    // Row 1: bulk.
+    let bulk = &rows[1].1;
+    let obj = bulk.as_object().unwrap();
+    assert_eq!(obj.len(), 3, "bulk payload should be exactly 3 keys");
+    let got: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+    let want: std::collections::BTreeSet<&str> =
+        ["kind", "initiator", "count"].iter().copied().collect();
+    assert_eq!(got, want, "session.revoke (bulk) key set");
+    assert_eq!(bulk["kind"], "bulk");
+    assert_eq!(bulk["initiator"], "self");
+    assert!(bulk["count"].is_number());
+    assert_no_forbidden_keys(bulk, "session.revoke.bulk");
+
+    // Cross-action sweep.
+    let scanned = assert_all_audit_payloads_clean(&pool, primary.user_id, "session.").await;
+    assert!(
+        scanned >= 2,
+        "expected ≥2 session.* rows for this user, got {scanned}"
+    );
+}
+
+#[tokio::test]
+async fn concurrent_revoke_same_target_writes_one_audit_row() {
+    // T23 edge case: two concurrent DELETEs on the same session id race;
+    // exactly one lands a `session.revoke` audit row. The other returns
+    // 404 NotFound (sessions_mgmt::revoke_other already returns
+    // RevokeOtherOutcome::NotFound on the loser — that branch does NOT
+    // call audit::record_wizard).
+    let (state, app) = app().await;
+    let primary = signup_verified(&state, &app, "s-conc").await;
+    let _secondary = second_session_for(&state, &app, &primary).await;
+
+    let body = list_sessions_raw(&app, &primary).await;
+    let target_id = body["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["isCurrent"] == false)
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let pool = audit_pool().await;
+    let baseline = audit_count(&pool, primary.user_id, "session.revoke").await;
+
+    // Fire both DELETEs concurrently.
+    let path = format!("/api/v1/auth/sessions/{target_id}");
+    let hdrs = vec![
+        (header::COOKIE.as_str(), primary.cookie.clone()),
+        ("x-csrf-token", primary.csrf.clone()),
+    ];
+    let (r1, r2) = tokio::join!(
+        delete(&app, &path, hdrs.clone()),
+        delete(&app, &path, hdrs.clone()),
+    );
+    let statuses = [r1.status(), r2.status()];
+    let ok_count = statuses
+        .iter()
+        .filter(|s| **s == StatusCode::NO_CONTENT)
+        .count();
+    let not_found_count = statuses
+        .iter()
+        .filter(|s| **s == StatusCode::NOT_FOUND)
+        .count();
+    assert_eq!(
+        ok_count, 1,
+        "exactly one concurrent revoke should succeed: {statuses:?}"
+    );
+    assert_eq!(
+        not_found_count, 1,
+        "the losing concurrent revoke should 404: {statuses:?}"
+    );
+
+    let after = audit_count(&pool, primary.user_id, "session.revoke").await;
+    assert_eq!(
+        after - baseline,
+        1,
+        "exactly one session.revoke audit row must land for the winning call"
+    );
+}

@@ -85,9 +85,57 @@ async fn m720_insert_close_and_create_and_updated_same_day() {
         payload["outcome"].as_str().unwrap(),
         "inserted" | "closed_and_created" | "updated_same_day"
     ));
-    for forbidden in ["amount_eur", "total_eur", "reference_date"] {
-        assert!(obj.get(forbidden).is_none(), "leaked {forbidden}");
-    }
+    let got_keys: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+    let want_keys: std::collections::BTreeSet<&str> =
+        ["category", "outcome"].iter().copied().collect();
+    assert_eq!(got_keys, want_keys, "modelo_720_inputs.upsert key set");
+    // Forbidden-fields sweep (T23, SEC-101).
+    assert_no_forbidden_keys(&payload, "modelo_720_inputs.upsert");
+    let scanned = assert_all_audit_payloads_clean(&pool, s.user_id, "modelo_720_inputs.").await;
+    assert!(scanned >= 2, "expected ≥2 m720 rows, got {scanned}");
+}
+
+#[tokio::test]
+async fn m720_noop_branch_writes_no_audit_row_and_returns_unchanged() {
+    // Edge case (T23, AC-6.2.5): save the same value twice, second call
+    // is a NoOp — 200 + `unchanged: true`. No second audit row lands.
+    let (state, app) = app().await;
+    let s = onboarded_with_grant(&state, &app, "m720-noop-edge").await;
+    let pool = audit_pool().await;
+
+    // Baseline.
+    let baseline = audit_count(&pool, s.user_id, "modelo_720_inputs.upsert").await;
+
+    // First save → Inserted.
+    let r = upsert(&app, &s, "real_estate", "5000.00").await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(body["outcome"], "inserted");
+    assert_eq!(
+        audit_count(&pool, s.user_id, "modelo_720_inputs.upsert").await,
+        baseline + 1
+    );
+
+    // Second save, identical value → NoOp. No extra audit row.
+    let r = upsert(&app, &s, "real_estate", "5000.00").await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["outcome"], "no_op");
+    assert_eq!(body["unchanged"], true);
+    assert_eq!(
+        audit_count(&pool, s.user_id, "modelo_720_inputs.upsert").await,
+        baseline + 1,
+        "NoOp must not write an audit row"
+    );
+
+    // A genuine change fires a new audit row (control group).
+    let r = upsert(&app, &s, "real_estate", "6000.00").await;
+    let (status, _c, _b) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        audit_count(&pool, s.user_id, "modelo_720_inputs.upsert").await,
+        baseline + 2
+    );
 }
 
 #[tokio::test]

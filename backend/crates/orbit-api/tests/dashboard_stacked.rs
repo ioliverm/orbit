@@ -136,3 +136,50 @@ async fn stacked_dashboard_mixed_instruments_carries_instrument_label() {
         "mixed instruments visible in drill-down"
     );
 }
+
+#[tokio::test]
+async fn stacked_dashboard_empty_portfolio_returns_arrays_not_nulls() {
+    // T23 edge: a user who has completed onboarding up through the
+    // `first_grant` step (disclaimer + residency committed, no grant
+    // yet) can reach `/dashboard/stacked` — the onboarding middleware
+    // `require_first_grant_or_later` admits users AT `first_grant` so
+    // the SPA can render the pre-first-grant dashboard shell without
+    // a 403. The response must be `{ byEmployer: [], combined: [] }` —
+    // arrays not nulls, no extra diagnostic keys.
+    //
+    // This pins the AC-8.2.8 contract the frontend's
+    // `EmployerPortfolioPanel` relies on (`stacked?.byEmployer ?? []`):
+    // a server drift to `null` would still hydrate the UI correctly
+    // thanks to the nullish-coalesce, but it would break the TS type
+    // and any downstream consumer that iterates without a guard.
+    let (state, app) = app().await;
+    let s = onboarded(&state, &app, "st-eg").await;
+
+    let r = get(
+        &app,
+        "/api/v1/dashboard/stacked",
+        vec![(header::COOKIE.as_str(), s.cookie.clone())],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK, "empty-portfolio stacked: {body}");
+
+    assert!(
+        body["byEmployer"].is_array(),
+        "byEmployer must be array: {body}"
+    );
+    assert!(
+        body["combined"].is_array(),
+        "combined must be array: {body}"
+    );
+    assert_eq!(body["byEmployer"].as_array().unwrap().len(), 0);
+    assert_eq!(body["combined"].as_array().unwrap().len(), 0);
+
+    // Valid JSON object with exactly those two keys (no diagnostic /
+    // placeholder fields leaking through).
+    let obj = body.as_object().unwrap();
+    let got: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
+    let want: std::collections::BTreeSet<&str> =
+        ["byEmployer", "combined"].iter().copied().collect();
+    assert_eq!(got, want, "empty stacked payload key set");
+}
