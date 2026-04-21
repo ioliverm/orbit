@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Rule-set chip (reference fragment)</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  rule-set-chip.html — Slice 3 §7 (AC-7.1..7.6).
+
+  NOT a full page. A style fragment that renders the footer chip in its
+  three states plus its open popover side-by-side so engineers can see
+  every pixel in one place. The four "states" exercised here are:
+
+    1. Fresh state (AC-4.5.1 + AC-7.1.3)  — the default rendering,
+       no staleness overlay.
+    2. Stale ≤ 2 days (AC-4.5.2 + AC-7.1.4) — chip appends
+       "· stale 2 días" with a warning tone.
+    3. Stale ≥ 3 days (AC-4.5.3) — same chip + the separate
+       dashboard-level banner (for reference only; the banner is
+       NOT part of the chip's responsibility, but it ships together).
+    4. Unavailable (AC-4.5.4) — chip is NOT rendered at all; included
+       here as a "render nothing" state for completeness.
+
+  The open popover (AC-7.1.5) is drawn next to the fresh chip. Copy is
+  exactly what the AC text specifies: "Qué muestra esto" link + short
+  explainer of ECB + motor. No marketing, no additional helpful
+  content — AC §7 is deliberate about the stub state.
+
+  Accessibility:
+    - The chip is an <a> to /app/help/chip-explainer, so keyboard
+      focusable by default with focus-visible ring from shared.css.
+    - The popover uses role="dialog" when floated over the chip in
+      production; in this reference it is statically placed so the
+      role is omitted (it is not actually a modal here).
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<main id="main" class="content">
+  <div class="page-title">
+    <div>
+      <h1>Rule-set chip · referencia visual</h1>
+      <div class="page-title__meta">
+        Fragmento de footer + popover — AC-7.1.1..5 (Slice 3). Ver <a href="dashboard-slice-3.html">dashboard-slice-3.html</a> para el chip en contexto.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       State 1 — fresh (default) + popover open side-by-side.
+       ============================================================ -->
+  <section class="stack gap-3 mb-8" aria-labelledby="s1-title">
+    <h2 id="s1-title">Estado 1 · fresh (por defecto)</h2>
+    <p class="text-sm muted">
+      Renderizado en el footer cuando al menos una cifra de la página depende del tipo de cambio ECB (AC-7.1.1). El chip es un enlace a <span class="mono">/app/help/chip-explainer</span>.
+    </p>
+
+    <div class="chip-demo">
+      <!-- Chip (what renders in the actual page footer). -->
+      <a class="chip" href="/app/help/chip-explainer" aria-label="Reglas usadas para calcular las cifras de esta página">
+        <span class="chip__dot" aria-hidden="true"></span>
+        Reglas: ECB · 17 abr 2026 · motor v0.0.0
+      </a>
+
+      <!-- Popover (what renders when the chip is activated). -->
+      <aside class="chip-popover" aria-labelledby="cp-title">
+        <h3 class="chip-popover__title" id="cp-title">Qué muestra este chip</h3>
+        <div class="chip-popover__meta">
+          <span>ECB · 17 abr 2026</span>
+          <span>motor v0.0.0</span>
+        </div>
+        <div class="chip-popover__term">
+          <span class="chip-popover__term-label">ECB</span>
+          <span class="chip-popover__term-body">
+            Fecha de publicación del tipo de cambio usado (Banco Central Europeo, referencia diaria).
+          </span>
+        </div>
+        <div class="chip-popover__term">
+          <span class="chip-popover__term-label">motor</span>
+          <span class="chip-popover__term-body">
+            Versión del motor de Orbit que produjo las cifras de esta página.
+          </span>
+        </div>
+        <a class="chip-popover__cta" href="/app/help/chip-explainer">Qué muestra esto →</a>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       State 2 — stale ≤ 2 days (AC-4.5.2 / AC-7.1.4).
+       ============================================================ -->
+  <section class="stack gap-3 mb-8" aria-labelledby="s2-title">
+    <h2 id="s2-title">Estado 2 · stale ≤ 2 días</h2>
+    <p class="text-sm muted">
+      Texto "· stale {N} día(s)" añadido al chip. Tono <span class="mono">chip--superseded</span> (reutilizado de Slice 1). Sin banner bloqueante.
+    </p>
+    <div class="chip-demo__footer">
+      <span>Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="spacer"></span>
+      <a class="chip chip--superseded" href="/app/help/chip-explainer" aria-label="Reglas usadas — tipo de cambio con 2 días de retraso">
+        <span class="chip__dot" aria-hidden="true"></span>
+        Reglas: ECB · 15 abr 2026 · motor v0.0.0 · stale 2 días
+      </a>
+      <a class="back-link" href="/app/help/chip-explainer">Qué muestra esto</a>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       State 3 — stale ≥ 3 days (AC-4.5.3).
+       ============================================================ -->
+  <section class="stack gap-3 mb-8" aria-labelledby="s3-title">
+    <h2 id="s3-title">Estado 3 · stale ≥ 3 días</h2>
+    <p class="text-sm muted">
+      El chip se mantiene; ADEMÁS se renderiza un banner en la parte superior del dashboard. Aquí se muestra el banner por referencia — no forma parte del chip en sí.
+    </p>
+
+    <aside class="alert alert--warning mb-3" role="region" aria-labelledby="s3-banner-title">
+      <strong id="s3-banner-title">Los tipos de cambio ECB no se han actualizado en 4 días</strong>
+      <p>Las cifras en EUR pueden estar materialmente desfasadas. El botón de cerrar oculta este aviso sólo para la sesión.</p>
+      <div class="row gap-3">
+        <button class="btn btn--ghost btn--sm" type="button">Cerrar por ahora</button>
+      </div>
+    </aside>
+
+    <div class="chip-demo__footer">
+      <span>Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="spacer"></span>
+      <a class="chip chip--superseded" href="/app/help/chip-explainer" aria-label="Reglas usadas — tipo de cambio con 4 días de retraso">
+        <span class="chip__dot" aria-hidden="true"></span>
+        Reglas: ECB · 13 abr 2026 · motor v0.0.0 · stale 4 días
+      </a>
+      <a class="back-link" href="/app/help/chip-explainer">Qué muestra esto</a>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       State 4 — unavailable (AC-4.5.4): chip NOT rendered.
+       ============================================================ -->
+  <section class="stack gap-3 mb-8" aria-labelledby="s4-title">
+    <h2 id="s4-title">Estado 4 · ECB no disponible (walkback agotado)</h2>
+    <p class="text-sm muted">
+      El chip <strong>no se renderiza</strong> (AC-4.5.4 + AC-7.1.2). El footer vuelve al formato Slice-1/2 de sólo copy.
+    </p>
+    <div class="chip-demo__footer">
+      <span>Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Surface coverage reminder (AC-7.1.1 / 7.1.2).
+       ============================================================ -->
+  <section class="stack gap-3 mb-8" aria-labelledby="s5-title">
+    <h2 id="s5-title">Dónde aparece y dónde no</h2>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th scope="col">Superficie</th>
+          <th scope="col">Chip visible</th>
+          <th scope="col">Motivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Dashboard (con ganancias en papel)</th>
+          <td>Sí</td>
+          <td>La tile muestra un EUR dependiente de FX.</td>
+        </tr>
+        <tr>
+          <th scope="row">Perfil · Modelo 720</th>
+          <td>Sí</td>
+          <td>Fila "Valores" derivada vía FX.</td>
+        </tr>
+        <tr>
+          <th scope="row">Grant-detail (con FMV introducido)</th>
+          <td>Sí</td>
+          <td>Precios de vesting alimentan el dashboard.</td>
+        </tr>
+        <tr>
+          <th scope="row">Viajes Art. 7.p</th>
+          <td>No</td>
+          <td>Sin cifra dependiente de FX.</td>
+        </tr>
+        <tr>
+          <th scope="row">Sesiones activas</th>
+          <td>No</td>
+          <td>Sin cifra dependiente de FX.</td>
+        </tr>
+        <tr>
+          <th scope="row">Residency setup / signup</th>
+          <td>No</td>
+          <td>Aún no hay datos para calcular.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer class="disclaimer" role="contentinfo">
+    <span class="disclaimer__text">Fragmento visual — no forma parte de ninguna ruta de producto.</span>
+  </footer>
+</main>
+
+</body>
+</html>
