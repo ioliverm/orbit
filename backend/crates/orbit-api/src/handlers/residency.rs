@@ -193,9 +193,9 @@ pub async fn create(
             .execute(tx.as_executor())
             .await?;
     }
-    tx.commit().await?;
 
-    // Audit summary: booleans only (SEC-101 / AC-4.1.8) — never the values.
+    // Audit summary: booleans only (SEC-101 / AC-4.1.8) — never the
+    // values. Rides the same tx as the residency write (T25 / S1).
     let autonomia_changed = prior
         .as_ref()
         .map(|p| p.sub_jurisdiction.as_deref() != sub)
@@ -209,8 +209,8 @@ pub async fn create(
     let currency_changed = prior_currency != body.primary_currency;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::ResidencyCreate,
         auth.user_id,
         Some(new_row.id),
@@ -222,6 +222,7 @@ pub async fn create(
         }),
     )
     .await?;
+    tx.commit().await?;
 
     let body = ResidencyResponse {
         residency: ResidencyDto {

@@ -683,10 +683,10 @@ pub async fn revoke_session(
 
     match outcome {
         orbit_db::sessions_mgmt::RevokeOtherOutcome::Revoked => {
-            tx.commit().await.map_err(|_| AppError::Internal)?;
             let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-            audit::record_wizard(
-                &state.pool,
+            // Audit rides the same tx as the UPDATE (T25 / S1).
+            audit::record_wizard_in_tx(
+                tx.as_executor(),
                 WizardAction::SessionRevoke,
                 auth.user_id,
                 Some(target_id),
@@ -694,6 +694,7 @@ pub async fn revoke_session(
                 json!({ "kind": "single", "initiator": "self" }),
             )
             .await?;
+            tx.commit().await.map_err(|_| AppError::Internal)?;
             Ok(StatusCode::NO_CONTENT.into_response())
         }
         orbit_db::sessions_mgmt::RevokeOtherOutcome::CannotRevokeCurrent => {
@@ -719,18 +720,25 @@ pub async fn revoke_all_others(
     let count = orbit_db::sessions_mgmt::revoke_all_others(&mut tx, auth.user_id, auth.session_id)
         .await
         .map_err(|_| AppError::Internal)?;
-    tx.commit().await.map_err(|_| AppError::Internal)?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    // Audit rides inside the same tx as the bulk UPDATE (T25 / S1).
+    // `target_id = None` on bulk: there is no single target session —
+    // pointing at the survivor (the caller's current session, which is
+    // explicitly the ONE row NOT revoked) would be misleading for
+    // audit consumers. `record_wizard_in_tx` falls back to `user_id`
+    // for the column default (see audit.rs) which is the correct
+    // semantics for a user-scoped bulk action (T25 / S3).
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::SessionRevoke,
         auth.user_id,
-        Some(auth.session_id),
+        None,
         ip_hash.as_ref().map(|s| &s[..]),
         json!({ "kind": "bulk", "initiator": "self", "count": count }),
     )
     .await?;
+    tx.commit().await.map_err(|_| AppError::Internal)?;
 
     Ok((StatusCode::OK, Json(json!({ "revokedCount": count }))).into_response())
 }
@@ -763,6 +771,12 @@ async fn issue_session_tx(
     let family_id = Uuid::new_v4();
     let ip_bytes: &[u8] = ip_hash.map(|h| &h[..]).unwrap_or(&[0u8; 32][..]);
 
+    // `sessions.country_iso2` is reserved in Slice 2 and populated in
+    // Slice 3 alongside the Finnhub / FX / uptime-monitor procurement
+    // cycle (T25 / S-2.2 + ADR-016 §9.2). Until then the column is
+    // left NULL at INSERT time; the sessions-list UI renders the
+    // "ubicación desconocida" branch for every row, which is the
+    // documented Slice-2 state.
     sqlx::query(
         r#"
         INSERT INTO sessions (

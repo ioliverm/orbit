@@ -115,7 +115,6 @@ pub async fn upsert(
     let outcome =
         orbit_db::modelo_720_inputs::create_or_upsert_same_day(&mut tx, auth.user_id, &form)
             .await?;
-    tx.commit().await?;
 
     let (status, outcome_label, write_audit) = match &outcome {
         UpsertOutcome::Inserted(_) => (StatusCode::CREATED, "inserted", true),
@@ -126,8 +125,8 @@ pub async fn upsert(
 
     if write_audit {
         let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-        audit::record_wizard(
-            &state.pool,
+        audit::record_wizard_in_tx(
+            tx.as_executor(),
             WizardAction::Modelo720Upsert,
             auth.user_id,
             Some(outcome.row().id),
@@ -139,6 +138,7 @@ pub async fn upsert(
         )
         .await?;
     }
+    tx.commit().await?;
 
     let dto: Modelo720InputDto = outcome.row().clone().into();
     let mut body = json!({

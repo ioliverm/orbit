@@ -9,7 +9,7 @@
 use hmac::{Hmac, Mac};
 use serde_json::Value;
 use sha2::Sha256;
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -164,13 +164,54 @@ pub async fn record_auth(
     Ok(())
 }
 
-/// INSERT an audit row for a wizard / grant action. Runs on the pool
-/// because `audit_log` is not RLS-scoped; callers that already hold a
-/// `Tx::for_user` can just pass the pool and don't need to thread the
-/// audit write through their transaction (the DB keeps integrity via the
-/// handler's commit/rollback of the underlying mutation — a committed
-/// residency/grant write without its audit row is a correctness bug we
-/// prevent by ordering the audit INSERT before the outer `tx.commit()`).
+/// INSERT an audit row for a wizard / grant action inside an existing
+/// per-user transaction.
+///
+/// The audit INSERT rides on the same `Tx::for_user` that drove the
+/// handler's mutation and MUST be issued **before** `tx.commit()`. This
+/// closes the post-commit-crash window where a committed mutation could
+/// miss its audit row: either both land or neither does (T25 / S1). The
+/// `orbit_app` role has INSERT on `audit_log`; the table is not RLS-
+/// scoped, so the per-user GUC does not block the write — the tx
+/// membership is what we're after, not tenant scoping.
+///
+/// Call sites that genuinely have no user-scoped tx (e.g. the pre-tx
+/// signup-failure branch) stay on [`record_wizard`] / [`record_auth`],
+/// which run against the pool.
+pub async fn record_wizard_in_tx(
+    conn: &mut PgConnection,
+    action: WizardAction,
+    user_id: Uuid,
+    target_id: Option<Uuid>,
+    ip_hash: Option<&[u8]>,
+    payload: Value,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO audit_log (
+            user_id, actor_kind, action, target_kind, target_id,
+            ip_hash, payload_summary
+        )
+        VALUES ($1, 'user', $2, $3, $4, $5, $6)
+        "#,
+    )
+    .bind(user_id)
+    .bind(action.as_str())
+    .bind(action.target_kind())
+    .bind(target_id.unwrap_or(user_id))
+    .bind(ip_hash)
+    .bind(payload)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// INSERT an audit row for a wizard / grant action against the pool.
+/// Retained for the small set of handlers that have no user-scoped tx
+/// at the point of the audit write (signup failure, verify-email
+/// failure pre-tx). Handlers WITH a tx must use
+/// [`record_wizard_in_tx`] so the audit row is atomic with the
+/// mutation (T25 / S1).
 pub async fn record_wizard(
     pool: &PgPool,
     action: WizardAction,

@@ -132,16 +132,19 @@ async fn trip_crud_happy_path_and_annual_tracker_embedded() {
     let payload = audit_last_payload(&pool, s.user_id, "trip.create").await;
     let obj = payload.as_object().unwrap();
     assert_eq!(obj.len(), 3);
-    assert_eq!(payload["country"], "US");
+    assert_eq!(payload["destination_country_iso2"], "US");
     assert_eq!(payload["criteria_answered"], 5);
     assert_eq!(payload["employer_paid"], true);
     // Positive allowlist: keys-set equals expected.
     let got_keys: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
-    let want_keys: std::collections::BTreeSet<&str> =
-        ["country", "criteria_answered", "employer_paid"]
-            .iter()
-            .copied()
-            .collect();
+    let want_keys: std::collections::BTreeSet<&str> = [
+        "destination_country_iso2",
+        "criteria_answered",
+        "employer_paid",
+    ]
+    .iter()
+    .copied()
+    .collect();
     assert_eq!(got_keys, want_keys, "trip.create key set");
     // Forbidden-fields sweep (T23, SEC-101).
     assert_no_forbidden_keys(&payload, "trip.create");

@@ -132,6 +132,21 @@ pub async fn create(
 
     let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id).await?;
 
+    // Serialize first-purchase POSTs on the same grant (T25 / S-2.1).
+    // Two concurrent callers would otherwise both observe an empty
+    // `existing` and both claim `notes_lift: true` in their audit
+    // payloads — stored state is still correct (one lift wins, the
+    // second finds `notes = NULL` and no-ops), but the audit log
+    // would misreport two lifts. Locking the parent grant row here
+    // closes the race. `user_id` guard is defense-in-depth alongside
+    // the RLS policy on `grants`.
+    sqlx::query("SELECT id FROM grants WHERE id = $1 AND user_id = $2 FOR UPDATE")
+        .bind(grant_id)
+        .bind(auth.user_id)
+        .fetch_optional(tx.as_executor())
+        .await?
+        .ok_or(AppError::NotFound)?;
+
     // Ownership + instrument check (ADR-016 §5.1 step 2). RLS already
     // filters cross-tenant rows to NotFound; explicit instrument check
     // lets us surface a clean 422 before the trigger fires.
@@ -202,11 +217,10 @@ pub async fn create(
     let purchase = insert_or_map_check_violation(
         orbit_db::espp_purchases::create(&mut tx, auth.user_id, &form).await,
     )?;
-    tx.commit().await?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::EsppPurchaseCreate,
         auth.user_id,
         Some(purchase.id),
@@ -219,6 +233,7 @@ pub async fn create(
         }),
     )
     .await?;
+    tx.commit().await?;
 
     let dto: EsppPurchaseDto = purchase.into();
     Ok((
@@ -298,11 +313,10 @@ pub async fn update(
         Err(sqlx::Error::RowNotFound) => return Err(AppError::NotFound),
         Err(e) => return Err(map_sqlx_err(e)),
     };
-    tx.commit().await?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::EsppPurchaseUpdate,
         auth.user_id,
         Some(purchase.id),
@@ -315,6 +329,7 @@ pub async fn update(
         }),
     )
     .await?;
+    tx.commit().await?;
 
     let dto: EsppPurchaseDto = purchase.into();
     Ok((StatusCode::OK, Json(json!({ "purchase": dto }))).into_response())
@@ -332,11 +347,10 @@ pub async fn delete(
         .await?
         .ok_or(AppError::NotFound)?;
     orbit_db::espp_purchases::delete(&mut tx, auth.user_id, id).await?;
-    tx.commit().await?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::EsppPurchaseDelete,
         auth.user_id,
         Some(id),
@@ -344,6 +358,7 @@ pub async fn delete(
         json!({ "currency": existing.currency }),
     )
     .await?;
+    tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT.into_response())
 }

@@ -153,11 +153,11 @@ describe('stacked_grants_cases.json — cross-implementation parity (AC-8.2.8)',
       // Final envelope sums.
       const last = out.combined[out.combined.length - 1]!;
       expect(
-        last.cumulativeVested,
+        last.cumulativeSharesVested,
         `${fx.name}: finalCumulativeVestedScaled`,
       ).toBe(BigInt(fx.expected.finalCumulativeVestedScaled));
       expect(
-        last.cumulativeAwaitingLiquidity,
+        last.cumulativeTimeVestedAwaitingLiquidity,
         `${fx.name}: finalCumulativeAwaitingScaled`,
       ).toBe(BigInt(fx.expected.finalCumulativeAwaitingScaled));
 

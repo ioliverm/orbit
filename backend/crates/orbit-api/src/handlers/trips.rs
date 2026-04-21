@@ -21,9 +21,14 @@
 //! of the five keys is `null`; the repo still accepts nulls for the edit
 //! form's prefill round-trip — the handler is the gatekeeper.
 //!
-//! Audit-log allowlist (SEC-101): `{ country, criteria_answered, employer_paid }`
-//! on create/update (country is low-entropy and already on the session
-//! row; dates and raw purpose text are excluded). `{}` on delete.
+//! Audit-log allowlist (SEC-101):
+//! `{ destination_country_iso2, criteria_answered, employer_paid }` on
+//! create/update (the country code is low-entropy and already on the
+//! session row; dates and raw purpose text are excluded). `{}` on
+//! delete. T25 / N2: the key is `destination_country_iso2` — not
+//! `country` or `destination_country` — to disambiguate from the DDL
+//! column name while still excluding raw destination strings from the
+//! forbidden-keys sweep.
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -128,23 +133,23 @@ pub async fn create(
 
     let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id).await?;
     let trip = orbit_db::art_7p_trips::create(&mut tx, auth.user_id, &form).await?;
-    tx.commit().await?;
 
     let criteria_answered = count_criteria_answered_true(&trip.eligibility_criteria);
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::TripCreate,
         auth.user_id,
         Some(trip.id),
         ip_hash.as_ref().map(|s| &s[..]),
         json!({
-            "country": trip.destination_country,
+            "destination_country_iso2": trip.destination_country,
             "criteria_answered": criteria_answered,
             "employer_paid": trip.employer_paid,
         }),
     )
     .await?;
+    tx.commit().await?;
 
     let dto: TripDto = trip.into();
     Ok((StatusCode::CREATED, Json(json!({ "trip": dto }))).into_response())
@@ -223,23 +228,23 @@ pub async fn update(
         Err(sqlx::Error::RowNotFound) => return Err(AppError::NotFound),
         Err(e) => return Err(e.into()),
     };
-    tx.commit().await?;
 
     let criteria_answered = count_criteria_answered_true(&trip.eligibility_criteria);
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::TripUpdate,
         auth.user_id,
         Some(trip.id),
         ip_hash.as_ref().map(|s| &s[..]),
         json!({
-            "country": trip.destination_country,
+            "destination_country_iso2": trip.destination_country,
             "criteria_answered": criteria_answered,
             "employer_paid": trip.employer_paid,
         }),
     )
     .await?;
+    tx.commit().await?;
 
     let dto: TripDto = trip.into();
     Ok((StatusCode::OK, Json(json!({ "trip": dto }))).into_response())
@@ -257,11 +262,10 @@ pub async fn delete(
         .await?
         .ok_or(AppError::NotFound)?;
     orbit_db::art_7p_trips::delete(&mut tx, auth.user_id, id).await?;
-    tx.commit().await?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::TripDelete,
         auth.user_id,
         Some(id),
@@ -269,6 +273,7 @@ pub async fn delete(
         json!({}),
     )
     .await?;
+    tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT.into_response())
 }

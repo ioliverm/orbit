@@ -463,13 +463,17 @@ pub const FORBIDDEN_IN_ANY_AUDIT_PAYLOAD: &[&str] = &[
     "offeringDate",
     "purchase_date",
     "purchaseDate",
-    // Trip detail (AC-5.2.8, §13 step 18).
+    // Trip detail (AC-5.2.8, §13 step 18). The trip create/update
+    // audit DOES ship a `destination_country_iso2` key (T25 / N2 —
+    // disambiguated from the DDL column name `destination_country`
+    // which would be forbidden-shadowed if we listed it here).
     "from_date",
     "fromDate",
     "to_date",
     "toDate",
     "destination_country",
     "destinationCountry",
+    "country",
     "purpose",
     "eligibility_criteria",
     "eligibilityCriteria",

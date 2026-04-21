@@ -201,11 +201,10 @@ pub async fn create(
     let events = vesting::derive_vesting_events(&grant_input, today).map_err(map_vesting_error)?;
     orbit_db::vesting_events::replace_for_grant(&mut tx, auth.user_id, grant.id, events.clone())
         .await?;
-    tx.commit().await?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::GrantCreate,
         auth.user_id,
         Some(grant.id),
@@ -217,6 +216,7 @@ pub async fn create(
         }),
     )
     .await?;
+    tx.commit().await?;
 
     let dto: GrantDto = grant.into();
     let events_dto: Vec<VestingEventDto> = events.iter().map(VestingEventDto::from).collect();
@@ -282,11 +282,10 @@ pub async fn update(
     let events = vesting::derive_vesting_events(&grant_input, today).map_err(map_vesting_error)?;
     orbit_db::vesting_events::replace_for_grant(&mut tx, auth.user_id, grant.id, events.clone())
         .await?;
-    tx.commit().await?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::GrantUpdate,
         auth.user_id,
         Some(grant.id),
@@ -298,6 +297,7 @@ pub async fn update(
         }),
     )
     .await?;
+    tx.commit().await?;
 
     let dto: GrantDto = grant.into();
     let events_dto: Vec<VestingEventDto> = events.iter().map(VestingEventDto::from).collect();
@@ -322,11 +322,10 @@ pub async fn delete(
         .await?
         .ok_or(AppError::NotFound)?;
     orbit_db::grants::delete_grant(&mut tx, auth.user_id, grant_id).await?;
-    tx.commit().await?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard(
-        &state.pool,
+    audit::record_wizard_in_tx(
+        tx.as_executor(),
         WizardAction::GrantDelete,
         auth.user_id,
         Some(grant_id),
@@ -334,6 +333,7 @@ pub async fn delete(
         json!({ "instrument": grant.instrument }),
     )
     .await?;
+    tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT.into_response())
 }

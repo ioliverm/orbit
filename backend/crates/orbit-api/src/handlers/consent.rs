@@ -56,12 +56,13 @@ pub async fn disclaimer(
     .bind(&body.version)
     .fetch_optional(tx.as_executor())
     .await?;
-    tx.commit().await?;
 
     if updated.is_some() {
+        // Audit rides inside the same tx as the UPDATE so the two land
+        // atomically (T25 / S1).
         let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-        audit::record_wizard(
-            &state.pool,
+        audit::record_wizard_in_tx(
+            tx.as_executor(),
             WizardAction::DisclaimerAccepted,
             auth.user_id,
             Some(auth.user_id),
@@ -70,6 +71,7 @@ pub async fn disclaimer(
         )
         .await?;
     }
+    tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT.into_response())
 }

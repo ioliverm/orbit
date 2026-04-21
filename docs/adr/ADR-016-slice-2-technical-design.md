@@ -44,7 +44,7 @@ Below is the **authoritative DDL for the tables Slice 2 adds** — `espp_purchas
 -- ESPP PURCHASES ---------------------------------------------------------
 -- AC-4.1..AC-4.5. One row per ESPP purchase window; the parent grant
 -- must have instrument='espp' — enforced via a BEFORE-INSERT/UPDATE
--- trigger (see grants_enforce_espp_parent below). PostgreSQL subqueries
+-- trigger (see espp_purchases_enforce_grant_instrument below). PostgreSQL subqueries
 -- are not allowed in CHECK constraints, so a trigger is the correct
 -- mechanism for the "grant_id references an ESPP grant" assertion.
 CREATE TABLE espp_purchases (
@@ -361,8 +361,16 @@ The backend list + single-revoke endpoints shipped partial in Slice 1 (ADR-011 �
 | Method | Path | Notes |
 |---|---|---|
 | `GET`    | `/auth/sessions` `[A]` | Lists the caller's active sessions (`WHERE user_id = app.user_id AND revoked_at IS NULL`). Response item shape: `{ id, userAgent, countryIso2, createdAt, lastUsedAt, isCurrent: bool }`. **Never** returns `session_id_hash`, `refresh_token_hash`, `ip_hash`, or `family_id`. `isCurrent` is computed by the handler by comparing the session row's `id` to the request's own session `id` (resolved via `lookup_session_by_hash`; see migration `20260502120000_t13a_session_lookup.sql`). |
-| `DELETE` | `/auth/sessions/:session_id` `[A]` `[V]` | Revokes one other session. 403 with `code="session.cannot_revoke_current"` if the target is the request's own session (AC-7.2.3 — defense-in-depth mirror of the UI guard). 404 with `code="resource.not_found"` if the session does not exist or was already revoked (AC-10.6 stale-tab handling). On success, `UPDATE sessions SET revoked_at = now(), revoke_reason = 'admin' WHERE id = $1` (reason = `admin` is the user-initiated-from-UI case; `user_signout` stays reserved for the current-session signout path per ADR-011 §Signout). Audit `session.revoke` with `payload_summary = { revoke_kind: "single", initiator: "self" }`. Returns 204. |
-| `POST`   | `/auth/sessions/revoke-all-others` `[A]` `[V]` | Bulk revoke of all non-current non-revoked sessions for the caller. `UPDATE sessions SET revoked_at = now(), revoke_reason = 'admin' WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL` (where `$2` is the current session id). Response: `200 { revokedCount: int }`. Audit `session.revoke` with `payload_summary = { revoke_kind: "all_others", initiator: "self", count: int }` — the `count` field is the only allowlisted numeric in any Slice-2 audit payload and is included because AC-7.2.2's demo script asserts it exists. |
+| `DELETE` | `/auth/sessions/:session_id` `[A]` `[V]` | Revokes one other session. 403 with `code="session.cannot_revoke_current"` if the target is the request's own session (AC-7.2.3 — defense-in-depth mirror of the UI guard). 404 with `code="resource.not_found"` if the session does not exist or was already revoked (AC-10.6 stale-tab handling). On success, `UPDATE sessions SET revoked_at = now(), revoke_reason = 'admin' WHERE id = $1` (reason = `admin` is the user-initiated-from-UI case; `user_signout` stays reserved for the current-session signout path per ADR-011 §Signout). Audit `session.revoke` with `payload_summary = { kind: "single", initiator: "self" }` and `target_id = $session_id`. Returns 204. |
+| `POST`   | `/auth/sessions/revoke-all-others` `[A]` `[V]` | Bulk revoke of all non-current non-revoked sessions for the caller. `UPDATE sessions SET revoked_at = now(), revoke_reason = 'admin' WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL` (where `$2` is the current session id). Response: `200 { revokedCount: int }`. Audit `session.revoke` with `payload_summary = { kind: "bulk", initiator: "self", count: int }` — the `count` field is the only allowlisted numeric in any Slice-2 audit payload and is included because AC-7.2.2's demo script asserts it exists. `target_id` is written as `NULL` in the handler (falling back to `user_id` per the `record_wizard` default); the bulk action has no single target, and pointing at the survivor (the caller's current session, which is explicitly the ONE row NOT revoked) would be misleading to audit consumers. |
+
+Audit-payload naming note (T25 resync): the shipped handler uses
+`kind` (values `single` / `bulk`), not `revoke_kind` (values `single`
+/ `all_others`) as the ADR originally specified. Shorter key + less-
+overloaded `bulk` label was the naming simplification during
+implementation; the integration-test assertions pin the shipped
+shape and are the enforcement surface. The same pattern as the T20
+/ T21 reconciliation noted in the `8b5be1d` commit.
 
 **Error envelope.** Unchanged from ADR-010 §7. Every validator error surfaces via the `errors: [{ field, code, message, messageEn }]` multi-field shape (AC-10.4 — validator-caught and CHECK-constraint-caught errors are indistinguishable to the UI). `espp_purchases_enforce_grant_instrument_trg` raises ERRCODE `check_violation`, which the handler maps to `code="espp_purchase.invalid.parent_grant_instrument"` + 422.
 
@@ -588,7 +596,7 @@ sequenceDiagram
             SPA->>SPA: refetch session list (AC-10.6)
         else 1 row updated
             API->>PG: INSERT audit_log (action='session.revoke', target_kind='session', \
-                       target_id=$target, payload={revoke_kind:'single', initiator:'self'})
+                       target_id=$target, payload={kind:'single', initiator:'self'})
             API->>PG: COMMIT
             API-->>SPA: 204
             SPA->>SPA: remove row from TanStack-Query cache; re-render
@@ -596,7 +604,7 @@ sequenceDiagram
     end
 ```
 
-The `revoke-all-others` sequence is identical in shape to the single-revoke branch above except the `UPDATE` predicate is `id <> current_session_id AND revoked_at IS NULL`, the `RETURNING` clause counts rows, and the audit-log `payload_summary` carries `{ revoke_kind: "all_others", initiator: "self", count: <int> }`.
+The `revoke-all-others` sequence is identical in shape to the single-revoke branch above except the `UPDATE` predicate is `id <> current_session_id AND revoked_at IS NULL`, the `RETURNING` clause counts rows, the audit-log `target_id` is left `NULL` (the bulk action has no single target; see §3), and the audit-log `payload_summary` carries `{ kind: "bulk", initiator: "self", count: <int> }`.
 
 ### 6. What Slice 2 explicitly defers (make TBD impossible)
 
@@ -652,8 +660,8 @@ Summary; detailed test work is `qa-engineer`'s (T23). The ADR pins what MUST be 
 - **M720 no-op on identical value (AC-6.2.5).** POST the same `amount_eur` twice (same day or not); assert one row and one audit row.
 - **Cross-tenant probes (SEC-023).** User A creates a purchase / trip / M720 input; user B `GET` / `PUT` / `DELETE` on A's id returns 404 (not 403); every new surface covered.
 - **Session revoke: cannot revoke current.** `DELETE /auth/sessions/{current_id}` returns 403 with the expected `code`; session row is unchanged.
-- **Session revoke: can revoke other.** As user B (logged in from a second browser), `DELETE /auth/sessions/{A_other}` as user A; assert 204 + `sessions.revoked_at` set + audit row with `revoke_kind = 'single'`.
-- **Revoke-all-others preserves current.** Seed user A with 3 active sessions (1 current + 2 others); POST `/auth/sessions/revoke-all-others`; assert response `{ revokedCount: 2 }`, the current row survives, both others have `revoked_at = now()`, one audit row with `payload = { revoke_kind: "all_others", initiator: "self", count: 2 }`.
+- **Session revoke: can revoke other.** As user B (logged in from a second browser), `DELETE /auth/sessions/{A_other}` as user A; assert 204 + `sessions.revoked_at` set + audit row with `kind = 'single'`.
+- **Revoke-all-others preserves current.** Seed user A with 3 active sessions (1 current + 2 others); POST `/auth/sessions/revoke-all-others`; assert response `{ revokedCount: 2 }`, the current row survives, both others have `revoked_at = now()`, one audit row with `payload = { kind: "bulk", initiator: "self", count: 2 }`.
 - **Audit payload allowlist.** For each new audit action, assert the serialized `payload_summary` matches the allowlisted shape exactly (no FMVs, no share counts, no destination country, no dates, no checklist booleans, no totals, no raw IPs). Enforced in CI via a schema fixture `backend/crates/orbit-core/tests/fixtures/audit_payload_shapes.json` keyed by action.
 
 **Frontend unit + E2E tests.**
@@ -701,8 +709,21 @@ Privacy implications, documented:
 
 - The column is `NULL`-able; if the GeoIP lookup fails at session creation (offline dev, or a private network), the UI renders `ubicación desconocida` / `location unknown` and does not block signin.
 - The column is **never** returned by any endpoint other than `GET /auth/sessions` for the caller's own rows.
-- The column is excluded from the `audit_log` payload (G-32). `session.revoke` payloads carry `revoke_kind` + `initiator` only.
+- The column is excluded from the `audit_log` payload (G-32). `session.revoke` payloads carry `kind` + `initiator` only.
 - On account deletion (Slice 7), the column is included in the cascade — no orphan.
+
+**Slice-2 delivery note (T25 / S-2.2).** The `sessions.country_iso2`
+column is **reserved in Slice 2 and populated in Slice 3**. Slice 2
+ships the DDL + the UI "ubicación desconocida" branch, but does not
+wire a GeoIP dataset — the column is always `NULL` at INSERT time
+for Slice-2 sessions. The GeoIP dataset decision (MaxMind GeoLite2
+`.mmdb` vs. a hosted lookup) is deferred to Slice 3's
+Finnhub / FX / uptime-monitor procurement cycle, where procurement
+of a second external dataset naturally fits. The privacy posture
+described above does not change: the column is narrower than raw
+IP, and until Slice 3 ships, the UI renders the unknown-location
+branch for every row. No Slice-2 AC is dependent on a populated
+column; the UI treats `NULL` the same as "lookup failed".
 
 **Cost of the opposite decision** (GeoIP at list-time with raw-IP storage): SEC-054 is violated; the new-device-notice email (SEC-010, shipped in Slice 1) would already need the raw IP to do a city lookup and we decided there to drop the city in favor of "new sign-in from Madrid (approx.)" — a country-level signal matching this decision. Keeping the two surfaces consistent is the right shape.
 

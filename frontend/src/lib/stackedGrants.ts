@@ -58,12 +58,17 @@ export interface PerGrantDelta {
   state: string;
 }
 
-/** Mirror of `orbit_core::stacked_grants::StackedPoint`. */
+/** Mirror of `orbit_core::stacked_grants::StackedPoint`.
+ *
+ * Field names match the wire DTO exactly (the Rust type applies
+ * `#[serde(rename = …)]` on both sums) so fixture and API decoders
+ * round-trip without a rename table (T25 / S4).
+ */
 export interface StackedPoint {
   /** ISO-8601 date string. */
   date: string;
-  cumulativeVested: bigint;
-  cumulativeAwaitingLiquidity: bigint;
+  cumulativeSharesVested: bigint;
+  cumulativeTimeVestedAwaitingLiquidity: bigint;
   perGrantBreakdown: PerGrantDelta[];
 }
 
@@ -253,8 +258,8 @@ function stackInternal(grants: GrantMeta[], events: VestingEvent[]): StackedPoin
 
     points.push({
       date: currentDate,
-      cumulativeVested,
-      cumulativeAwaitingLiquidity: cumulativeAwaiting,
+      cumulativeSharesVested: cumulativeVested,
+      cumulativeTimeVestedAwaitingLiquidity: cumulativeAwaiting,
       perGrantBreakdown: breakdown,
     });
   }

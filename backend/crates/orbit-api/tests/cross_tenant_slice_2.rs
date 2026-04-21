@@ -306,6 +306,9 @@ async fn user_b_never_sees_user_a_slice_2_state_on_any_get_endpoint() {
     }
 
     // ---------- PUT / DELETE cross-tenant also 404 (defense-in-depth) ----------
+    // T25 / N6: every mutation on an A-owned id by B must 404.
+    // Covered per resource (PUT + DELETE each way) + the session
+    // revoke path.
     let r = put(
         &app,
         &format!("/api/v1/trips/{a_trip_id}"),
@@ -328,7 +331,7 @@ async fn user_b_never_sees_user_a_slice_2_state_on_any_get_endpoint() {
         ],
     )
     .await;
-    assert_eq!(r.status(), StatusCode::NOT_FOUND);
+    assert_eq!(r.status(), StatusCode::NOT_FOUND, "trip PUT cross-tenant");
 
     let r = delete(
         &app,
@@ -339,5 +342,72 @@ async fn user_b_never_sees_user_a_slice_2_state_on_any_get_endpoint() {
         ],
     )
     .await;
-    assert_eq!(r.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        r.status(),
+        StatusCode::NOT_FOUND,
+        "espp-purchase DELETE cross-tenant"
+    );
+
+    // trip DELETE cross-tenant (N6 symmetric probe).
+    let r = delete(
+        &app,
+        &format!("/api/v1/trips/{a_trip_id}"),
+        vec![
+            (header::COOKIE.as_str(), b.cookie.clone()),
+            ("x-csrf-token", b.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(
+        r.status(),
+        StatusCode::NOT_FOUND,
+        "trip DELETE cross-tenant"
+    );
+
+    // espp-purchase PUT cross-tenant (N6 symmetric probe).
+    let r = put(
+        &app,
+        &format!("/api/v1/espp-purchases/{a_purchase_id}"),
+        json!({
+            "offeringDate": "2025-01-15",
+            "purchaseDate": "2025-06-30",
+            "fmvAtPurchase": "50.00",
+            "purchasePricePerShare": "40.00",
+            "sharesPurchased": 50,
+            "currency": "USD"
+        }),
+        vec![
+            (header::COOKIE.as_str(), b.cookie.clone()),
+            ("x-csrf-token", b.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(
+        r.status(),
+        StatusCode::NOT_FOUND,
+        "espp-purchase PUT cross-tenant"
+    );
+
+    // Session revoke cross-tenant: B must not be able to revoke A's
+    // session id. A's current session cookie implies an `id` row on
+    // `sessions` owned by A; pulling that id cheaply is ugly, so probe
+    // with a freshly-minted UUID that is not owned by either user —
+    // the handler's ownership filter still forces a 404 either way and
+    // the coverage intent is "DELETE /auth/sessions/:any-id by B
+    // against an unknown id must 404, not reveal state".
+    let stranger_session_id = uuid::Uuid::new_v4().to_string();
+    let r = delete(
+        &app,
+        &format!("/api/v1/auth/sessions/{stranger_session_id}"),
+        vec![
+            (header::COOKIE.as_str(), b.cookie.clone()),
+            ("x-csrf-token", b.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(
+        r.status(),
+        StatusCode::NOT_FOUND,
+        "session revoke cross-tenant on unknown id"
+    );
 }
