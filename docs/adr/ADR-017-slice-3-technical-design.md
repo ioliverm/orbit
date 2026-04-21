@@ -328,6 +328,15 @@ Concrete for Slice 3. Path-relative to `/api/v1`. Notation inherited from ADR-01
 
 ### 4. ECB worker — first real `orbit-worker` job
 
+> **Amendment (Slice 3 T33, 2026-04-21).** Payload shapes in this
+> section were reconciled to the shipped worker schema. The pre-T33
+> draft described `fx.fetch_success = { kind, rate_count, oldest_date,
+> newest_date }` and an `attempt_number` key on `fx.fetch_failure`;
+> neither shipped. The actual shapes are pinned below (also asserted
+> by the T31 audit-allowlist sweep in
+> `backend/crates/orbit-api/tests/audit_allowlist_sweep_slice_3.rs`).
+> Code is unchanged — this is a doc-only edit.
+
 The `orbit-worker` crate currently carries a `lib.rs` stub (Slice-0a scaffold). Slice 3 wires the first real job.
 
 **CLI shape.** Two entry points on a single `WorkerCli` struct:
@@ -346,9 +355,9 @@ The `--once` flags are for developer use (demo-script step 2 runs `--once bootst
 
 **Upsert.** `orbit_db::fx_rates::insert_daily(tx, rows) -> Result<usize, DbError>` wraps `INSERT INTO fx_rates (...) VALUES (...) ON CONFLICT (base, quote, rate_date, source) DO NOTHING` and returns the number of rows inserted. The idempotency gate is the unique key; a same-day repeat fetch writes zero rows (AC-4.1.3). This is the Slice-1 audit_log insert pattern — no UPSERT-with-update; "already there" is the null result.
 
-**Bootstrap.** On worker startup, `SELECT COUNT(*) FROM fx_rates WHERE quote = 'USD' AND rate_date >= (CURRENT_DATE - INTERVAL '90 days')`. If the count is below a threshold (ADR-017 picks **`< 30`** — the 90-day file typically yields ~60 business-day rows, so <30 means a cold DB or a very-stale restart), the worker fetches `https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml` once, parses it (same structure, just with many `<Cube time="…">` inner nodes), and bulk-inserts via the same idempotent helper. Emits `fx.bootstrap_success` audit row with `rows_inserted: N, span_days: N, historical_file: "eurofxref-hist-90d"`. AC-4.3.3 (warm-restart-is-a-no-op): the threshold check runs on every startup; a warm DB (count ≥ 30) short-circuits without a network call.
+**Bootstrap.** On worker startup, `SELECT COUNT(*) FROM fx_rates WHERE quote = 'USD' AND rate_date >= (CURRENT_DATE - INTERVAL '90 days')`. If the count is below a threshold (ADR-017 picks **`< 30`** — the 90-day file typically yields ~60 business-day rows, so <30 means a cold DB or a very-stale restart), the worker fetches `https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml` once, parses it (same structure, just with many `<Cube time="…">` inner nodes), and bulk-inserts via the same idempotent helper. Emits `fx.bootstrap_success` audit row with `payload_summary = { kind: "bootstrap", quote_currencies: ["USD"], rows_inserted, publication_date?, span_days?, historical_file: "eurofxref-hist-90d" }` (optional fields present when at least one row landed). AC-4.3.3 (warm-restart-is-a-no-op): the threshold check runs on every startup; a warm DB (count ≥ 30) short-circuits without a network call.
 
-**Failure policy.** Retry with exponential backoff: 1s, 5s, 25s (three attempts, five-second per-attempt timeout). On all three failing, write `fx.fetch_failure` audit row with `payload_summary = { reason, attempt_number: 3, attempted_at_minute: "HH:MM" }` per G-32. Per ADR-007 §ECB unreachable, on two consecutive failed fetch runs a log line at WARN level is emitted (`orbit_log::event!(WARN, "fx.fetch_persistent_failure", run_count = N)`) — no alerting route ships in Slice 3 (G-34 notes the metric is log-only). The walkback logic handles the resulting data gap; users see the AC-4.5.2/4.5.3 staleness chip.
+**Failure policy.** Retry with exponential backoff: 1s, 5s, 25s (three attempts, five-second per-attempt timeout). On all three failing, write `fx.fetch_failure` audit row with `payload_summary = { reason, kind, attempted_at_minute: "HH:MM" }` — `reason` classifies into `{ "timeout", "network", "parse", "db" }` per the worker's `FetchError::classify`. Per ADR-007 §ECB unreachable, on two consecutive failed fetch runs a log line at WARN level is emitted (`orbit_log::event!(WARN, "fx.fetch_persistent_failure", run_count = N)`) — no alerting route ships in Slice 3 (G-34 notes the metric is log-only). The walkback logic handles the resulting data gap; users see the AC-4.5.2/4.5.3 staleness chip. The symmetric `fx.bootstrap_failure` row uses the same `{ reason, kind, attempted_at_minute }` shape.
 
 **Walkback helper.** `orbit_db::fx_rates::lookup_walkback(pool, quote: &str, on: NaiveDate, max_walkback_days: u32) -> Result<(Decimal, NaiveDate, u32), FxError>`. Implementation:
 

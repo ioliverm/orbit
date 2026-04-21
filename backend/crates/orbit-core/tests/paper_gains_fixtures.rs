@@ -14,7 +14,7 @@
 //! Exact EUR amounts are unit-tested in `orbit_core::paper_gains::tests`;
 //! the fixture's role is the cross-implementation-parity contract.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 
 use chrono::NaiveDate;
@@ -37,6 +37,13 @@ struct Case {
     today: String,
     #[serde(rename = "fxRateEurNative")]
     fx_rate_eur_native: Option<String>,
+    /// T33 S4 — per-currency EUR/native map. Absent / empty in older
+    /// single-USD cases so the legacy `fxRateEurNative` fallback drives
+    /// conversion. New multi-currency cases populate this and leave the
+    /// legacy rate as a stale decoy so a regression to "one rate fits
+    /// all" fails the fixture.
+    #[serde(rename = "fxRatesByCurrency", default)]
+    fx_rates_by_currency: Option<std::collections::BTreeMap<String, Option<String>>>,
     grants: Vec<GrantJson>,
     #[serde(rename = "tickerPrices")]
     ticker_prices: Vec<TickerPriceJson>,
@@ -109,6 +116,28 @@ struct Expected {
     incomplete_grants: Vec<Uuid>,
     #[serde(rename = "hasCombinedBand")]
     has_combined_band: bool,
+    /// T33 S1 — optional bitwise-parity numeric expectations. Present
+    /// on the two fully-pinned cases (single-RSU-complete + mixed
+    /// ESPP+RSU); absent cases still assert structural shape only.
+    #[serde(rename = "expectedPerGrant", default)]
+    expected_per_grant: std::collections::BTreeMap<Uuid, ExpectedPerGrant>,
+    #[serde(rename = "expectedCombinedEurBand", default)]
+    expected_combined_eur_band: Option<ExpectedBand>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExpectedPerGrant {
+    #[serde(rename = "gainNative")]
+    gain_native: String,
+    #[serde(rename = "gainEurBand")]
+    gain_eur_band: ExpectedBand,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExpectedBand {
+    low: String,
+    mid: String,
+    high: String,
 }
 
 fn parse_date(s: &str) -> NaiveDate {
@@ -203,11 +232,18 @@ fn every_paper_gains_case_matches_compute_output() {
             })
             .collect();
 
+        let fx_rates_by_currency: BTreeMap<String, Option<String>> = case
+            .fx_rates_by_currency
+            .as_ref()
+            .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default();
+
         let input = PaperGainsInput {
             grants: &grants,
             ticker_prices: &ticker_prices,
             grant_overrides: &grant_overrides,
             fx_rate_eur_native: case.fx_rate_eur_native.clone(),
+            fx_rates_by_currency,
             today: parse_date(&case.today),
         };
 
@@ -244,5 +280,71 @@ fn every_paper_gains_case_matches_compute_output() {
             "case {}: hasCombinedBand",
             case.name,
         );
+
+        // T33 S1 — bitwise-parity numeric assertions for cases that pin
+        // them. Rust is the source of truth; the same file drives the
+        // TS mirror in `frontend/src/lib/__tests__/paperGains.test.ts`.
+        for (grant_id, expected) in &case.expected.expected_per_grant {
+            let row = result
+                .per_grant
+                .iter()
+                .find(|p| p.grant_id == *grant_id)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "case {}: expectedPerGrant entry {grant_id} has no matching row",
+                        case.name
+                    )
+                });
+            assert_eq!(
+                row.gain_native.as_deref(),
+                Some(expected.gain_native.as_str()),
+                "case {}: gainNative mismatch for grant {grant_id}",
+                case.name,
+            );
+            let band = row.gain_eur_band.as_ref().unwrap_or_else(|| {
+                panic!(
+                    "case {}: expectedPerGrant {grant_id} pins a gainEurBand but compute returned None",
+                    case.name
+                )
+            });
+            assert_eq!(
+                band.low, expected.gain_eur_band.low,
+                "case {}: gainEurBand.low mismatch for grant {grant_id}",
+                case.name,
+            );
+            assert_eq!(
+                band.mid, expected.gain_eur_band.mid,
+                "case {}: gainEurBand.mid mismatch for grant {grant_id}",
+                case.name,
+            );
+            assert_eq!(
+                band.high, expected.gain_eur_band.high,
+                "case {}: gainEurBand.high mismatch for grant {grant_id}",
+                case.name,
+            );
+        }
+        if let Some(expected_combined) = &case.expected.expected_combined_eur_band {
+            let band = result.combined_eur_band.as_ref().unwrap_or_else(|| {
+                panic!(
+                    "case {}: expectedCombinedEurBand pinned but combined_eur_band is None",
+                    case.name
+                )
+            });
+            assert_eq!(
+                band.low, expected_combined.low,
+                "case {}: combinedEurBand.low mismatch",
+                case.name,
+            );
+            assert_eq!(
+                band.mid, expected_combined.mid,
+                "case {}: combinedEurBand.mid mismatch",
+                case.name,
+            );
+            assert_eq!(
+                band.high, expected_combined.high,
+                "case {}: combinedEurBand.high mismatch",
+                case.name,
+            );
+        }
     }
 }

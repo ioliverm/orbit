@@ -1543,13 +1543,21 @@ async fn vesting_events_override_round_trip_preserves_fmv() {
     // --- clear_override: revert date + shares; preserve FMV.
     // `today = 2030-01-01` pins every derived row to a state that isn't
     // Upcoming; the 2025-09-15 cliff row is what the algorithm outputs.
+    // `applied.updated_at` is the fresh OCC cookie after the preceding
+    // apply_override — clear_override requires it per AC-10.5.
     let mut tx = Tx::for_user(&app_pool, user_a)
         .await
         .expect("Tx::for_user(user_a) clear");
     let today = chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap();
-    let clear_outcome = orbit_db::vesting_events::clear_override(&mut tx, user_a, event_id, today)
-        .await
-        .expect("clear_override call");
+    let clear_outcome = orbit_db::vesting_events::clear_override(
+        &mut tx,
+        user_a,
+        event_id,
+        today,
+        applied.updated_at,
+    )
+    .await
+    .expect("clear_override call");
     tx.commit().await.expect("commit clear");
 
     let cleared = match clear_outcome {
@@ -1645,14 +1653,21 @@ async fn vesting_events_clear_override_without_fmv_resets_flags() {
     assert!(applied.fmv_at_vest.is_none());
     assert!(applied.is_user_override);
 
-    // Now clear; expect full reset since FMV is NULL.
+    // Now clear; expect full reset since FMV is NULL. `applied.updated_at`
+    // is the fresh OCC cookie the clear call requires per AC-10.5.
     let mut tx = Tx::for_user(&app_pool, user_a)
         .await
         .expect("Tx::for_user clear");
     let today = chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap();
-    let clear_outcome = orbit_db::vesting_events::clear_override(&mut tx, user_a, event_id, today)
-        .await
-        .expect("clear_override");
+    let clear_outcome = orbit_db::vesting_events::clear_override(
+        &mut tx,
+        user_a,
+        event_id,
+        today,
+        applied.updated_at,
+    )
+    .await
+    .expect("clear_override");
     tx.commit().await.expect("commit clear");
 
     let cleared = match clear_outcome {
@@ -1672,5 +1687,64 @@ async fn vesting_events_clear_override_without_fmv_resets_flags() {
         "fmv_at_vest must remain NULL"
     );
 
+    cleanup_user(&migrate_pool, user_a).await;
+}
+
+// ---------------------------------------------------------------------------
+// Slice 3 T33 Sec-S2 — `Tx::system` primes `app.user_id` to the nil UUID
+// so any accidental SELECT from an RLS-scoped table fails closed (zero
+// rows) rather than raising `invalid input syntax for type uuid`.
+// ---------------------------------------------------------------------------
+
+/// Probe — `Tx::system` primes `app.user_id` to the nil UUID (string).
+#[tokio::test]
+async fn tx_system_primes_app_user_id_to_nil_uuid() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+
+    let mut tx = Tx::system(&app_pool).await.expect("Tx::system");
+    let row = sqlx::query("SELECT current_setting('app.user_id', true) AS v")
+        .fetch_one(tx.as_executor())
+        .await
+        .expect("read guc");
+    let v: String = row.try_get("v").expect("get v");
+    assert_eq!(
+        v,
+        Uuid::nil().to_string(),
+        "Tx::system must prime app.user_id to the nil UUID so RLS fails closed"
+    );
+    tx.rollback().await.expect("rollback");
+}
+
+/// Probe — `Tx::system` SELECT on an RLS-scoped table returns zero rows
+/// (not an `invalid input syntax for type uuid` error), even when seeded
+/// rows exist for real users. This is the fail-closed guarantee that
+/// keeps the escape hatch safe against accidental misuse.
+#[tokio::test]
+async fn tx_system_select_on_rls_table_returns_zero_rows() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    ensure_user(&migrate_pool, user_a, "a_sys_nil").await;
+    let sid_a = seed_session(&migrate_pool, user_a, "a_sys_nil").await;
+
+    let mut tx = Tx::system(&app_pool).await.expect("Tx::system");
+    let rows = sqlx::query("SELECT id FROM sessions WHERE id = $1")
+        .bind(sid_a)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect(
+            "SELECT under Tx::system must succeed (nil-UUID prime keeps \
+             the RLS uuid-cast from raising) and simply return zero rows",
+        );
+
+    assert_eq!(
+        rows.len(),
+        0,
+        "Tx::system must see zero RLS-scoped rows: any other count means \
+         the nil-UUID prime landed on a real user's rows or RLS is misconfigured"
+    );
+
+    tx.rollback().await.expect("rollback");
     cleanup_user(&migrate_pool, user_a).await;
 }

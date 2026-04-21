@@ -49,8 +49,13 @@ const MAX_PRICE_LEN: usize = 32;
 pub struct OverrideBody {
     #[serde(default)]
     pub vest_date: Option<NaiveDate>,
-    #[serde(default)]
-    pub shares_vested: Option<i64>,
+    /// Whole-or-fractional share count. Accepted as either a JSON number
+    /// (whole shares — legacy) or a decimal string with up to 4 dp
+    /// (preserves fractional precision on round-trip via `SHARES_SCALE`,
+    /// matches the `fmvAtVest` convention). The handler normalizes both
+    /// to scaled-i64 [`Shares`] before reaching the repo.
+    #[serde(default, deserialize_with = "deserialize_optional_shares_input")]
+    pub shares_vested: Option<SharesInput>,
     /// Absent = leave FMV alone; present = upsert (or clear with `null`).
     #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
     pub fmv_at_vest: Option<Option<String>>,
@@ -59,6 +64,15 @@ pub struct OverrideBody {
     #[serde(default)]
     pub clear_override: bool,
     pub expected_updated_at: DateTime<Utc>,
+}
+
+/// Internal representation of the `sharesVested` JSON value before
+/// per-field validation. `Integer` is the legacy whole-shares form;
+/// `Decimal` carries up to 4 dp of precision (truncated beyond).
+#[derive(Debug, Clone)]
+pub enum SharesInput {
+    Integer(i64),
+    Decimal(String),
 }
 
 /// `PUT /api/v1/grants/:grantId/vesting-events/:eventId`
@@ -83,18 +97,24 @@ pub async fn upsert_override(
     }
 
     // The clear-override branch reverts date/shares to the algorithmic
-    // output and preserves FMV per AC-8.7.1.
+    // output and preserves FMV per AC-8.7.1. OCC (AC-10.5) is enforced
+    // inside the repo's UPDATE predicate — a stale `expected_updated_at`
+    // resolves as `ClearOutcome::Conflict` and surfaces as 409
+    // `resource.stale_client_state`, same as `apply_override`.
     if body.clear_override {
         let had_fmv = existing.fmv_at_vest.is_some();
-        // AC-10.5 OCC check before any revert.
-        if existing.updated_at != body.expected_updated_at {
-            return Err(AppError::Conflict);
-        }
-        let outcome =
-            vesting_events::clear_override(&mut tx, auth.user_id, event_id, today).await?;
+        let outcome = vesting_events::clear_override(
+            &mut tx,
+            auth.user_id,
+            event_id,
+            today,
+            body.expected_updated_at,
+        )
+        .await?;
         let row = match outcome {
             ClearOutcome::Cleared(row) => row,
             ClearOutcome::NotFound => return Err(AppError::NotFound),
+            ClearOutcome::Conflict => return Err(AppError::Conflict),
             ClearOutcome::NoAlgorithmicMatch => {
                 return Err(AppError::Validation(vec![FieldError {
                     field: "clearOverride".into(),
@@ -141,14 +161,30 @@ pub async fn upsert_override(
             });
         }
     }
-    if let Some(s) = body.shares_vested {
-        if s <= 0 {
-            errors.push(FieldError {
-                field: "sharesVested".into(),
-                code: "must_be_positive".into(),
-            });
+    let shares_scaled: Option<i64> = match &body.shares_vested {
+        None => None,
+        Some(SharesInput::Integer(n)) => {
+            if *n <= 0 {
+                errors.push(FieldError {
+                    field: "sharesVested".into(),
+                    code: "must_be_positive".into(),
+                });
+                None
+            } else {
+                Some(n.saturating_mul(SHARES_SCALE))
+            }
         }
-    }
+        Some(SharesInput::Decimal(s)) => match parse_shares_decimal(s) {
+            Some(scaled) if scaled > 0 => Some(scaled),
+            _ => {
+                errors.push(FieldError {
+                    field: "sharesVested".into(),
+                    code: "must_be_positive".into(),
+                });
+                None
+            }
+        },
+    };
     if let Some(Some(ref fmv)) = body.fmv_at_vest {
         if fmv.len() > MAX_PRICE_LEN {
             errors.push(FieldError {
@@ -190,10 +226,12 @@ pub async fn upsert_override(
         return Err(AppError::Validation(errors));
     }
 
-    // Compose the patch.
+    // Compose the patch. `shares_scaled` is the handler-normalized
+    // scaled-i64 form; per-field validation above already rejected
+    // non-positive or malformed inputs.
     let patch = VestingEventOverridePatch {
         vest_date: body.vest_date,
-        shares_vested_this_event: body.shares_vested.map(|s| s.saturating_mul(SHARES_SCALE)),
+        shares_vested_this_event: shares_scaled,
         fmv_at_vest: body.fmv_at_vest.clone(),
         fmv_currency: body.fmv_currency.clone(),
     };
@@ -349,4 +387,73 @@ where
 {
     use serde::Deserialize as _;
     Option::<Option<String>>::deserialize(d)
+}
+
+/// Custom deserializer: accepts either a JSON integer (whole shares —
+/// legacy clients) or a JSON string containing a decimal (up to 4 dp —
+/// the new fractional form used by the frontend editor). Strings with
+/// more than 4 dp are truncated at the scaling step, not here.
+fn deserialize_optional_shares_input<'de, D>(d: D) -> Result<Option<SharesInput>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    let raw: Option<serde_json::Value> = Option::deserialize(d)?;
+    Ok(match raw {
+        None | Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::Number(n)) => n
+            .as_i64()
+            .map(SharesInput::Integer)
+            .or_else(|| n.as_f64().map(|f| SharesInput::Decimal(f.to_string()))),
+        Some(serde_json::Value::String(s)) => Some(SharesInput::Decimal(s)),
+        Some(other) => {
+            return Err(D::Error::custom(format!(
+                "sharesVested must be a number or decimal string, got {other:?}",
+            )));
+        }
+    })
+}
+
+/// Parse a decimal string like "12.3400" into scaled-i64 shares. The
+/// fraction is truncated (not rounded) at 4 dp. Returns `None` on any
+/// parse failure or on a value that would overflow `i64` after scaling.
+fn parse_shares_decimal(s: &str) -> Option<i64> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    // Allow a single leading sign for robustness; the caller rejects
+    // non-positive values separately.
+    let (sign, rest) = match trimmed.as_bytes().first() {
+        Some(b'+') => (1i64, &trimmed[1..]),
+        Some(b'-') => (-1i64, &trimmed[1..]),
+        _ => (1i64, trimmed),
+    };
+    if rest.is_empty() {
+        return None;
+    }
+    let (int_part, frac_part) = match rest.find('.') {
+        Some(idx) => (&rest[..idx], &rest[idx + 1..]),
+        None => (rest, ""),
+    };
+    if !int_part.chars().all(|c| c.is_ascii_digit())
+        || !frac_part.chars().all(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    // Take up to 4 frac digits, right-pad with zeros so "12.34" → "3400".
+    let mut frac = frac_part.to_string();
+    if frac.len() > 4 {
+        frac.truncate(4);
+    }
+    while frac.len() < 4 {
+        frac.push('0');
+    }
+    let int_val: i64 = int_part.parse().ok()?;
+    let frac_val: i64 = frac.parse().ok()?;
+    let scaled = int_val
+        .checked_mul(SHARES_SCALE)?
+        .checked_add(frac_val)?
+        .checked_mul(sign)?;
+    Some(scaled)
 }

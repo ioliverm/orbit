@@ -49,6 +49,8 @@
 //!   - ADR-017 §5 (authoritative algorithm).
 //!   - docs/requirements/slice-3-acceptance-criteria.md §5.
 
+use std::collections::BTreeMap;
+
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -123,8 +125,22 @@ pub struct PaperGainsInput<'a> {
     pub ticker_prices: &'a [TickerPriceForPaperGains],
     pub grant_overrides: &'a [GrantPriceOverrideForPaperGains],
     /// EUR per unit of native currency for today. `None` when
-    /// `FxLookupResult::Unavailable` (AC-5.5.4).
+    /// `FxLookupResult::Unavailable` (AC-5.5.4). **Legacy** — treated
+    /// as the fallback rate for grants whose `native_currency` has no
+    /// entry in `fx_rates_by_currency`. The Slice-3 worker wires
+    /// `fx_rates_by_currency` for every grant currency it resolved; a
+    /// grant whose currency is present in `fx_rates_by_currency` with
+    /// `None` (explicit missing) surfaces as
+    /// [`MissingReason::UnsupportedCurrency`], distinct from the
+    /// `fx_rate_eur_native = None` global case.
     pub fx_rate_eur_native: Option<String>,
+    /// EUR-per-native rate keyed by the grant's `native_currency`. A
+    /// `Some(rate)` entry supplies the conversion; a `None` entry
+    /// signals "this currency has no FX today" and the grant lands as
+    /// [`MissingReason::UnsupportedCurrency`]. Absent keys fall through
+    /// to `fx_rate_eur_native` (Slice-3 back-compat for single-currency
+    /// setups).
+    pub fx_rates_by_currency: BTreeMap<String, Option<String>>,
     pub today: NaiveDate,
 }
 
@@ -169,6 +185,11 @@ pub enum MissingReason {
     NsoDeferred,
     /// Double-trigger RSU with `liquidity_event_date IS NULL` (AC-5.4.4).
     DoubleTriggerPreLiquidity,
+    /// The grant's `native_currency` has no FX rate in
+    /// `fx_rates_by_currency` (Slice-3 T33 S4). The grant is
+    /// otherwise complete; it surfaces on the incomplete-data banner
+    /// as "FX no disponible para {currency}".
+    UnsupportedCurrency,
 }
 
 /// Aggregate result.
@@ -194,7 +215,7 @@ pub struct PaperGainsResult {
 /// Pure paper-gains computation per ADR-017 §5. See the module docs for
 /// the ESPP treatment and FX-unavailable semantics.
 pub fn compute(input: &PaperGainsInput<'_>) -> PaperGainsResult {
-    let fx = input.fx_rate_eur_native.as_deref().and_then(parse_decimal);
+    let fallback_fx = input.fx_rate_eur_native.as_deref().and_then(parse_decimal);
 
     let mut per_grant: Vec<PerGrantGains> = Vec::with_capacity(input.grants.len());
     let mut incomplete_grants: Vec<Uuid> = Vec::new();
@@ -206,7 +227,16 @@ pub fn compute(input: &PaperGainsInput<'_>) -> PaperGainsResult {
     let mut combined_any = false;
 
     for g in input.grants {
-        let row = compute_grant(g, input, fx);
+        // Resolve the per-grant FX rate. An explicit entry in the map
+        // wins (even if `None` — that's the "unsupported currency"
+        // signal). Otherwise fall back to the global rate.
+        let grant_fx_entry = input.fx_rates_by_currency.get(&g.native_currency);
+        let (grant_fx, currency_explicitly_missing) = match grant_fx_entry {
+            Some(Some(s)) => (parse_decimal(s), false),
+            Some(None) => (None, true),
+            None => (fallback_fx, false),
+        };
+        let row = compute_grant(g, input, grant_fx, currency_explicitly_missing);
 
         // Aggregate only when the grant is complete AND we have a band.
         if row.complete {
@@ -220,7 +250,9 @@ pub fn compute(input: &PaperGainsInput<'_>) -> PaperGainsResult {
             // Only grants with actionable gaps surface in the banner.
             if matches!(
                 reason,
-                MissingReason::FmvMissing | MissingReason::NoCurrentPrice
+                MissingReason::FmvMissing
+                    | MissingReason::NoCurrentPrice
+                    | MissingReason::UnsupportedCurrency
             ) {
                 incomplete_grants.push(row.grant_id);
             }
@@ -229,7 +261,10 @@ pub fn compute(input: &PaperGainsInput<'_>) -> PaperGainsResult {
         per_grant.push(row);
     }
 
-    let combined_eur_band = if combined_any && fx.is_some() {
+    // The combined band is available iff at least one grant landed a
+    // band — in the per-currency world the "global FX" is irrelevant
+    // for presence; individual grants drove the aggregate.
+    let combined_eur_band = if combined_any {
         Some(EurBand {
             low: format_eur(combined_low),
             mid: format_eur(combined_mid),
@@ -254,6 +289,7 @@ fn compute_grant(
     g: &GrantForPaperGains,
     input: &PaperGainsInput<'_>,
     fx: Option<f64>,
+    currency_explicitly_missing: bool,
 ) -> PerGrantGains {
     // AC-5.4.3 NSO deferral.
     if matches!(g.instrument.as_str(), "nso" | "iso_mapped_to_nso" | "iso") {
@@ -316,6 +352,23 @@ fn compute_grant(
             gain_native: None,
             gain_eur_band: None,
             missing_reason: Some(MissingReason::FmvMissing),
+        };
+    }
+
+    // The grant is price+fmv-complete. If the FX for this grant's
+    // currency was *explicitly* missing (handler wired an empty entry
+    // for it), surface `UnsupportedCurrency` so the banner mentions it
+    // rather than silently omitting the grant from the aggregate.
+    // This is distinct from the "global fx unavailable" case, which
+    // leaves `complete = true, gainEurBand = None` — an implicit
+    // fallback handled at the handler layer.
+    if currency_explicitly_missing {
+        return PerGrantGains {
+            grant_id: g.id,
+            complete: false,
+            gain_native: Some(format_native(gain_native)),
+            gain_eur_band: None,
+            missing_reason: Some(MissingReason::UnsupportedCurrency),
         };
     }
 
@@ -499,6 +552,7 @@ mod tests {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.93".to_string()),
+            fx_rates_by_currency: BTreeMap::new(),
             today: d(2026, 4, 19),
         };
         let result = compute(&input);
@@ -529,6 +583,7 @@ mod tests {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.90".to_string()),
+            fx_rates_by_currency: BTreeMap::new(),
             today: d(2026, 4, 19),
         };
         let result = compute(&input);
@@ -560,6 +615,7 @@ mod tests {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.90".to_string()),
+            fx_rates_by_currency: BTreeMap::new(),
             today: d(2026, 4, 19),
         };
         let result = compute(&input);
@@ -581,6 +637,7 @@ mod tests {
             ticker_prices: &[],
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.90".to_string()),
+            fx_rates_by_currency: BTreeMap::new(),
             today: d(2026, 4, 19),
         };
         let result = compute(&input);
@@ -612,6 +669,7 @@ mod tests {
             ticker_prices: &prices,
             grant_overrides: &overrides,
             fx_rate_eur_native: Some("1.00".to_string()),
+            fx_rates_by_currency: BTreeMap::new(),
             today: d(2026, 4, 19),
         };
         let result = compute(&input);
@@ -645,6 +703,7 @@ mod tests {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.90".to_string()),
+            fx_rates_by_currency: BTreeMap::new(),
             today: d(2026, 4, 19),
         };
         let result = compute(&input);
@@ -676,6 +735,7 @@ mod tests {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("1.00".to_string()),
+            fx_rates_by_currency: BTreeMap::new(),
             today: d(2026, 4, 19),
         };
         let result = compute(&input);
@@ -698,11 +758,81 @@ mod tests {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: None,
+            fx_rates_by_currency: BTreeMap::new(),
             today: d(2026, 4, 19),
         };
         let result = compute(&input);
         assert!(result.per_grant[0].complete);
         assert!(result.per_grant[0].gain_eur_band.is_none());
+        assert!(result.combined_eur_band.is_none());
+    }
+
+    #[test]
+    fn gbp_native_grant_uses_per_currency_fx() {
+        let id = Uuid::new_v4();
+        let mut g = base_grant(id, "rsu");
+        g.native_currency = "GBP".to_string();
+        g.ticker = Some("GBCO".to_string());
+        g.vesting_events = vec![rsu_event(d(2025, 1, 15), 100, Some("40.00"))];
+        let prices = vec![TickerPriceForPaperGains {
+            ticker: "GBCO".to_string(),
+            price: "50.00".to_string(),
+            currency: "GBP".to_string(),
+        }];
+        let mut fx_map: BTreeMap<String, Option<String>> = BTreeMap::new();
+        fx_map.insert("GBP".to_string(), Some("1.20".to_string()));
+        let input = PaperGainsInput {
+            grants: std::slice::from_ref(&g),
+            ticker_prices: &prices,
+            grant_overrides: &[],
+            // `fx_rate_eur_native` is stale EUR/USD; the per-currency
+            // map must win for GBP grants.
+            fx_rate_eur_native: Some("0.90".to_string()),
+            fx_rates_by_currency: fx_map,
+            today: d(2026, 4, 19),
+        };
+        let result = compute(&input);
+        assert!(result.per_grant[0].complete);
+        // (50 - 40) * 100 = 1000 GBP. EUR mid = 1000 * 1.20 * 0.985 = 1182.00
+        let band = result.per_grant[0].gain_eur_band.as_ref().unwrap();
+        assert_eq!(band.mid, "1182.00");
+    }
+
+    #[test]
+    fn unsupported_currency_surfaces_reason_and_banner() {
+        let id = Uuid::new_v4();
+        let mut g = base_grant(id, "rsu");
+        g.native_currency = "JPY".to_string();
+        g.ticker = Some("JPCO".to_string());
+        g.vesting_events = vec![rsu_event(d(2025, 1, 15), 100, Some("40.00"))];
+        let prices = vec![TickerPriceForPaperGains {
+            ticker: "JPCO".to_string(),
+            price: "50.00".to_string(),
+            currency: "JPY".to_string(),
+        }];
+        let mut fx_map: BTreeMap<String, Option<String>> = BTreeMap::new();
+        fx_map.insert("JPY".to_string(), None);
+        let input = PaperGainsInput {
+            grants: std::slice::from_ref(&g),
+            ticker_prices: &prices,
+            grant_overrides: &[],
+            fx_rate_eur_native: Some("0.90".to_string()),
+            fx_rates_by_currency: fx_map,
+            today: d(2026, 4, 19),
+        };
+        let result = compute(&input);
+        assert!(!result.per_grant[0].complete);
+        assert_eq!(
+            result.per_grant[0].missing_reason,
+            Some(MissingReason::UnsupportedCurrency)
+        );
+        // Native-currency gain is still surfaced for UI context.
+        assert_eq!(
+            result.per_grant[0].gain_native.as_deref(),
+            Some("1000.0000")
+        );
+        assert!(result.per_grant[0].gain_eur_band.is_none());
+        assert_eq!(result.incomplete_grants, vec![id]);
         assert!(result.combined_eur_band.is_none());
     }
 }

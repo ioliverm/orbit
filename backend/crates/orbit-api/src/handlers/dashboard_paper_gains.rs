@@ -8,6 +8,8 @@
 //! On FX unavailable the response still lands (200) with
 //! `stalenessFx = "unavailable"` and a null `combinedEurBand` per AC-5.5.4.
 
+use std::collections::BTreeMap;
+
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -24,6 +26,12 @@ use crate::error::AppError;
 use crate::middleware::session::SessionAuth;
 use crate::state::AppState;
 
+/// Slice-3 ECB ingestion whitelist (ADR-017 §4, AC-4.1.2). Every
+/// quote in this list is expected to have a row in `fx_rates` for
+/// today / the walkback window; anything outside surfaces as
+/// `MissingReason::UnsupportedCurrency` to the UI.
+const SUPPORTED_FX_QUOTES: &[&str] = &["USD", "GBP"];
+
 /// `GET /api/v1/dashboard/paper-gains`
 pub async fn paper_gains(
     State(state): State<AppState>,
@@ -31,13 +39,17 @@ pub async fn paper_gains(
 ) -> Result<Response, AppError> {
     let today = Utc::now().date_naive();
 
-    // FX lookup (pool-level, not RLS-scoped).
-    let fx = orbit_db::fx_rates::lookup_walkback(&state.pool, "EUR", "USD", today, 7).await?;
-    let fx_rate = fx.as_ref().map(|r| r.rate.clone());
-    let fx_date = fx
+    // Pre-fetch the per-currency walkback lookups. EUR/USD drives the
+    // dashboard staleness chip + legacy `fx_rate_eur_native` compat; GBP
+    // feeds the `fx_rates_by_currency` map for GBP-native grants. Both
+    // lookups are pool-level (not RLS-scoped) since `fx_rates` is
+    // reference data.
+    let fx_usd = orbit_db::fx_rates::lookup_walkback(&state.pool, "EUR", "USD", today, 7).await?;
+    let fx_rate = fx_usd.as_ref().map(|r| r.rate.clone());
+    let fx_date = fx_usd
         .as_ref()
         .map(|r| r.rate_date.format("%Y-%m-%d").to_string());
-    let staleness = match fx.as_ref() {
+    let staleness = match fx_usd.as_ref() {
         None => "unavailable",
         Some(r) => match r.staleness {
             orbit_db::fx_rates::Staleness::Fresh => "fresh",
@@ -46,6 +58,26 @@ pub async fn paper_gains(
             orbit_db::fx_rates::Staleness::Unavailable => "unavailable",
         },
     };
+
+    // Per-currency EUR rate map, one entry per Slice-3 supported quote.
+    // Entries carry `Some(rate)` when the ECB has a recent row and
+    // `None` otherwise — the latter surfaces as
+    // `MissingReason::UnsupportedCurrency` for grants in that currency
+    // (T33 S4). `USD` is filled from the `fx_usd` lookup above to
+    // reuse the round-trip.
+    let mut fx_rates_by_currency: BTreeMap<String, Option<String>> = BTreeMap::new();
+    for quote in SUPPORTED_FX_QUOTES {
+        let rate = if *quote == "USD" {
+            fx_usd.as_ref().map(|r| r.rate.clone())
+        } else {
+            orbit_db::fx_rates::lookup_walkback(&state.pool, "EUR", quote, today, 7)
+                .await?
+                .map(|r| r.rate)
+        };
+        fx_rates_by_currency.insert((*quote).to_string(), rate);
+    }
+    // EUR-native grants don't need an ECB lookup — the rate is 1.0000.
+    fx_rates_by_currency.insert("EUR".to_string(), Some("1.0000".to_string()));
 
     // Per-user tx: grants + vesting_events + espp_purchases + current
     // prices + grant overrides. Same scanning discipline as the Slice-2
@@ -80,13 +112,35 @@ pub async fn paper_gains(
         } else {
             Vec::new()
         };
-        pg_grants.push(GrantForPaperGains {
-            id: g.id,
-            instrument: g.instrument.clone(),
-            native_currency: g
+        // Per-grant native currency selection (T33 S4):
+        //   * NSO / ISO — `strike_currency` (required for options).
+        //   * ESPP — first `espp_purchases.currency`; defaults to USD
+        //     if the grant has no purchases yet (ESPP-without-purchases
+        //     is a `gain = 0, complete = true` case that never hits
+        //     FX).
+        //   * RSU — the FMV currency from any vesting event that
+        //     carries one, else USD. RSU vesting rows write
+        //     `fmv_currency` alongside `fmv_at_vest`; taking the first
+        //     non-NULL value is the handler's best guess without
+        //     requiring a ground-truth column on the grant itself.
+        let native_currency = match g.instrument.as_str() {
+            "nso" | "iso_mapped_to_nso" | "iso" => g
                 .strike_currency
                 .clone()
                 .unwrap_or_else(|| "USD".to_string()),
+            "espp" => purchases
+                .first()
+                .map(|p| p.currency.clone())
+                .unwrap_or_else(|| "USD".to_string()),
+            _ => vs
+                .iter()
+                .find_map(|e| e.fmv_currency.clone())
+                .unwrap_or_else(|| "USD".to_string()),
+        };
+        pg_grants.push(GrantForPaperGains {
+            id: g.id,
+            instrument: g.instrument.clone(),
+            native_currency,
             ticker: g.ticker.clone(),
             double_trigger: g.double_trigger,
             liquidity_event_date: g.liquidity_event_date,
@@ -128,6 +182,7 @@ pub async fn paper_gains(
         ticker_prices: &ticker_prices,
         grant_overrides: &grant_overrides,
         fx_rate_eur_native: fx_rate,
+        fx_rates_by_currency,
         today,
     };
     let result = compute_paper_gains(&input);

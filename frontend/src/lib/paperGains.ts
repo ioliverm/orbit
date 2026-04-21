@@ -66,8 +66,17 @@ export interface PaperGainsInput {
   grants: GrantForPaperGains[];
   tickerPrices: TickerPriceForPaperGains[];
   grantOverrides: GrantPriceOverrideForPaperGains[];
-  /** EUR per unit of native currency. `null` on ECB-unavailable. */
+  /** Legacy EUR-per-USD rate. Used as a fallback when a grant's
+   *  `nativeCurrency` has no entry in `fxRatesByCurrency`. `null`
+   *  on ECB-unavailable. */
   fxRateEurNative: string | null;
+  /** T33 S4 — EUR-per-native rate keyed by ISO currency. An explicit
+   *  `null` value marks the currency as *unsupported today* and the
+   *  grant surfaces as `MissingReason.UnsupportedCurrency`. Absent
+   *  keys fall through to `fxRateEurNative`. Optional for back-compat
+   *  with the single-USD Slice-3 setup; the fixture tests and the
+   *  backend both populate it. */
+  fxRatesByCurrency?: Record<string, string | null>;
   today: Date;
 }
 
@@ -75,7 +84,8 @@ export type MissingReason =
   | 'fmv_missing'
   | 'no_current_price'
   | 'nso_deferred'
-  | 'double_trigger_pre_liquidity';
+  | 'double_trigger_pre_liquidity'
+  | 'unsupported_currency';
 
 export interface EurBand {
   /** 3% retail spread (worst-case). */
@@ -105,7 +115,7 @@ export interface PaperGainsResult {
 // ---------------------------------------------------------------------------
 
 export function computePaperGains(input: PaperGainsInput): PaperGainsResult {
-  const fx = parseDecimal(input.fxRateEurNative);
+  const fallbackFx = parseDecimal(input.fxRateEurNative);
   const perGrant: PerGrantGains[] = [];
   const incompleteGrants: string[] = [];
 
@@ -115,7 +125,25 @@ export function computePaperGains(input: PaperGainsInput): PaperGainsResult {
   let combinedAny = false;
 
   for (const g of input.grants) {
-    const row = computeGrant(g, input, fx);
+    // Resolve per-grant FX: explicit map entry wins (even `null`, which
+    // signals "unsupported currency"); otherwise fall back to the
+    // legacy `fxRateEurNative`.
+    const mapEntry = input.fxRatesByCurrency
+      ? Object.prototype.hasOwnProperty.call(input.fxRatesByCurrency, g.nativeCurrency)
+        ? input.fxRatesByCurrency[g.nativeCurrency]
+        : undefined
+      : undefined;
+    let grantFx: number | null;
+    let currencyExplicitlyMissing = false;
+    if (mapEntry === null) {
+      grantFx = null;
+      currencyExplicitlyMissing = true;
+    } else if (mapEntry === undefined) {
+      grantFx = fallbackFx;
+    } else {
+      grantFx = parseDecimal(mapEntry);
+    }
+    const row = computeGrant(g, input, grantFx, currencyExplicitlyMissing);
 
     if (row.complete && row.gainEurBand) {
       combinedLow += parseDecimal(row.gainEurBand.low) ?? 0;
@@ -124,21 +152,21 @@ export function computePaperGains(input: PaperGainsInput): PaperGainsResult {
       combinedAny = true;
     } else if (
       row.missingReason === 'fmv_missing' ||
-      row.missingReason === 'no_current_price'
+      row.missingReason === 'no_current_price' ||
+      row.missingReason === 'unsupported_currency'
     ) {
       incompleteGrants.push(row.grantId);
     }
     perGrant.push(row);
   }
 
-  const combinedEurBand: EurBand | null =
-    combinedAny && fx !== null
-      ? {
-          low: formatEur(combinedLow),
-          mid: formatEur(combinedMid),
-          high: formatEur(combinedHigh),
-        }
-      : null;
+  const combinedEurBand: EurBand | null = combinedAny
+    ? {
+        low: formatEur(combinedLow),
+        mid: formatEur(combinedMid),
+        high: formatEur(combinedHigh),
+      }
+    : null;
 
   return { perGrant, combinedEurBand, incompleteGrants };
 }
@@ -151,6 +179,7 @@ function computeGrant(
   g: GrantForPaperGains,
   input: PaperGainsInput,
   fx: number | null,
+  currencyExplicitlyMissing: boolean,
 ): PerGrantGains {
   // AC-5.4.3 NSO deferral.
   if (g.instrument === 'nso' || g.instrument === 'iso_mapped_to_nso' || g.instrument === 'iso') {
@@ -211,6 +240,19 @@ function computeGrant(
       gainNative: null,
       gainEurBand: null,
       missingReason: 'fmv_missing',
+    };
+  }
+
+  // T33 S4 — explicit `null` FX entry for this currency: surface
+  // UnsupportedCurrency with `complete = false` rather than silently
+  // falling back to the legacy EUR/USD rate.
+  if (currencyExplicitlyMissing) {
+    return {
+      grantId: g.id,
+      complete: false,
+      gainNative: formatNative(gain),
+      gainEurBand: null,
+      missingReason: 'unsupported_currency',
     };
   }
 

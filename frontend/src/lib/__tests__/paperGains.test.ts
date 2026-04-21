@@ -59,16 +59,32 @@ interface FixtureOverride {
   currency: string;
 }
 
+interface FixtureExpectedBand {
+  low: string;
+  mid: string;
+  high: string;
+}
+
+interface FixtureExpectedPerGrant {
+  gainNative: string;
+  gainEurBand: FixtureExpectedBand;
+}
+
 interface FixtureExpected {
   completeIds: string[];
   incompleteGrants: string[];
   hasCombinedBand: boolean;
+  /** T33 S1 — optional bitwise-parity pins. */
+  expectedPerGrant?: Record<string, FixtureExpectedPerGrant>;
+  expectedCombinedEurBand?: FixtureExpectedBand;
 }
 
 interface FixtureCase {
   name: string;
   today: string;
   fxRateEurNative: string | null;
+  /** T33 S4 — optional per-currency EUR rates map. */
+  fxRatesByCurrency?: Record<string, string | null>;
   grants: FixtureGrant[];
   tickerPrices: FixtureTicker[];
   grantOverrides: FixtureOverride[];
@@ -141,6 +157,7 @@ describe('paper_gains_cases.json — TS/Rust parity', () => {
         })),
         fxRateEurNative: fx.fxRateEurNative,
         today: parseUtcDate(fx.today),
+        ...(fx.fxRatesByCurrency ? { fxRatesByCurrency: fx.fxRatesByCurrency } : {}),
       };
 
       const result = computePaperGains(input);
@@ -165,6 +182,40 @@ describe('paper_gains_cases.json — TS/Rust parity', () => {
         expect(result.combinedEurBand, `${fx.name}: combinedEurBand`).not.toBeNull();
       } else {
         expect(result.combinedEurBand, `${fx.name}: combinedEurBand`).toBeNull();
+      }
+
+      // T33 S1 — bitwise numeric parity for pinned cases. Rust is
+      // the source of truth; this assertion catches any TS drift.
+      if (fx.expected.expectedPerGrant) {
+        for (const [grantId, expected] of Object.entries(fx.expected.expectedPerGrant)) {
+          const row = result.perGrant.find((p) => p.grantId === grantId);
+          expect(row, `${fx.name}: no row for grant ${grantId}`).toBeTruthy();
+          expect(row!.gainNative, `${fx.name}: gainNative for ${grantId}`).toBe(
+            expected.gainNative,
+          );
+          expect(row!.gainEurBand, `${fx.name}: gainEurBand for ${grantId}`).not.toBeNull();
+          expect(row!.gainEurBand!.low, `${fx.name}: band.low for ${grantId}`).toBe(
+            expected.gainEurBand.low,
+          );
+          expect(row!.gainEurBand!.mid, `${fx.name}: band.mid for ${grantId}`).toBe(
+            expected.gainEurBand.mid,
+          );
+          expect(row!.gainEurBand!.high, `${fx.name}: band.high for ${grantId}`).toBe(
+            expected.gainEurBand.high,
+          );
+        }
+      }
+      if (fx.expected.expectedCombinedEurBand) {
+        expect(result.combinedEurBand, `${fx.name}: combinedEurBand`).not.toBeNull();
+        expect(result.combinedEurBand!.low, `${fx.name}: combined.low`).toBe(
+          fx.expected.expectedCombinedEurBand.low,
+        );
+        expect(result.combinedEurBand!.mid, `${fx.name}: combined.mid`).toBe(
+          fx.expected.expectedCombinedEurBand.mid,
+        );
+        expect(result.combinedEurBand!.high, `${fx.name}: combined.high`).toBe(
+          fx.expected.expectedCombinedEurBand.high,
+        );
       }
     },
   );

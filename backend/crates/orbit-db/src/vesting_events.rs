@@ -529,16 +529,20 @@ pub async fn apply_override(
 /// common case (user overrode the vest within-window).
 ///
 /// Returns [`ClearOutcome::NotFound`] if the row is not present or not
-/// owned by `user_id` (RLS-filtered); [`ClearOutcome::NoAlgorithmicMatch`]
-/// if the algorithm produces no row that can be reverted to (the
-/// override's `vest_date` is outside the derivation window AND no
-/// positional match is possible — practically, the grant has zero
-/// derived rows). Otherwise [`ClearOutcome::Cleared(row)`].
+/// owned by `user_id` (RLS-filtered); [`ClearOutcome::Conflict`] if the
+/// `expected_updated_at` predicate did not match at UPDATE time (AC-10.5
+/// — matches [`apply_override`]'s OCC discipline);
+/// [`ClearOutcome::NoAlgorithmicMatch`] if the algorithm produces no row
+/// that can be reverted to (the override's `vest_date` is outside the
+/// derivation window AND no positional match is possible — practically,
+/// the grant has zero derived rows). Otherwise
+/// [`ClearOutcome::Cleared(row)`].
 pub async fn clear_override(
     tx: &mut Tx<'_>,
     user_id: Uuid,
     event_id: Uuid,
     today: NaiveDate,
+    expected_updated_at: chrono::DateTime<chrono::Utc>,
 ) -> Result<ClearOutcome, sqlx::Error> {
     // 1. Fetch the row to clear. RLS scopes us; `None` → NotFound.
     let existing = get_event(tx, user_id, event_id).await?;
@@ -633,16 +637,22 @@ pub async fn clear_override(
     //      true and overridden_at is preserved (the CHECK requires it).
     let has_fmv = existing.fmv_at_vest.is_some();
 
-    // 6. UPDATE in place. We do NOT change fmv_at_vest / fmv_currency
-    // (preservation per AC-8.7.1 (b)). We DO update vest_date + shares,
-    // and conditionally clear the override flag.
+    // 6. UPDATE in place, predicated on `updated_at = $expected` to
+    // close the read-vs-update race (AC-10.5 — same OCC discipline as
+    // `apply_override`). A zero-rows result is indistinguishable from a
+    // cross-tenant RLS filter, but the prior `get_event` lookup narrows
+    // that case to the stale-state branch.
+    //
+    // We do NOT change fmv_at_vest / fmv_currency (preservation per
+    // AC-8.7.1 (b)). We DO update vest_date + shares, and conditionally
+    // clear the override flag.
     let row = if has_fmv {
         sqlx::query(&format!(
             r#"
             UPDATE vesting_events
                SET vest_date = $3,
                    shares_vested_this_event = $4::numeric / 10000
-             WHERE id = $1 AND user_id = $2
+             WHERE id = $1 AND user_id = $2 AND updated_at = $5
          RETURNING {RETURNING_COLUMNS}
             "#,
         ))
@@ -650,7 +660,8 @@ pub async fn clear_override(
         .bind(user_id)
         .bind(algo_row.vest_date)
         .bind(algo_row.shares_vested_this_event)
-        .fetch_one(tx.as_executor())
+        .bind(expected_updated_at)
+        .fetch_optional(tx.as_executor())
         .await?
     } else {
         sqlx::query(&format!(
@@ -660,7 +671,7 @@ pub async fn clear_override(
                    shares_vested_this_event = $4::numeric / 10000,
                    is_user_override = false,
                    overridden_at = NULL
-             WHERE id = $1 AND user_id = $2
+             WHERE id = $1 AND user_id = $2 AND updated_at = $5
          RETURNING {RETURNING_COLUMNS}
             "#,
         ))
@@ -668,11 +679,15 @@ pub async fn clear_override(
         .bind(user_id)
         .bind(algo_row.vest_date)
         .bind(algo_row.shares_vested_this_event)
-        .fetch_one(tx.as_executor())
+        .bind(expected_updated_at)
+        .fetch_optional(tx.as_executor())
         .await?
     };
 
-    Ok(ClearOutcome::Cleared(row_to_event(&row)?))
+    match row {
+        Some(r) => Ok(ClearOutcome::Cleared(row_to_event(&r)?)),
+        None => Ok(ClearOutcome::Conflict),
+    }
 }
 
 /// Outcome of [`clear_override`].
@@ -683,6 +698,11 @@ pub enum ClearOutcome {
     Cleared(VestingEventRow),
     /// The event id was not found or is not owned by `user_id`.
     NotFound,
+    /// The `expected_updated_at` predicate did not match the DB row's
+    /// current `updated_at`. The handler returns 409 with code
+    /// `resource.stale_client_state`, matching `apply_override`
+    /// (AC-10.5).
+    Conflict,
     /// The derivation algorithm produced no row matching this event's
     /// `vest_date` — the override is "outside the window" (e.g., grant
     /// params changed since the override was applied). The handler

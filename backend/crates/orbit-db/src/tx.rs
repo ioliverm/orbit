@@ -68,13 +68,31 @@ impl Tx<'_> {
     /// writes to non-RLS-scoped tables such as `fx_rates` and the paired
     /// `system`-actor audit rows).
     ///
-    /// `app.user_id` is NOT primed; any query that depends on RLS
-    /// scoping in this transaction will see zero rows. Reserved for
-    /// (a) `fx_rates` INSERTs from `orbit-worker` and (b) the paired
-    /// `actor_kind = 'system'` `audit_log` row that records the fetch.
-    /// Handlers MUST use [`Tx::for_user`] — no exception.
+    /// `app.user_id` is primed to the **nil UUID**
+    /// (`00000000-0000-0000-0000-000000000000`) so that RLS policies
+    /// keyed on `current_setting('app.user_id', true)::uuid` fail
+    /// **closed** (zero rows match the nil UUID) if this escape hatch
+    /// is ever accidentally wired to an RLS-scoped table. Without the
+    /// prime the cast would raise `invalid input syntax for type uuid`
+    /// and surface as a 500 — worse than a silent zero-rows result.
+    /// This mirrors the priming pattern in [`Tx::for_user`].
+    ///
+    /// Reserved for (a) `fx_rates` INSERTs from `orbit-worker` and
+    /// (b) the paired `actor_kind = 'system'` `audit_log` row that
+    /// records the fetch. Handlers MUST use [`Tx::for_user`] — no
+    /// exception.
     pub async fn system(pool: &PgPool) -> Result<Tx<'static>, Error> {
-        let inner = pool.begin().await.map_err(Error::Tx)?;
+        let mut inner = pool.begin().await.map_err(Error::Tx)?;
+
+        // Prime to the nil UUID so RLS fails closed. `SET LOCAL` scope
+        // via `set_config(..., is_local = true)` — identical plumbing
+        // to `Tx::for_user`.
+        sqlx::query("SELECT set_config('app.user_id', $1, true)")
+            .bind(Uuid::nil().to_string())
+            .execute(&mut *inner)
+            .await
+            .map_err(Error::Tx)?;
+
         Ok(Tx { inner })
     }
 

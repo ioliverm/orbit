@@ -207,6 +207,7 @@ proptest! {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.90".into()),
+            fx_rates_by_currency: std::collections::BTreeMap::new(),
             today: TODAY,
         };
         let result = compute_paper_gains(&input);
@@ -228,6 +229,7 @@ proptest! {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.90".into()),
+            fx_rates_by_currency: std::collections::BTreeMap::new(),
             today: TODAY,
         };
         let result = compute_paper_gains(&input);
@@ -270,6 +272,7 @@ proptest! {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("1.0".into()),
+            fx_rates_by_currency: std::collections::BTreeMap::new(),
             today: TODAY,
         };
         let result = compute_paper_gains(&input);
@@ -326,6 +329,7 @@ proptest! {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some(fx),
+            fx_rates_by_currency: std::collections::BTreeMap::new(),
             today: TODAY,
         };
         let result = compute_paper_gains(&input);
@@ -349,6 +353,7 @@ proptest! {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.90".into()),
+            fx_rates_by_currency: std::collections::BTreeMap::new(),
             today: TODAY,
         };
         let result = compute_paper_gains(&input);
@@ -375,6 +380,7 @@ proptest! {
             ticker_prices: &prices,
             grant_overrides: &[],
             fx_rate_eur_native: Some("0.90".into()),
+            fx_rates_by_currency: std::collections::BTreeMap::new(),
             today: TODAY,
         };
         let result = compute_paper_gains(&input);
@@ -387,6 +393,67 @@ proptest! {
         // the combined band (handled in the dedicated integration
         // probe). Since this strategy guarantees >=1 purchase, we have
         // a combined band.
+        prop_assert!(result.combined_eur_band.is_some());
+    }
+
+    /// 7. Slice-3 T33 S4 — a grant whose `native_currency` has an
+    ///    explicit `None` entry in `fx_rates_by_currency` surfaces as
+    ///    `UnsupportedCurrency` and lands in `incomplete_grants`,
+    ///    regardless of the legacy `fx_rate_eur_native` fallback.
+    #[test]
+    fn prop_unsupported_currency_surfaces_incomplete(
+        g in complete_rsu_strategy(TODAY),
+        price in price_strategy(),
+    ) {
+        let mut g = g;
+        g.native_currency = "JPY".to_string();
+        let prices = acme_price(&price);
+        let mut fx_map: std::collections::BTreeMap<String, Option<String>> =
+            std::collections::BTreeMap::new();
+        fx_map.insert("JPY".into(), None);
+        let input = PaperGainsInput {
+            grants: std::slice::from_ref(&g),
+            ticker_prices: &prices,
+            grant_overrides: &[],
+            fx_rate_eur_native: Some("0.90".into()),
+            fx_rates_by_currency: fx_map,
+            today: TODAY,
+        };
+        let result = compute_paper_gains(&input);
+        prop_assert_eq!(result.per_grant[0].complete, false);
+        prop_assert_eq!(
+            result.per_grant[0].missing_reason,
+            Some(MissingReason::UnsupportedCurrency),
+        );
+        prop_assert!(result.incomplete_grants.contains(&g.id));
+    }
+
+    /// 8. Slice-3 T33 S4 — a GBP-native grant with a GBP entry in
+    ///    `fx_rates_by_currency` uses that rate, not the legacy
+    ///    `fx_rate_eur_native` fallback (which is EUR/USD).
+    #[test]
+    fn prop_gbp_native_uses_per_currency_rate(
+        g in complete_rsu_strategy(TODAY),
+        price in price_strategy(),
+    ) {
+        let mut g = g;
+        g.native_currency = "GBP".to_string();
+        let prices = acme_price(&price);
+        let mut fx_map: std::collections::BTreeMap<String, Option<String>> =
+            std::collections::BTreeMap::new();
+        fx_map.insert("GBP".into(), Some("1.2000".into()));
+        let input = PaperGainsInput {
+            grants: std::slice::from_ref(&g),
+            ticker_prices: &prices,
+            grant_overrides: &[],
+            // Deliberately stale / mismatched fallback — the per-currency
+            // rate must win.
+            fx_rate_eur_native: Some("0.90".into()),
+            fx_rates_by_currency: fx_map,
+            today: TODAY,
+        };
+        let result = compute_paper_gains(&input);
+        prop_assert_eq!(result.per_grant[0].complete, true);
         prop_assert!(result.combined_eur_band.is_some());
     }
 }

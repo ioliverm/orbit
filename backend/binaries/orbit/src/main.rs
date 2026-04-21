@@ -186,9 +186,17 @@ async fn run_worker(database_url: String, once: Option<String>) -> ExitCode {
     // The ECB worker needs a separate reqwest client from the API's
     // HIBP client because the timeout posture differs: 5 s here per
     // ADR-007 vs 500 ms for HIBP.
+    //
+    // `redirect(Policy::none())` — ECB publishes at a stable
+    // `https://www.ecb.europa.eu/stats/eurofxref/...` URL, so a redirect
+    // is either a site reshuffle (tracked manually) or an attempt to
+    // pivot the fetch somewhere unexpected. Fail closed rather than
+    // follow. The response-size cap lives in `fx::fetch_xml` so that
+    // bootstrap + daily share the same gate.
     let http = match reqwest::Client::builder()
         .user_agent("orbit-worker/0.0.0")
         .timeout(std::time::Duration::from_secs(5))
+        .redirect(reqwest::redirect::Policy::none())
         .build()
     {
         Ok(c) => c,

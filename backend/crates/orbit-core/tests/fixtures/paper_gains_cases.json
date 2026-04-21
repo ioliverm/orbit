@@ -38,7 +38,14 @@
       "expected": {
         "completeIds": ["11111111-1111-1111-1111-111111111111"],
         "incompleteGrants": [],
-        "hasCombinedBand": true
+        "hasCombinedBand": true,
+        "expectedPerGrant": {
+          "11111111-1111-1111-1111-111111111111": {
+            "gainNative": "1800.0000",
+            "gainEurBand": { "low": "1571.40", "mid": "1595.70", "high": "1620.00" }
+          }
+        },
+        "expectedCombinedEurBand": { "low": "1571.40", "mid": "1595.70", "high": "1620.00" }
       }
     },
     {
@@ -366,7 +373,18 @@
           "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
         ],
         "incompleteGrants": [],
-        "hasCombinedBand": true
+        "hasCombinedBand": true,
+        "expectedPerGrant": {
+          "99999999-9999-9999-9999-999999999999": {
+            "gainNative": "2000.0000",
+            "gainEurBand": { "low": "1746.00", "mid": "1773.00", "high": "1800.00" }
+          },
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa": {
+            "gainNative": "1000.0000",
+            "gainEurBand": { "low": "873.00", "mid": "886.50", "high": "900.00" }
+          }
+        },
+        "expectedCombinedEurBand": { "low": "2619.00", "mid": "2659.50", "high": "2700.00" }
       }
     },
     {
@@ -410,6 +428,87 @@
       "expected": {
         "completeIds": [],
         "incompleteGrants": [],
+        "hasCombinedBand": false
+      }
+    },
+    {
+      "name": "gbp-native-uses-per-currency-fx",
+      "today": "2026-04-19",
+      "fxRateEurNative": "0.9000",
+      "fxRatesByCurrency": {
+        "GBP": "1.2000"
+      },
+      "grants": [
+        {
+          "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "instrument": "rsu",
+          "nativeCurrency": "GBP",
+          "ticker": "GBCO",
+          "doubleTrigger": false,
+          "liquidityEventDate": null,
+          "vestingEvents": [
+            {
+              "vestDate": "2025-10-15",
+              "state": "vested",
+              "sharesVestedScaled": 1000000,
+              "fmvAtVest": "40.0000",
+              "fmvCurrency": "GBP"
+            }
+          ],
+          "esppPurchases": []
+        }
+      ],
+      "tickerPrices": [
+        { "ticker": "GBCO", "price": "50.0000", "currency": "GBP" }
+      ],
+      "grantOverrides": [],
+      "expected": {
+        "completeIds": ["dddddddd-dddd-dddd-dddd-dddddddddddd"],
+        "incompleteGrants": [],
+        "hasCombinedBand": true,
+        "expectedPerGrant": {
+          "dddddddd-dddd-dddd-dddd-dddddddddddd": {
+            "gainNative": "1000.0000",
+            "gainEurBand": { "low": "1164.00", "mid": "1182.00", "high": "1200.00" }
+          }
+        },
+        "expectedCombinedEurBand": { "low": "1164.00", "mid": "1182.00", "high": "1200.00" }
+      }
+    },
+    {
+      "name": "unsupported-currency-surfaces-reason",
+      "today": "2026-04-19",
+      "fxRateEurNative": "0.9000",
+      "fxRatesByCurrency": {
+        "JPY": null
+      },
+      "grants": [
+        {
+          "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          "instrument": "rsu",
+          "nativeCurrency": "JPY",
+          "ticker": "JPCO",
+          "doubleTrigger": false,
+          "liquidityEventDate": null,
+          "vestingEvents": [
+            {
+              "vestDate": "2025-10-15",
+              "state": "vested",
+              "sharesVestedScaled": 1000000,
+              "fmvAtVest": "40.0000",
+              "fmvCurrency": "JPY"
+            }
+          ],
+          "esppPurchases": []
+        }
+      ],
+      "tickerPrices": [
+        { "ticker": "JPCO", "price": "50.0000", "currency": "JPY" }
+      ],
+      "grantOverrides": [],
+      "expected": {
+        "completeIds": [],
+        "incompleteGrants": ["eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"],
         "hasCombinedBand": false
       }
     }

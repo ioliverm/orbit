@@ -270,7 +270,7 @@ function PastRow({
   const [editing, setEditing] = useState(false);
   const [vestDate, setVestDate] = useState(event.vestDate);
   const [shares, setShares] = useState(
-    String(Math.floor(event.sharesVestedThisEventScaled / 10000)),
+    scaledToDecimalShares(event.sharesVestedThisEventScaled),
   );
   const [fmv, setFmv] = useState(event.fmvAtVest ?? '');
   const [currency, setCurrency] = useState<PriceCurrency>(
@@ -282,16 +282,17 @@ function PastRow({
       if (!event.id || !event.updatedAt) throw new Error('missing row id');
       const body: {
         vestDate?: string;
-        sharesVested?: number;
+        sharesVested?: string;
         fmvAtVest?: string | null;
         fmvCurrency?: PriceCurrency | null;
         expectedUpdatedAt: string;
       } = { expectedUpdatedAt: event.updatedAt };
       if (vestDate !== event.vestDate) body.vestDate = vestDate;
-      const originalShares = String(
-        Math.floor(event.sharesVestedThisEventScaled / 10000),
-      );
-      if (shares !== originalShares) body.sharesVested = Number(shares);
+      const originalShares = scaledToDecimalShares(event.sharesVestedThisEventScaled);
+      // Pass the raw string-decimal so the backend keeps the full 4-dp
+      // precision (matches `fmvAtVest`'s convention). `Number()`ing
+      // here would truncate "12.3400" → 12.34 on round-trip.
+      if (shares.trim() !== originalShares) body.sharesVested = shares.trim();
       body.fmvAtVest = fmv.trim() === '' ? null : fmv;
       body.fmvCurrency = fmv.trim() === '' ? null : currency;
       return putOverride(grantId, event.id, body);
@@ -316,6 +317,11 @@ function PastRow({
       });
     },
     onSuccess: () => onAfterMutate(),
+    onError: (err: unknown) => {
+      if (err instanceof AppError && err.isStaleClientState() && event.id) {
+        onConflict(event.id);
+      }
+    },
   });
 
   return (
@@ -341,6 +347,9 @@ function PastRow({
             <input
               className="input input--cell num"
               type="number"
+              // 4-dp step matches `SHARES_SCALE = 10_000`; the handler
+              // truncates beyond 4 dp anyway.
+              step="0.0001"
               value={shares}
               onChange={(e) => setShares(e.target.value)}
               onKeyDown={(e) => handleKey(e, saveM.mutate, () => setEditing(false))}
@@ -399,9 +408,7 @@ function PastRow({
         <>
           <td>{formatLongDate(event.vestDate, locale)}</td>
           <td className="num">
-            {Math.floor(event.sharesVestedThisEventScaled / 10000).toLocaleString(
-              locale === 'es-ES' ? 'es-ES' : 'en-US',
-            )}
+            {formatScaledShares(event.sharesVestedThisEventScaled, locale)}
           </td>
           <td className="num">
             {event.fmvAtVest ? `${event.fmvAtVest} ${event.fmvCurrency ?? ''}` : '—'}
@@ -494,9 +501,7 @@ function FutureRow({
     >
       <td>{formatLongDate(event.vestDate, locale)}</td>
       <td className="num muted">
-        {Math.floor(event.sharesVestedThisEventScaled / 10000).toLocaleString(
-          locale === 'es-ES' ? 'es-ES' : 'en-US',
-        )}
+        {formatScaledShares(event.sharesVestedThisEventScaled, locale)}
       </td>
       <td className="num">
         {editing ? (
@@ -706,4 +711,36 @@ function handleKey(
     e.preventDefault();
     onCancel();
   }
+}
+
+/// Convert a scaled-i64 share count (1/10_000ths of a share) to a
+/// canonical editor string. Preserves up to 4 dp; trims trailing
+/// zeros and a trailing "." so whole numbers render as "500" rather
+/// than "500.0000".
+///
+/// Matches the Rust `orbit_core::SHARES_SCALE = 10_000` bridge.
+export function scaledToDecimalShares(scaled: number): string {
+  if (!Number.isFinite(scaled)) return '0';
+  const sign = scaled < 0 ? '-' : '';
+  const abs = Math.abs(Math.trunc(scaled));
+  const whole = Math.floor(abs / 10_000);
+  const frac = abs % 10_000;
+  if (frac === 0) return `${sign}${whole}`;
+  const fracStr = String(frac).padStart(4, '0').replace(/0+$/, '');
+  return `${sign}${whole}.${fracStr}`;
+}
+
+function formatScaledShares(scaled: number, locale: 'es-ES' | 'en'): string {
+  const whole = Math.trunc(scaled / 10_000);
+  const frac = Math.abs(scaled % 10_000);
+  const fmtLocale = locale === 'es-ES' ? 'es-ES' : 'en-US';
+  const wholePart = whole.toLocaleString(fmtLocale);
+  if (frac === 0) return wholePart;
+  // Locale-correct decimal separator via toLocaleString on a compound
+  // value; round to the nearest 1/10_000th for display.
+  const asNumber = scaled / 10_000;
+  return asNumber.toLocaleString(fmtLocale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  });
 }

@@ -26,6 +26,12 @@ use std::time::Duration;
 const ECB_DAILY_URL: &str = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
 const ECB_BOOTSTRAP_URL: &str = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml";
 
+/// Maximum accepted response body. The daily file is ~3 KiB; the 90-day
+/// historical file is ~200 KiB. 256 KiB leaves comfortable headroom
+/// without letting a misbehaving upstream (or an attacker that has
+/// usurped the endpoint) stream unbounded bytes into the worker.
+const MAX_RESPONSE_BYTES: usize = 256 * 1024;
+
 /// Which fetch to run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FetchKind {
@@ -118,10 +124,30 @@ async fn fetch_xml(http: &reqwest::Client, url: &str) -> Result<String, FetchErr
             resp.status().as_u16()
         )));
     }
-    tokio::time::timeout(Duration::from_secs(5), resp.text())
+
+    // Up-front reject: if the server advertises a body larger than the
+    // cap via `Content-Length`, drop the connection without draining.
+    // A stale `Content-Length` value would otherwise let us paying the
+    // full read cost before the cap fires below.
+    if let Some(len) = resp.content_length() {
+        if len as usize > MAX_RESPONSE_BYTES {
+            return Err(FetchError::Parse("response_too_large".to_string()));
+        }
+    }
+
+    let bytes = tokio::time::timeout(Duration::from_secs(5), resp.bytes())
         .await
         .map_err(|_| FetchError::Timeout)?
-        .map_err(|e| FetchError::Network(e.to_string()))
+        .map_err(|e| FetchError::Network(e.to_string()))?;
+
+    // Post-read cap: handles servers that omit / lie about
+    // Content-Length. The body is already in memory so reject-and-drop
+    // is sufficient; no need to stream-cap.
+    if bytes.len() > MAX_RESPONSE_BYTES {
+        return Err(FetchError::Parse("response_too_large".to_string()));
+    }
+
+    String::from_utf8(bytes.to_vec()).map_err(|e| FetchError::Parse(format!("utf8: {e}")))
 }
 
 // ---------------------------------------------------------------------------

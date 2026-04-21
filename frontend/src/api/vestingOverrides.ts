@@ -10,7 +10,9 @@ import type { PriceCurrency } from './currentPrices';
 
 export interface VestingOverrideBody {
   vestDate?: string;
-  sharesVested?: number;
+  /** Whole-share integer (legacy) or decimal string with up to 4 dp
+   *  (preferred; preserves fractional precision on round-trip). */
+  sharesVested?: number | string;
   /** `undefined` = leave FMV alone; `null` = clear; string = set. */
   fmvAtVest?: string | null;
   fmvCurrency?: PriceCurrency | null;

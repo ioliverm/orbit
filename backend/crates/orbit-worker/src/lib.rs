@@ -118,8 +118,10 @@ async fn wait_shutdown(mut rx: tokio::sync::watch::Receiver<bool>) {
     let _ = rx.changed().await;
 }
 
-/// Best-effort audit-row insert for a fetch failure. Runs against a
-/// system pseudo-tx (no user scoping; fx_rates is reference data).
+/// Best-effort audit-row insert for a fetch failure. Rides inside a
+/// `Tx::system` transaction so the write respects the module's "every
+/// system write goes through `Tx::system`" contract (lib-docstring §1)
+/// and so future failure bookkeeping (multi-statement) stays atomic.
 /// Errors are swallowed because (a) the fetch already failed and
 /// (b) losing the audit row is strictly less bad than losing the
 /// scheduler on a DB blip.
@@ -132,7 +134,11 @@ async fn record_failure_audit(pool: &PgPool, kind: FetchKind, err: &FetchError) 
         "kind": kind_str,
         "attempted_at_minute": minute,
     });
-    let _ = sqlx::query(
+    let mut tx = match Tx::system(pool).await {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+    let insert_result = sqlx::query(
         r#"
         INSERT INTO audit_log (
             user_id, actor_kind, action, target_kind, target_id,
@@ -146,8 +152,11 @@ async fn record_failure_audit(pool: &PgPool, kind: FetchKind, err: &FetchError) 
         FetchKind::Bootstrap => "fx.bootstrap_failure",
     })
     .bind(payload)
-    .execute(pool)
+    .execute(tx.as_executor())
     .await;
+    if insert_result.is_ok() {
+        let _ = tx.commit().await;
+    }
 }
 
 /// Helper for audit writes that DO ride inside a tx (success path). See

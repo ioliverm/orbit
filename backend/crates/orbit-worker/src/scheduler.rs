@@ -3,10 +3,13 @@
 //! ADR-017 §4 picks the simplest shape that works: on each tick, sleep
 //! until the next 17:00 local. Europe/Madrid's offset is `CET (+1)` /
 //! `CEST (+2)`; we approximate this with a **fixed +01:00 offset** so
-//! the worker has zero dependencies on `chrono-tz`. Four hours of drift
-//! per year during DST transitions is acceptable at Slice-3 scale (one
-//! scheduled fetch per day; ECB publishes at ~16:00 CET regardless, so
-//! the 17:00 trigger window comfortably covers both the DST edges).
+//! the worker has zero dependencies on `chrono-tz`. During CEST (roughly
+//! the last Sunday of March through the last Sunday of October — ~26
+//! weeks) the fixed-offset tick fires one hour later than the true local
+//! 17:00 (i.e., at 18:00 Madrid wall-clock). This is acceptable at
+//! Slice-3 scale (one scheduled fetch per day; ECB publishes at ~16:00
+//! CET regardless, so the 17:00 / 18:00 trigger window still comfortably
+//! covers both the DST edges).
 //!
 //! If Slice 9's ops review wants strict Europe/Madrid (including DST),
 //! swap the offset for `chrono_tz::Europe::Madrid` — the rest of the

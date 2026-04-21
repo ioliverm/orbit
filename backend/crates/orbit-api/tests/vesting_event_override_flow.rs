@@ -64,11 +64,18 @@ async fn list_vesting(app: &axum::Router, s: &Session, grant_id: &uuid::Uuid) ->
 }
 
 async fn fetch_event_row(
-    pool: &sqlx::PgPool,
+    _pool: &sqlx::PgPool,
     grant_id: uuid::Uuid,
     idx: i64,
 ) -> (uuid::Uuid, chrono::DateTime<chrono::Utc>) {
-    // Fetch the N-th past vesting event (by vest_date ASC).
+    // Routes through `DATABASE_URL_MIGRATE` when set: the `orbit_app`
+    // role's RLS policy casts `current_setting('app.user_id')` to UUID,
+    // which errors (22P02 `invalid input syntax for type uuid: ""`) when
+    // the GUC has been left empty on a pooled connection after a prior
+    // `Tx::for_user` commit. The migrate pool bypasses RLS; callers
+    // that still pass `&state.pool` keep the signature for back-compat
+    // but the actual query lands on the migrate pool.
+    let pool = audit_pool().await;
     let row: (uuid::Uuid, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
         r#"
         SELECT id, updated_at FROM vesting_events
@@ -79,7 +86,7 @@ async fn fetch_event_row(
     )
     .bind(grant_id)
     .bind(idx)
-    .fetch_one(pool)
+    .fetch_one(&pool)
     .await
     .expect("fetch event row");
     row
@@ -232,6 +239,71 @@ async fn override_two_concurrent_puts_first_wins_second_409s() {
             "fmvAtVest": "43.0000",
             "fmvCurrency": "USD",
             "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(body["error"]["code"], "resource.stale_client_state");
+}
+
+/// T33 / B1 — two simultaneous `clearOverride: true` PUTs with the
+/// same `expectedUpdatedAt` cookie: the first reverts, the second
+/// must 409. Mirrors `override_two_concurrent_puts_first_wins_second_409s`
+/// for the clear-override path, closing the read-vs-UPDATE OCC gap
+/// the T32 review flagged.
+#[tokio::test]
+async fn clear_override_two_concurrent_puts_first_wins_second_409s() {
+    let (state, app) = app().await;
+    let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "vev-clear-occ").await;
+    let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
+
+    // Seed the row as overridden so the clear path has something to
+    // revert. Use the freshest updated_at cookie for the first write.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "sharesVested": 500,
+            "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::OK);
+    let (_s, _c, row) = body_json(r).await;
+    let after_override_ua: String = row["updatedAt"].as_str().unwrap().into();
+
+    // First clear — fresh token, succeeds.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "clearOverride": true,
+            "expectedUpdatedAt": after_override_ua,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::OK);
+
+    // Second clear — SAME stale token → 409, not a silent re-clear.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "clearOverride": true,
+            "expectedUpdatedAt": after_override_ua,
         }),
         vec![
             (header::COOKIE.as_str(), s.cookie.clone()),
