@@ -712,18 +712,19 @@ Privacy implications, documented:
 - The column is excluded from the `audit_log` payload (G-32). `session.revoke` payloads carry `kind` + `initiator` only.
 - On account deletion (Slice 7), the column is included in the cascade — no orphan.
 
-**Slice-2 delivery note (T25 / S-2.2).** The `sessions.country_iso2`
-column is **reserved in Slice 2 and populated in Slice 3**. Slice 2
-ships the DDL + the UI "ubicación desconocida" branch, but does not
-wire a GeoIP dataset — the column is always `NULL` at INSERT time
-for Slice-2 sessions. The GeoIP dataset decision (MaxMind GeoLite2
-`.mmdb` vs. a hosted lookup) is deferred to Slice 3's
-Finnhub / FX / uptime-monitor procurement cycle, where procurement
-of a second external dataset naturally fits. The privacy posture
-described above does not change: the column is narrower than raw
-IP, and until Slice 3 ships, the UI renders the unknown-location
-branch for every row. No Slice-2 AC is dependent on a populated
-column; the UI treats `NULL` the same as "lookup failed".
+**Slice-2 delivery note (T25 / S-2.2, superseded 2026-04-21).** The
+`sessions.country_iso2` column is **reserved in Slice 2 and
+populated in Slice 9** (was "Slice 3" pre-2026-04-21; per plan v1.4
+Q2 decision, the GeoIP dataset — MaxMind GeoLite2 `.mmdb` or
+equivalent — now lands alongside Finnhub + other vendor procurement
+at the final deploy slice, so every external sub-processor lands in
+one concentrated cycle). Slice 2 ships the DDL + the UI "ubicación
+desconocida" branch; Slices 3–8 continue to insert `NULL` at session
+creation. The privacy posture described above does not change: the
+column is narrower than raw IP, and until Slice 9 ships, the UI
+renders the unknown-location branch for every row. No Slice-2 AC is
+dependent on a populated column; the UI treats `NULL` the same as
+"lookup failed".
 
 **Cost of the opposite decision** (GeoIP at list-time with raw-IP storage): SEC-054 is violated; the new-device-notice email (SEC-010, shipped in Slice 1) would already need the raw IP to do a city lookup and we decided there to drop the city in favor of "new sign-in from Madrid (approx.)" — a country-level signal matching this decision. Keeping the two surfaces consistent is the right shape.
 
