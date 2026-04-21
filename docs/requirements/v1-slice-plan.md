@@ -2,14 +2,15 @@
 
 | Field       | Value                                                      |
 |-------------|------------------------------------------------------------|
-| Version     | 1.3                                                        |
-| Date        | 2026-04-20                                                 |
+| Version     | 1.4                                                        |
+| Date        | 2026-04-21                                                 |
 | Owner       | requirements-analyst (Ivan Oliver)                         |
 | Sources     | `docs/specs/orbit-v1-persona-b-spain.md`, ADR-001..ADR-008, ADR-015 (local-first split), `docs/design/orbit-v1-ui-proposal.md`, `docs/requirements/open-questions-resolved.md` |
 | Purpose     | Break v1 into ordered, independently shippable vertical slices. Each ends in a demo-able state. No layers; every slice crosses frontend + backend + data + ops. |
 | v1.1 change | Product owner decision 2026-04-19: defer cloud deployment to the end. Slices 1–7 build and demo against the local stack established in Slice 0a. Everything deferred from ADR-015 §0b, plus the pen-test and legal-surface publication previously in Slice 7, consolidate into a new **Slice 8 — Production deployment & launch gate**. No feature work changes. |
 | v1.2 change | Product owner decision 2026-04-19 (same day, follow-up): **this is a PoC; no Stripe, no paid tier.** The free/paid distinction is removed everywhere. Every account is the same account; every feature is available to every user. Slice 3 collapses from "Paid shell + Modelo 720 passive UX" to just "FX pipeline + Modelo 720 passive UX + dashboard EUR conversion". Billing, subscription state, VAT handling, feature-matrix screen, preview-only blurred state, and `subscriptions` table all drop out. TOTP 2FA becomes optional for every user in Slice 7 (no "mandatory for paid"). Stripe live-mode cutover and professional indemnity insurance drop out of Slice 8. |
 | v1.3 change | Product owner decision 2026-04-20: **defer bulk-import tooling (CSV Carta + Shareworks, ETrade PDF) to the end of v1**, immediately before cloud deployment. Slice 2 trims to the non-import surfaces (ESPP purchases, Art. 7.p trips, multi-grant dashboard, Modelo 720 category inputs, session-device UI). A new **Slice 8 — Portfolio bulk import** is inserted between the old Slice 7 and the old Slice 8; the deploy slice renumbers to **Slice 9 — Production deployment & launch gate**. Rationale: hand-entry through Slice 7 is the minimum viable path for Ivan's own dogfooding; import tooling has a long-tail QA story (column-mapping edge cases, vendor CSV drift) that is safer to build in one concentrated batch just before production users arrive. Neither the "Tengo varios grants" link (AC-4.2.11) nor the bulk-import affordance in Slice 2 is moved — both defer to Slice 8. Internal-readiness gate shifts: **end of Slice 8** is now the feature-complete mark (was end of Slice 7); end of Slice 7 is the "hand-entry-only MVP" mark. |
+| v1.4 change | Product owner decision 2026-04-21: fold **per-vest FMV capture + editable past vesting events** into Slice 3. Rationale: the spec (`orbit-v1-persona-b-spain.md` L319/L334) treats FMV-at-vest as the RSU cost basis but no slice defined where that data lives. `vesting_events` gets `fmv_at_vest` + `fmv_currency` + `is_user_override` + `overridden_at` columns; past-event rows become editable for FMV, date, and shares-vested with user-edits authoritative over the derivation (cumulative invariant relaxes on any override). Slice 3 T-shirt bumps **M → L**. Ships alongside the ECB pipeline so the grant-detail "Precios de vesting" section can render pre-filled EUR values on introduction. NSO exercise-FMV is the symmetric gap on NSO grants and stays in Slice 5 where sell-now consumes it (`nso_exercises` table lands there). |
 
 ## Principles
 
@@ -27,7 +28,7 @@
 | 0a | Foundation shell (local) | Bootable local app, auth, empty dashboard, CI, observability skeleton, cookie banner. | M | Log in on `localhost`, land on empty dashboard, log out. |
 | 1 | **First portfolio** | Sign up → residency → first grant → see vesting schedule. | L | Persona B enters one grant, sees vesting timeline. Nothing else. |
 | 2 | Portfolio completeness (hand-entry) | Multiple grants, dashboard tiles, ESPP purchases, Art. 7.p trip entry, Modelo 720 category inputs, session-device UI. **No bulk import** (Slice 8). | M | Persona B adds several grants by hand, records an ESPP purchase, logs a trip. |
-| 3 | FX + Modelo 720 passive UX | ECB FX pipeline, dashboard EUR conversion (paper-gains tile), Modelo 720 threshold alert, rule-set chip in footer. | M | Paper-gains tile shows EUR with bands; M720 threshold alert fires; footer chip shows ECB FX date + engine version. |
+| 3 | FX + Modelo 720 passive UX + FMV capture | ECB FX pipeline, dashboard EUR conversion (paper-gains tile), Modelo 720 threshold alert, rule-set chip in footer, per-vest FMV capture + editable past vesting events. | L | Paper-gains tile shows EUR with bands; M720 threshold alert fires; footer chip shows ECB FX date + engine version; grant-detail "Precios de vesting" lets the user adjust past vests. |
 | 4 | Tax engine + autonomía + scenario modeler | First tax numbers. Rule-set versioning goes live. Ranges-and-sensitivity NFR activates. | XL | Persona B runs the IPO/lockup/hold scenario and sees net proceeds with sensitivity. |
 | 5 | Sell-now calculator (post-IPO leg) | Finnhub (dev tier) + ECB pipeline + US-013. | L | Persona B opens sell-now, enters lots, sees net-EUR-landing range. |
 | 6 | Exports + Modelo 720 worksheet + recompute | Gestor PDF, CSV, traceability IDs, recompute-under-current-rules. | L | Persona B exports a scenario PDF; tests recompute after a rule-set bump. |
@@ -184,10 +185,10 @@ End of Slice 1.
 
 ---
 
-## Slice 3 — FX pipeline + Modelo 720 passive UX
+## Slice 3 — FX pipeline + Modelo 720 passive UX + FMV capture
 
 ### Scope one-liner
-The ECB FX ingestion pipeline stands up, EUR conversion lights up on the dashboard, and the Modelo 720 threshold UI (alert only — not the worksheet PDF yet) works. **No billing. No Stripe. No paid/free gating. Every feature is available to every account** (v1.2 PoC scope).
+The ECB FX ingestion pipeline stands up, EUR conversion lights up on the dashboard, the Modelo 720 threshold UI (alert only — not the worksheet PDF yet) works, and **per-vest FMV capture + editable past vesting events** (v1.4) land so Slice 4's tax engine has the cost-basis data it needs. **No billing. No Stripe. No paid/free gating. Every feature is available to every account** (v1.2 PoC scope).
 
 ### Entry state
 End of Slice 2.
@@ -198,21 +199,27 @@ End of Slice 2.
 - **Dashboard paper-gains tile** displays gains in EUR for the first time (uses ECB FX, bands at 0% / 1.5% / 3% per UX and ADR-007). Paper gains = (current price − grant price) × shares, converted to EUR. Current price is user-entered at this slice (Finnhub wires up in Slice 5 when it is decision-load-bearing).
 - **Modelo 720 threshold alert** (US-007 ACs 1, 2, 4) against the user-entered totals + the grant-side securities number. The securities number requires FX — that's why M720 alert rides with the FX pipeline in the same slice.
 - **Rule-set chip in footer** on pages that now carry an FX-dependent number. No tax rule-set yet — the chip surfaces ECB FX date + Orbit engine version in Slice 3. Full tax rule-set stamping starts in Slice 4.
+- **Per-vest FMV capture** (v1.4): `vesting_events` gains `fmv_at_vest NUMERIC(20,6)`, `fmv_currency TEXT`, `is_user_override BOOLEAN DEFAULT false`, `overridden_at TIMESTAMPTZ`. FMV is nullable (pre-IPO grants may have no value yet); Slice 4's tax engine surfaces "missing FMV" as a validation warning.
+- **Editable past vesting events** (v1.4): new "Precios de vesting" section on grant detail lists vest events with `vest_date ≤ today`. Each row is inline-editable for `vest_date`, `shares_vested_this_event`, and `fmv_at_vest`; FMV is also editable on future rows. Date + shares edits are confined to past events only. Edits mark the row `is_user_override = true`; grant re-derivations preserve overridden rows. Cumulative invariant (sum = share_count) is RELAXED on grants with any override — user-edit wins. Bulk-fill CTA "Aplicar FMV a todos" for pre-IPO grants with a constant 409A. Warning banner surfaces on the grant-edit form if any overrides exist.
+- **`sessions.country_iso2` populated** (ADR-016 follow-up from Slice 2): GeoIP lookup lands alongside the ECB worker since Slice 3 is the procurement cycle where the dataset decision naturally fits. The Slice-2 DDL column gets a writer.
 
 ### Explicit non-goals
 - **No Stripe, no billing, no subscription state, no VAT handling, no feature matrix screen, no preview-only blurred state, no `subscriptions` table.** All of this is permanently out of v1 PoC scope (v1.2 decision).
 - **No tax math on the dashboard still.** No IRPF projection.
 - **No Modelo 720 worksheet PDF export** (Slice 6).
 - **No scenarios, no sell-now compute** (Slices 4–5).
-- **No market-data vendor** yet (current price is user-entered in this slice).
+- **No market-data vendor** yet (current price and FMV-at-vest are user-entered in this slice; Slice 5 auto-fills FMV from Finnhub historicals).
+- **No NSO exercise-FMV capture** — symmetric gap that lands in Slice 5 (`nso_exercises` table) where sell-now consumes it.
+- **No Art. 7.p eligibility evaluation** — still Slice 4.
 
 ### T-shirt
-**M.** The ECB pipeline is bounded (ADR-007 is explicit); M720 alert is form + threshold; paper-gains tile is a formula with band rendering.
+**L** (was M; bumped by the v1.4 FMV+editability expansion). The ECB pipeline is bounded (ADR-007 is explicit); M720 alert is form + threshold; paper-gains tile is a formula with band rendering; the FMV capture + editable past events add a schema change + override-preservation logic + an editable table surface on grant detail.
 
 ### Dependencies
 - Slice 2 complete.
 - ADR-007 ECB pipeline.
 - `fx_rates` table populated per ADR-005.
+- ADR-017 (Slice-3 technical design — supersedes the ADR-007 scope by adding the FMV columns + the override-preservation rules on `orbit_core::vesting::derive_vesting_events`).
 
 ---
 
