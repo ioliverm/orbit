@@ -214,10 +214,14 @@ describe('ESPP purchase new form', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /guardar compra/i }));
 
-    // First submit: duplicate warning renders.
-    await waitFor(() => {
-      expect(screen.getByText(/parece un duplicado/i)).toBeInTheDocument();
-    });
+    // First submit: duplicate warning renders. Assert by ARIA role + text
+    // content of the alert (Lingui's <Trans> can split its output across
+    // multiple DOM nodes on some runners, which breaks the default
+    // `getByText` single-node match — CI tripped on this). `role="alert"`
+    // is the ErrorBanner's stable hook, and `textContent` coalesces any
+    // child-element text.
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent ?? '').toMatch(/parece un duplicado/i);
 
     // Confirm and retry.
     fireEvent.click(
