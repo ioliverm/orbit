@@ -118,12 +118,41 @@ pub struct GrantInput {
 }
 
 /// A single derived vesting event.
+///
+/// # Slice 3 additions
+///
+/// `fmv_at_vest` and `fmv_currency` are populated only when the event
+/// originated from a `VestingEventOverride` (Slice 3 override-preservation
+/// branch). Algorithm-derived rows carry `None` for both — the DB layer's
+/// `vesting_events` row is the authoritative home for captured FMV, and
+/// this struct is simply the wire shape the derivation function returns.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VestingEvent {
     pub vest_date: NaiveDate,
     pub shares_vested_this_event: Shares,
     pub cumulative_shares_vested: Shares,
     pub state: VestingState,
+    /// Slice 3: FMV carried verbatim from an override; `None` for
+    /// algorithm-derived rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fmv_at_vest: Option<String>,
+    /// Slice 3: currency carried verbatim from an override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fmv_currency: Option<String>,
+}
+
+/// An existing user override passed into [`derive_vesting_events`] so that
+/// a grant-param change preserves the row (AC-8.4.2). The tuple
+/// `(vest_date, original_derivation_index)` is the deterministic ordering
+/// key when multiple overrides happen to fall on the same `vest_date`
+/// (ADR-017 §2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VestingEventOverride {
+    pub vest_date: NaiveDate,
+    pub shares_vested_this_event: Shares,
+    pub fmv_at_vest: Option<String>,
+    pub fmv_currency: Option<String>,
+    pub original_derivation_index: usize,
 }
 
 /// Errors produced by the validator + derivation.
@@ -147,12 +176,46 @@ pub enum VestingError {
 ///
 /// Returns events in chronological order. Every invariant from AC-4.3.1..5
 /// is exercised by the unit + property tests in this module.
+///
+/// # Slice 3 override preservation (ADR-017 §2)
+///
+/// `existing_overrides` carries the user's previously-edited rows across a
+/// grant-param change (AC-8.4.2). When the slice is empty the function is
+/// bit-identical to its Slice-1 shape: pure derivation from `grant`, the
+/// cumulative invariant `sum == share_count` holds (asserted in debug
+/// builds).
+///
+/// When any override is present:
+///
+///   * Every override is returned **verbatim** at its `vest_date`, carrying
+///     its shares and FMV unchanged. The `state` is recomputed against
+///     `today`.
+///   * Algorithm-derived slots that do NOT collide with an override by
+///     `vest_date` are emitted from the standard derivation.
+///   * The cumulative-invariant is **relaxed** — the sum MAY differ from
+///     `grant.share_count` per AC-8.5.2. The caller renders the UI banner
+///     per AC-8.5.3.
+///   * Events are sorted by `(vest_date ASC, original_derivation_index
+///     ASC)` for deterministic output across runs.
 pub fn derive_vesting_events(
     grant: &GrantInput,
     today: NaiveDate,
+    existing_overrides: &[VestingEventOverride],
 ) -> Result<Vec<VestingEvent>, VestingError> {
     validate(grant)?;
 
+    if existing_overrides.is_empty() {
+        return derive_no_overrides(grant, today);
+    }
+
+    derive_with_overrides(grant, today, existing_overrides)
+}
+
+/// Slice-1 path — unchanged behavior, cumulative invariant asserted.
+fn derive_no_overrides(
+    grant: &GrantInput,
+    today: NaiveDate,
+) -> Result<Vec<VestingEvent>, VestingError> {
     let total = grant.share_count;
     let total_months = grant.vesting_total_months;
     let cliff = grant.cliff_months;
@@ -176,6 +239,8 @@ pub fn derive_vesting_events(
             shares_vested_this_event: at_cliff,
             cumulative_shares_vested: at_cliff,
             state: state_for(grant, today, vest_date),
+            fmv_at_vest: None,
+            fmv_currency: None,
         });
         cumulative = at_cliff;
         // Clamp so that a cadence whose `cliff + step` overshoots the total
@@ -206,6 +271,8 @@ pub fn derive_vesting_events(
             shares_vested_this_event: delta,
             cumulative_shares_vested: target,
             state: state_for(grant, today, vest_date),
+            fmv_at_vest: None,
+            fmv_currency: None,
         });
         cumulative = target;
         // Break if we just emitted the final event; `m + step` could overshoot.
@@ -227,6 +294,100 @@ pub fn derive_vesting_events(
     debug_assert_eq!(cumulative, total, "sum of shares must equal total");
 
     Ok(events)
+}
+
+/// Slice-3 override-aware path. Builds the base schedule, substitutes
+/// matching overrides by `vest_date`, merges any overrides that fall
+/// outside the derivation window (they survive — AC-8.4.2), then sorts
+/// by `(vest_date, original_derivation_index)` for deterministic output.
+/// The cumulative-invariant is NOT asserted here; the caller renders
+/// AC-8.5.3 when the sum diverges.
+fn derive_with_overrides(
+    grant: &GrantInput,
+    today: NaiveDate,
+    existing_overrides: &[VestingEventOverride],
+) -> Result<Vec<VestingEvent>, VestingError> {
+    let base = derive_no_overrides(grant, today)?;
+
+    // Build a merged list: every base slot becomes either a passthrough
+    // (original_derivation_index = slot's position) or a substitution
+    // (the override at that vest_date wins). Overrides whose vest_date
+    // does not land on any base slot are appended as extra events
+    // carrying their own original_derivation_index.
+    let mut merged: Vec<(usize, VestingEvent)> =
+        Vec::with_capacity(base.len() + existing_overrides.len());
+    let mut consumed: Vec<bool> = vec![false; existing_overrides.len()];
+
+    for (slot_idx, slot) in base.iter().enumerate() {
+        // Match by vest_date. First unconsumed override wins (overrides
+        // with the same vest_date break ties via their original index
+        // after the sort — this loop is stable because we walk slots
+        // in order).
+        let hit = existing_overrides
+            .iter()
+            .enumerate()
+            .find(|(i, o)| !consumed[*i] && o.vest_date == slot.vest_date);
+        match hit {
+            Some((i, over)) => {
+                consumed[i] = true;
+                merged.push((
+                    over.original_derivation_index,
+                    override_to_event(over, grant, today),
+                ));
+            }
+            None => {
+                merged.push((slot_idx, slot.clone()));
+            }
+        }
+    }
+
+    // Overrides without a matching base slot — preserve them (AC-8.4.2
+    // override-outside-window case).
+    for (i, over) in existing_overrides.iter().enumerate() {
+        if !consumed[i] {
+            merged.push((
+                over.original_derivation_index,
+                override_to_event(over, grant, today),
+            ));
+        }
+    }
+
+    // Sort by (vest_date ASC, original_derivation_index ASC).
+    merged.sort_by(|a, b| {
+        a.1.vest_date
+            .cmp(&b.1.vest_date)
+            .then_with(|| a.0.cmp(&b.0))
+    });
+
+    // Recompute cumulative_shares_vested for the merged sequence so the
+    // returned events remain internally consistent as a prefix-sum.
+    let mut cumulative: Shares = 0;
+    let events: Vec<VestingEvent> = merged
+        .into_iter()
+        .map(|(_, mut e)| {
+            cumulative = cumulative.saturating_add(e.shares_vested_this_event);
+            e.cumulative_shares_vested = cumulative;
+            e
+        })
+        .collect();
+
+    Ok(events)
+}
+
+fn override_to_event(
+    over: &VestingEventOverride,
+    grant: &GrantInput,
+    today: NaiveDate,
+) -> VestingEvent {
+    VestingEvent {
+        vest_date: over.vest_date,
+        shares_vested_this_event: over.shares_vested_this_event,
+        // Cumulative is recomputed by the merging caller.
+        cumulative_shares_vested: 0,
+        state: state_for(grant, today, over.vest_date),
+        fmv_at_vest: over.fmv_at_vest.clone(),
+        fmv_currency: over.fmv_currency.clone(),
+    }
 }
 
 /// Cumulative view of a schedule as of `today`: (fully vested, awaiting-liquidity).
@@ -352,7 +513,7 @@ mod tests {
             ..base(0)
         };
         assert_eq!(
-            derive_vesting_events(&g, d(2026, 1, 1)).unwrap_err(),
+            derive_vesting_events(&g, d(2026, 1, 1), &[]).unwrap_err(),
             VestingError::NonPositiveShareCount
         );
     }
@@ -364,7 +525,7 @@ mod tests {
             ..base(whole_shares(100))
         };
         assert_eq!(
-            derive_vesting_events(&g, d(2026, 1, 1)).unwrap_err(),
+            derive_vesting_events(&g, d(2026, 1, 1), &[]).unwrap_err(),
             VestingError::TotalMonthsOutOfRange
         );
     }
@@ -376,7 +537,7 @@ mod tests {
             ..base(whole_shares(100))
         };
         assert_eq!(
-            derive_vesting_events(&g, d(2026, 1, 1)).unwrap_err(),
+            derive_vesting_events(&g, d(2026, 1, 1), &[]).unwrap_err(),
             VestingError::TotalMonthsOutOfRange
         );
     }
@@ -388,7 +549,7 @@ mod tests {
             ..base(whole_shares(100))
         };
         assert_eq!(
-            derive_vesting_events(&g, d(2026, 1, 1)).unwrap_err(),
+            derive_vesting_events(&g, d(2026, 1, 1), &[]).unwrap_err(),
             VestingError::CliffExceedsTotal
         );
     }
@@ -399,7 +560,7 @@ mod tests {
     fn sum_equals_total_for_standard_monthly_cliff() {
         // 30,000 shares, 48 months, 12-month cliff, monthly: canonical RSU.
         let g = base(whole_shares(30_000));
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let sum: Shares = events.iter().map(|e| e.shares_vested_this_event).sum();
         assert_eq!(sum, whole_shares(30_000));
         assert_eq!(events.last().unwrap().cumulative_shares_vested, sum);
@@ -412,7 +573,7 @@ mod tests {
             cadence: Cadence::Quarterly,
             ..base(whole_shares(12_345))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let sum: Shares = events.iter().map(|e| e.shares_vested_this_event).sum();
         assert_eq!(sum, whole_shares(12_345));
     }
@@ -424,7 +585,7 @@ mod tests {
             vesting_total_months: 36,
             ..base(whole_shares(1_000))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let sum: Shares = events.iter().map(|e| e.shares_vested_this_event).sum();
         assert_eq!(sum, whole_shares(1_000));
     }
@@ -435,7 +596,7 @@ mod tests {
         // is 10_000, `whole_shares` won't round; we set the scaled value
         // directly.
         let g = base(1_234_567);
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let sum: Shares = events.iter().map(|e| e.shares_vested_this_event).sum();
         assert_eq!(sum, 1_234_567);
     }
@@ -445,7 +606,7 @@ mod tests {
     #[test]
     fn first_event_is_at_cliff_with_accumulated_portion() {
         let g = base(whole_shares(48_000)); // 48k over 48 months, 12-month cliff.
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         assert_eq!(events[0].vest_date, d(2025, 9, 15));
         // 12/48 * 48,000 = 12,000.
         assert_eq!(events[0].cumulative_shares_vested, whole_shares(12_000));
@@ -455,7 +616,7 @@ mod tests {
     #[test]
     fn no_event_before_cliff() {
         let g = base(whole_shares(48_000));
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let cliff_date = d(2025, 9, 15);
         assert!(events.iter().all(|e| e.vest_date >= cliff_date));
     }
@@ -470,7 +631,7 @@ mod tests {
             vesting_total_months: 12,
             ..base(whole_shares(1_000))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         // 12 months / 3-month step → 4 events.
         assert_eq!(events.len(), 4);
         let dates: Vec<_> = events.iter().map(|e| e.vest_date).collect();
@@ -489,7 +650,7 @@ mod tests {
             liquidity_event_date: None,
             ..base(whole_shares(4_800))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         // Every past event should be `TimeVestedAwaitingLiquidity`.
         for e in &events {
             assert_eq!(e.state, VestingState::TimeVestedAwaitingLiquidity);
@@ -503,7 +664,7 @@ mod tests {
             liquidity_event_date: Some(d(2025, 1, 1)),
             ..base(whole_shares(4_800))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         for e in &events {
             assert_eq!(e.state, VestingState::Vested);
         }
@@ -516,7 +677,7 @@ mod tests {
             liquidity_event_date: Some(d(2035, 1, 1)),
             ..base(whole_shares(4_800))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         for e in &events {
             assert!(matches!(
                 e.state,
@@ -532,7 +693,7 @@ mod tests {
             liquidity_event_date: None,
             ..base(whole_shares(4_800))
         };
-        let events = derive_vesting_events(&g, d(2025, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2025, 1, 1), &[]).unwrap();
         // `today` is 2025-01-01; the cliff event is 2025-09-15 → still Upcoming.
         assert!(events.iter().all(|e| e.state == VestingState::Upcoming));
     }
@@ -542,8 +703,8 @@ mod tests {
     #[test]
     fn same_input_same_output() {
         let g = base(whole_shares(30_000));
-        let a = derive_vesting_events(&g, d(2026, 3, 1)).unwrap();
-        let b = derive_vesting_events(&g, d(2026, 3, 1)).unwrap();
+        let a = derive_vesting_events(&g, d(2026, 3, 1), &[]).unwrap();
+        let b = derive_vesting_events(&g, d(2026, 3, 1), &[]).unwrap();
         assert_eq!(a, b);
     }
 
@@ -552,7 +713,7 @@ mod tests {
     #[test]
     fn cumulative_is_monotonic_non_decreasing() {
         let g = base(whole_shares(7_777));
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let mut prev = 0;
         for e in &events {
             assert!(e.cumulative_shares_vested >= prev);
@@ -568,7 +729,7 @@ mod tests {
             cliff_months: 48,
             ..base(whole_shares(1_000))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].shares_vested_this_event, whole_shares(1_000));
         assert_eq!(events[0].cumulative_shares_vested, whole_shares(1_000));
@@ -587,7 +748,7 @@ mod tests {
             cadence: Cadence::Monthly,
             ..base(whole_shares(300))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         assert_eq!(events.len(), 3);
         // Jan 31 + 1 month → Feb 29 (leap year); + 2 months → Mar 31; + 3 → Apr 30.
         assert_eq!(events[0].vest_date, d(2024, 2, 29));
@@ -605,7 +766,7 @@ mod tests {
             cadence: Cadence::Monthly,
             ..base(whole_shares(10))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         assert_eq!(events[0].vest_date, d(2025, 4, 30));
     }
 
@@ -619,7 +780,7 @@ mod tests {
             cadence: Cadence::Quarterly,
             ..base(whole_shares(1_000))
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let sum: Shares = events.iter().map(|e| e.shares_vested_this_event).sum();
         assert_eq!(sum, whole_shares(1_000));
         // Last event should fall at month 13.
@@ -640,7 +801,7 @@ mod tests {
         // vesting_start = 2024-09-15; today = 2025-10-15 should be
         // 13/48 * 30,000 = 8,125 shares (13 monthly tranches through month 13).
         let g = base(whole_shares(30_000));
-        let events = derive_vesting_events(&g, d(2025, 10, 15)).unwrap();
+        let events = derive_vesting_events(&g, d(2025, 10, 15), &[]).unwrap();
         let (vested, awaiting) = vested_to_date(&events, d(2025, 10, 15));
         assert_eq!(awaiting, 0);
         // 12-month cliff yields 7,500 shares on 2025-09-15; monthly after that.
@@ -655,7 +816,7 @@ mod tests {
             liquidity_event_date: None,
             ..base(whole_shares(30_000))
         };
-        let events = derive_vesting_events(&g, d(2025, 10, 15)).unwrap();
+        let events = derive_vesting_events(&g, d(2025, 10, 15), &[]).unwrap();
         let (vested, awaiting) = vested_to_date(&events, d(2025, 10, 15));
         assert_eq!(vested, 0);
         assert_eq!(awaiting, whole_shares(8_125));
@@ -695,7 +856,7 @@ mod tests {
                             double_trigger: false,
                             liquidity_event_date: None,
                         };
-                        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+                        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
                         let sum: Shares = events.iter().map(|e| e.shares_vested_this_event).sum();
                         assert_eq!(
                             sum, share_count,

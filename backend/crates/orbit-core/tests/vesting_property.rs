@@ -227,14 +227,14 @@ proptest! {
 
     #[test]
     fn prop_sum_equals_total((g, today) in grant_strategy()) {
-        let events = derive_vesting_events(&g, today).expect("legal input");
+        let events = derive_vesting_events(&g, today, &[]).expect("legal input");
         let sum: i64 = events.iter().map(|e| e.shares_vested_this_event).sum();
         prop_assert_eq!(sum, g.share_count, "AC-4.3.1: sum must equal total");
     }
 
     #[test]
     fn prop_cumulative_monotonic((g, today) in grant_strategy()) {
-        let events = derive_vesting_events(&g, today).expect("legal input");
+        let events = derive_vesting_events(&g, today, &[]).expect("legal input");
         let mut prev_cum: i64 = 0;
         for (idx, e) in events.iter().enumerate() {
             prop_assert!(
@@ -254,7 +254,7 @@ proptest! {
 
     #[test]
     fn prop_no_event_before_cliff((g, today) in grant_strategy()) {
-        let events = derive_vesting_events(&g, today).expect("legal input");
+        let events = derive_vesting_events(&g, today, &[]).expect("legal input");
         if g.cliff_months > 0 {
             let cutoff = cliff_date(&g);
             for e in &events {
@@ -275,7 +275,7 @@ proptest! {
         // the cliff can be the `next = cliff + step` jump which is still
         // 3-month-exact, but the last-event clamp can shorten it; we assert
         // over the middle of the sequence only.
-        let events = derive_vesting_events(&g, today).expect("legal input");
+        let events = derive_vesting_events(&g, today, &[]).expect("legal input");
         if events.len() < 2 {
             return Ok(());
         }
@@ -301,8 +301,8 @@ proptest! {
 
     #[test]
     fn prop_determinism((g, today) in grant_strategy()) {
-        let a = derive_vesting_events(&g, today).expect("legal input");
-        let b = derive_vesting_events(&g, today).expect("legal input");
+        let a = derive_vesting_events(&g, today, &[]).expect("legal input");
+        let b = derive_vesting_events(&g, today, &[]).expect("legal input");
         prop_assert_eq!(a, b, "AC-4.3.5: identical input must produce identical events");
     }
 
@@ -311,7 +311,7 @@ proptest! {
         // Every vest_date must be representable via chrono's checked_add_months
         // — the function we rely on internally. This guards against any
         // future refactor that tries to compute dates manually.
-        let events = derive_vesting_events(&g, today).expect("legal input");
+        let events = derive_vesting_events(&g, today, &[]).expect("legal input");
         for (i, e) in events.iter().enumerate() {
             // Reconstruct the vest date from the raw month offset and ensure
             // equality. Finding that offset requires walking the cadence.
@@ -337,7 +337,7 @@ proptest! {
 
     #[test]
     fn prop_cliff_equals_total_single_event((g, today) in grant_strategy_cliff_equals_total()) {
-        let events = derive_vesting_events(&g, today).expect("legal input");
+        let events = derive_vesting_events(&g, today, &[]).expect("legal input");
         prop_assert_eq!(events.len(), 1, "cliff == total must yield exactly one event");
         prop_assert_eq!(events[0].shares_vested_this_event, g.share_count);
         prop_assert_eq!(events[0].cumulative_shares_vested, g.share_count);
@@ -345,7 +345,7 @@ proptest! {
 
     #[test]
     fn prop_double_trigger_state_machine((g, today) in grant_strategy()) {
-        let events = derive_vesting_events(&g, today).expect("legal input");
+        let events = derive_vesting_events(&g, today, &[]).expect("legal input");
         for e in &events {
             let expected = if e.vest_date > today {
                 VestingState::Upcoming

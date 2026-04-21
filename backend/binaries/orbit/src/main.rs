@@ -47,8 +47,16 @@ enum Command {
         #[arg(long, env = "DATABASE_URL_MIGRATE")]
         database_url_migrate: String,
     },
-    /// Stub — real worker wiring ships in Slice 3+.
-    Worker,
+    /// Boot the background worker (Slice 3+: scheduled ECB FX fetch).
+    Worker {
+        /// Postgres connection URL (orbit_app role).
+        #[arg(long, env = "DATABASE_URL")]
+        database_url: String,
+        /// When set, run a single fetch and exit (for dev + CI smoke).
+        /// Accepts `fx` (daily) or `bootstrap` (90-day history).
+        #[arg(long, value_parser = ["fx", "bootstrap"])]
+        once: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -74,10 +82,7 @@ async fn main() -> ExitCode {
         Command::Migrate {
             database_url_migrate,
         } => run_migrate(database_url_migrate).await,
-        Command::Worker => {
-            println!("worker: not yet implemented (Slice 3+)");
-            ExitCode::SUCCESS
-        }
+        Command::Worker { database_url, once } => run_worker(database_url, once).await,
     }
 }
 
@@ -165,6 +170,70 @@ async fn run_migrate(url: String) -> ExitCode {
         Err(e) => {
             eprintln!("orbit migrate: {e}");
             ExitCode::FAILURE
+        }
+    }
+}
+
+async fn run_worker(database_url: String, once: Option<String>) -> ExitCode {
+    let pool = match orbit_db::connect(&database_url).await {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("orbit worker: database connect failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    // The ECB worker needs a separate reqwest client from the API's
+    // HIBP client because the timeout posture differs: 5 s here per
+    // ADR-007 vs 500 ms for HIBP.
+    let http = match reqwest::Client::builder()
+        .user_agent("orbit-worker/0.0.0")
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("orbit worker: reqwest client build: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if let Some(kind_str) = once {
+        let kind = match kind_str.as_str() {
+            "fx" => orbit_worker::FetchKind::Daily,
+            "bootstrap" => orbit_worker::FetchKind::Bootstrap,
+            other => {
+                eprintln!("orbit worker: unknown --once value {other:?}");
+                return ExitCode::from(2);
+            }
+        };
+        match orbit_worker::run_once(&pool, &http, kind).await {
+            Ok(outcome) => {
+                eprintln!(
+                    "orbit worker --once {}: rows_inserted={} oldest={:?} newest={:?}",
+                    kind_str, outcome.rows_inserted, outcome.oldest_date, outcome.newest_date
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("orbit worker --once {kind_str}: {e}");
+                ExitCode::FAILURE
+            }
+        }
+    } else {
+        let (tx, rx) = tokio::sync::watch::channel(false);
+        // Wire Ctrl-C to flip the shutdown signal.
+        tokio::spawn(async move {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                let _ = tx.send(true);
+            }
+        });
+        match orbit_worker::run_scheduled(pool, http, rx).await {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("orbit worker: scheduler error: {e}");
+                ExitCode::FAILURE
+            }
         }
     }
 }

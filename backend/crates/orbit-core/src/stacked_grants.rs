@@ -356,7 +356,7 @@ mod tests {
     fn single_grant_produces_one_employer_with_single_id() {
         let id = Uuid::new_v4();
         let g = rsu_grant(crate::vesting::whole_shares(1200), d(2024, 1, 15), 12, 0);
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let inputs = vec![(meta(id, "Acme", "rsu", ts(2024, 1, 1)), events.clone())];
 
         let out = stack_dashboard(inputs);
@@ -375,8 +375,8 @@ mod tests {
         let b_id = Uuid::new_v4();
         let ga = rsu_grant(crate::vesting::whole_shares(1200), d(2024, 1, 15), 12, 0);
         let gb = rsu_grant(crate::vesting::whole_shares(2400), d(2024, 1, 15), 12, 0);
-        let events_a = derive_vesting_events(&ga, d(2030, 1, 1)).unwrap();
-        let events_b = derive_vesting_events(&gb, d(2030, 1, 1)).unwrap();
+        let events_a = derive_vesting_events(&ga, d(2030, 1, 1), &[]).unwrap();
+        let events_b = derive_vesting_events(&gb, d(2030, 1, 1), &[]).unwrap();
         let inputs = vec![
             (
                 meta(a_id, "ACME Inc.", "rsu", ts(2024, 1, 1)),
@@ -428,7 +428,7 @@ mod tests {
         let a_id = Uuid::new_v4();
         let b_id = Uuid::new_v4();
         let g = rsu_grant(crate::vesting::whole_shares(1200), d(2024, 1, 15), 12, 0);
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let inputs = vec![
             (meta(a_id, "Alpha", "rsu", ts(2024, 1, 1)), events.clone()),
             (meta(b_id, "Bravo", "nso", ts(2024, 2, 1)), events.clone()),
@@ -445,7 +445,7 @@ mod tests {
         let rsu_id = Uuid::new_v4();
         let nso_id = Uuid::new_v4();
         let g = rsu_grant(crate::vesting::whole_shares(1200), d(2024, 1, 15), 12, 0);
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let inputs = vec![
             (meta(rsu_id, "Acme", "rsu", ts(2024, 1, 1)), events.clone()),
             (meta(nso_id, "Acme", "nso", ts(2024, 2, 1)), events.clone()),
@@ -473,7 +473,7 @@ mod tests {
             liquidity_event_date: None,
             ..rsu_grant(crate::vesting::whole_shares(1200), d(2024, 1, 15), 12, 0)
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let inputs = vec![(meta(id, "Acme", "rsu", ts(2024, 1, 1)), events.clone())];
 
         let out = stack_dashboard(inputs);
@@ -493,8 +493,8 @@ mod tests {
         let b_id = Uuid::new_v4();
         let ga = rsu_grant(crate::vesting::whole_shares(600), d(2024, 1, 15), 12, 0);
         let gb = rsu_grant(crate::vesting::whole_shares(1200), d(2024, 1, 15), 12, 0);
-        let events_a = derive_vesting_events(&ga, d(2030, 1, 1)).unwrap();
-        let events_b = derive_vesting_events(&gb, d(2030, 1, 1)).unwrap();
+        let events_a = derive_vesting_events(&ga, d(2030, 1, 1), &[]).unwrap();
+        let events_b = derive_vesting_events(&gb, d(2030, 1, 1), &[]).unwrap();
 
         let input_ab = vec![
             (meta(a_id, "Acme", "rsu", ts(2024, 1, 1)), events_a.clone()),
@@ -520,9 +520,9 @@ mod tests {
         let g1 = rsu_grant(crate::vesting::whole_shares(1000), d(2024, 1, 15), 12, 0);
         let g2 = rsu_grant(crate::vesting::whole_shares(500), d(2024, 2, 15), 24, 6);
         let g3 = rsu_grant(crate::vesting::whole_shares(750), d(2024, 3, 15), 48, 12);
-        let e1 = derive_vesting_events(&g1, d(2030, 1, 1)).unwrap();
-        let e2 = derive_vesting_events(&g2, d(2030, 1, 1)).unwrap();
-        let e3 = derive_vesting_events(&g3, d(2030, 1, 1)).unwrap();
+        let e1 = derive_vesting_events(&g1, d(2030, 1, 1), &[]).unwrap();
+        let e2 = derive_vesting_events(&g2, d(2030, 1, 1), &[]).unwrap();
+        let e3 = derive_vesting_events(&g3, d(2030, 1, 1), &[]).unwrap();
         let inputs = vec![
             (
                 meta(Uuid::new_v4(), "E1", "rsu", ts(2024, 1, 1)),
@@ -561,7 +561,7 @@ mod tests {
             liquidity_event_date: Some(d(2024, 6, 1)),
             ..rsu_grant(crate::vesting::whole_shares(120), d(2024, 1, 15), 12, 0)
         };
-        let events = derive_vesting_events(&g, d(2030, 1, 1)).unwrap();
+        let events = derive_vesting_events(&g, d(2030, 1, 1), &[]).unwrap();
         let inputs = vec![(meta(id, "Acme", "rsu", ts(2024, 1, 1)), events)];
         let out = stack_dashboard(inputs);
         let es = &out.by_employer[0];

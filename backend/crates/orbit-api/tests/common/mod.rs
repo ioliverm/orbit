@@ -510,6 +510,27 @@ pub const FORBIDDEN_IN_ANY_AUDIT_PAYLOAD: &[&str] = &[
     "familyId",
     "user_agent",
     "userAgent",
+    // Slice 3 T29 additions (AC-8.10.3 + G-29 extended) — FMV values,
+    // share counts, vest dates, ticker symbols, employer names must
+    // never appear in any payload. price + currency are already covered
+    // by the Slice-2 set for the current-price case.
+    "fmv_at_vest",
+    "fmvAtVest",
+    "fmv_currency",
+    "fmvCurrency",
+    "shares_vested",
+    "sharesVested",
+    "vest_date",
+    "vestDate",
+    "ticker",
+    "employer_name",
+    "employerName",
+    "rate",
+    "rates",
+    "raw_xml",
+    "rawXml",
+    "response_body",
+    "responseBody",
 ];
 
 /// Recursively walk a JSON value and assert none of the

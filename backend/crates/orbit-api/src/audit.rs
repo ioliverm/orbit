@@ -93,6 +93,26 @@ pub enum WizardAction {
     /// `{ kind: "single", initiator: "self" }`
     /// or `{ kind: "bulk", initiator: "self", count: int }`.
     SessionRevoke,
+
+    // --- Slice 3 T29 (ADR-017 §1/§4 + G-32 extensions) ---
+    /// `grant.current_price_override.upsert` — payload allowlist:
+    /// `{ grant_id, had_prior: bool }`. Never carries price or currency.
+    GrantCurrentPriceOverrideUpsert,
+    /// `grant.current_price_override.delete` — payload `{ grant_id }`.
+    GrantCurrentPriceOverrideDelete,
+
+    /// `vesting_event.override` — payload allowlist:
+    /// `{ grant_id, fields_changed: ["vest_date"|"shares"|"fmv", ...] }`.
+    /// Never FMV/shares/dates/tickers/employers (AC-8.10.3).
+    VestingEventOverride,
+    /// `vesting_event.clear_override` — payload allowlist:
+    /// `{ grant_id, cleared_fields: ["vest_date","shares"], preserved: ["fmv"] | [] }`.
+    VestingEventClearOverride,
+    /// `vesting_event.bulk_fmv` — payload allowlist:
+    /// `{ grant_id, applied_count, skipped_count }`. One extra row is
+    /// written per modified event via [`WizardAction::VestingEventOverride`]
+    /// to carry per-row provenance (AC-8.6.4).
+    VestingEventBulkFmv,
 }
 
 impl WizardAction {
@@ -111,6 +131,11 @@ impl WizardAction {
             WizardAction::TripDelete => "trip.delete",
             WizardAction::Modelo720Upsert => "modelo_720_inputs.upsert",
             WizardAction::SessionRevoke => "session.revoke",
+            WizardAction::GrantCurrentPriceOverrideUpsert => "grant.current_price_override.upsert",
+            WizardAction::GrantCurrentPriceOverrideDelete => "grant.current_price_override.delete",
+            WizardAction::VestingEventOverride => "vesting_event.override",
+            WizardAction::VestingEventClearOverride => "vesting_event.clear_override",
+            WizardAction::VestingEventBulkFmv => "vesting_event.bulk_fmv",
         }
     }
 
@@ -129,6 +154,11 @@ impl WizardAction {
             }
             WizardAction::Modelo720Upsert => "modelo_720_input",
             WizardAction::SessionRevoke => "session",
+            WizardAction::GrantCurrentPriceOverrideUpsert
+            | WizardAction::GrantCurrentPriceOverrideDelete => "grant_current_price_override",
+            WizardAction::VestingEventOverride
+            | WizardAction::VestingEventClearOverride
+            | WizardAction::VestingEventBulkFmv => "vesting_event",
         }
     }
 }

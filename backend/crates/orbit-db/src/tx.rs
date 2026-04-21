@@ -64,6 +64,20 @@ impl Tx<'_> {
         Ok(Tx { inner })
     }
 
+    /// Open a non-user-scoped transaction for system work (worker-driven
+    /// writes to non-RLS-scoped tables such as `fx_rates` and the paired
+    /// `system`-actor audit rows).
+    ///
+    /// `app.user_id` is NOT primed; any query that depends on RLS
+    /// scoping in this transaction will see zero rows. Reserved for
+    /// (a) `fx_rates` INSERTs from `orbit-worker` and (b) the paired
+    /// `actor_kind = 'system'` `audit_log` row that records the fetch.
+    /// Handlers MUST use [`Tx::for_user`] — no exception.
+    pub async fn system(pool: &PgPool) -> Result<Tx<'static>, Error> {
+        let inner = pool.begin().await.map_err(Error::Tx)?;
+        Ok(Tx { inner })
+    }
+
     /// Commit the transaction. On commit the `app.user_id` GUC is reset by
     /// Postgres automatically (it was SET LOCAL).
     pub async fn commit(self) -> Result<(), Error> {

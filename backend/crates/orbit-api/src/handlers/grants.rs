@@ -198,7 +198,8 @@ pub async fn create(
 
     let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id).await?;
     let grant = orbit_db::grants::create_grant(&mut tx, auth.user_id, &form).await?;
-    let events = vesting::derive_vesting_events(&grant_input, today).map_err(map_vesting_error)?;
+    let events =
+        vesting::derive_vesting_events(&grant_input, today, &[]).map_err(map_vesting_error)?;
     orbit_db::vesting_events::replace_for_grant(&mut tx, auth.user_id, grant.id, events.clone())
         .await?;
 
@@ -250,10 +251,23 @@ pub async fn get_one(
     let grant = orbit_db::grants::get_grant(&mut tx, auth.user_id, grant_id)
         .await?
         .ok_or(AppError::NotFound)?;
+    // AC-8.8 surfaces the count of overrides so the grant-edit form can
+    // render the "N manually adjusted vest(s)" warning banner without a
+    // second round-trip.
+    let override_count =
+        orbit_db::vesting_events::count_override_rows(&mut tx, auth.user_id, grant.id).await?;
     tx.commit().await?;
 
     let dto: GrantDto = grant.into();
-    Ok((StatusCode::OK, Json(json!({ "grant": dto }))).into_response())
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "grant": dto,
+            "overridesWarning": override_count > 0,
+            "overrideCount": override_count,
+        })),
+    )
+        .into_response())
 }
 
 /// `PUT /api/v1/grants/:id`
@@ -271,6 +285,19 @@ pub async fn update(
     let grant_input = form_to_grant_input(&form).map_err(map_vesting_error)?;
 
     let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id).await?;
+
+    // AC-8.9.1: reject a `share_count` shrink that would fall below the
+    // sum of manually-overridden shares. The guard has to look at the
+    // existing overrides BEFORE the `replace_for_grant` wipe.
+    let override_sum =
+        orbit_db::vesting_events::sum_override_shares(&mut tx, auth.user_id, grant_id).await?;
+    if form.share_count < override_sum {
+        return Err(AppError::Validation(vec![FieldError {
+            field: "shareCount".into(),
+            code: "grant.share_count_below_overrides".into(),
+        }]));
+    }
+
     // Confirm the row is owned by the caller before UPDATE — `update_grant`
     // returns `RowNotFound` via RLS scoping, which the `From<sqlx::Error>`
     // impl maps to 404 (AC-7.3).
@@ -279,7 +306,8 @@ pub async fn update(
         Err(sqlx::Error::RowNotFound) => return Err(AppError::NotFound),
         Err(e) => return Err(e.into()),
     };
-    let events = vesting::derive_vesting_events(&grant_input, today).map_err(map_vesting_error)?;
+    let events =
+        vesting::derive_vesting_events(&grant_input, today, &[]).map_err(map_vesting_error)?;
     orbit_db::vesting_events::replace_for_grant(&mut tx, auth.user_id, grant.id, events.clone())
         .await?;
 
@@ -361,6 +389,8 @@ pub async fn vesting_for_grant(
             shares_vested_this_event: r.shares_vested_this_event,
             cumulative_shares_vested: r.cumulative_shares_vested,
             state: r.state,
+            fmv_at_vest: r.fmv_at_vest.clone(),
+            fmv_currency: r.fmv_currency.clone(),
         })
         .collect();
     let (vested, awaiting) = vesting::vested_to_date(&events, Utc::now().date_naive());

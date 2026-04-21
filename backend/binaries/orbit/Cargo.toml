@@ -11,9 +11,10 @@ name = "orbit"
 path = "src/main.rs"
 
 [dependencies]
-orbit-api = { path = "../../crates/orbit-api" }
-orbit-db  = { path = "../../crates/orbit-db" }
-orbit-log = { path = "../../crates/orbit-log" }
+orbit-api    = { path = "../../crates/orbit-api" }
+orbit-db     = { path = "../../crates/orbit-db" }
+orbit-log    = { path = "../../crates/orbit-log" }
+orbit-worker = { path = "../../crates/orbit-worker" }
 
 clap.workspace = true
 tokio.workspace = true

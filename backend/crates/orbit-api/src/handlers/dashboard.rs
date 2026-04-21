@@ -44,6 +44,8 @@ pub async fn stacked(
                 shares_vested_this_event: r.shares_vested_this_event,
                 cumulative_shares_vested: r.cumulative_shares_vested,
                 state: r.state,
+                fmv_at_vest: r.fmv_at_vest.clone(),
+                fmv_currency: r.fmv_currency.clone(),
             })
             .collect();
         inputs.push((

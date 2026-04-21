@@ -81,6 +81,12 @@ pub enum AppError {
     #[error("not found")]
     NotFound,
 
+    /// 409 — optimistic-concurrency mismatch. The client holds a stale
+    /// `updated_at` for a resource that has since been written. The SPA
+    /// surfaces the AC-10.5 copy and prompts a refresh.
+    #[error("conflict")]
+    Conflict,
+
     /// 422 — validation error with a per-field map.
     #[error("validation")]
     Validation(Vec<FieldError>),
@@ -151,6 +157,12 @@ impl AppError {
                 StatusCode::NOT_FOUND,
                 "not_found",
                 "Resource not found.",
+                None,
+            ),
+            AppError::Conflict => (
+                StatusCode::CONFLICT,
+                "resource.stale_client_state",
+                "The resource was modified elsewhere; refresh to see current values.",
                 None,
             ),
             AppError::Validation(fields) => (

@@ -1,0 +1,281 @@
+{
+  "cases": [
+    {
+      "name": "override-in-middle",
+      "inputs": {
+        "shareCountScaled": 120000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-06-15",
+          "sharesVestedScaled": 20000000,
+          "fmvAtVest": "42.5000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 5
+        }
+      ],
+      "expected": {
+        "eventCount": 12,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2024-06-15"],
+        "overriddenShares": {
+          "2024-06-15": 20000000
+        }
+      }
+    },
+    {
+      "name": "override-all",
+      "inputs": {
+        "shareCountScaled": 40000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 4,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2024-05-01",
+      "overrides": [
+        {
+          "vestDate": "2024-02-15",
+          "sharesVestedScaled": 5000000,
+          "fmvAtVest": "10.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 0
+        },
+        {
+          "vestDate": "2024-03-15",
+          "sharesVestedScaled": 5000000,
+          "fmvAtVest": "11.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 1
+        },
+        {
+          "vestDate": "2024-04-15",
+          "sharesVestedScaled": 5000000,
+          "fmvAtVest": "12.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 2
+        },
+        {
+          "vestDate": "2024-05-15",
+          "sharesVestedScaled": 5000000,
+          "fmvAtVest": "13.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 3
+        }
+      ],
+      "expected": {
+        "eventCount": 4,
+        "cumulativeRelaxed": true,
+        "overriddenDates": [
+          "2024-02-15",
+          "2024-03-15",
+          "2024-04-15",
+          "2024-05-15"
+        ],
+        "overriddenShares": {
+          "2024-02-15": 5000000,
+          "2024-03-15": 5000000,
+          "2024-04-15": 5000000,
+          "2024-05-15": 5000000
+        }
+      }
+    },
+    {
+      "name": "override-outside-window",
+      "inputs": {
+        "shareCountScaled": 120000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2030-06-15",
+          "sharesVestedScaled": 30000000,
+          "fmvAtVest": "88.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 99
+        }
+      ],
+      "expected": {
+        "eventCount": 13,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2030-06-15"],
+        "overriddenShares": {
+          "2030-06-15": 30000000
+        }
+      }
+    },
+    {
+      "name": "override-currency-mismatch",
+      "inputs": {
+        "shareCountScaled": 120000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-06-15",
+          "sharesVestedScaled": 8000000,
+          "fmvAtVest": "42.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 5
+        },
+        {
+          "vestDate": "2024-09-15",
+          "sharesVestedScaled": 9000000,
+          "fmvAtVest": "35.0000",
+          "fmvCurrency": "GBP",
+          "originalDerivationIndex": 8
+        }
+      ],
+      "expected": {
+        "eventCount": 12,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2024-06-15", "2024-09-15"],
+        "overriddenShares": {
+          "2024-06-15": 8000000,
+          "2024-09-15": 9000000
+        }
+      }
+    },
+    {
+      "name": "override-preserved-across-shortening",
+      "inputs": {
+        "shareCountScaled": 60000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 6,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-12-15",
+          "sharesVestedScaled": 10000000,
+          "fmvAtVest": "50.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 11
+        }
+      ],
+      "expected": {
+        "eventCount": 7,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2024-12-15"],
+        "overriddenShares": {
+          "2024-12-15": 10000000
+        }
+      }
+    },
+    {
+      "name": "override-preserved-across-cliff-change",
+      "inputs": {
+        "shareCountScaled": 120000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 3,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-06-15",
+          "sharesVestedScaled": 15000000,
+          "fmvAtVest": "42.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 3
+        }
+      ],
+      "expected": {
+        "eventCount": 10,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2024-06-15"],
+        "overriddenShares": {
+          "2024-06-15": 15000000
+        }
+      }
+    },
+    {
+      "name": "override-preserved-across-cadence-change",
+      "inputs": {
+        "shareCountScaled": 120000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "quarterly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-05-15",
+          "sharesVestedScaled": 10000000,
+          "fmvAtVest": "41.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 4
+        }
+      ],
+      "expected": {
+        "eventCount": 5,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2024-05-15"],
+        "overriddenShares": {
+          "2024-05-15": 10000000
+        }
+      }
+    },
+    {
+      "name": "override-with-fmv-only",
+      "inputs": {
+        "shareCountScaled": 120000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-06-15",
+          "sharesVestedScaled": 10000000,
+          "fmvAtVest": "42.8000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 5
+        }
+      ],
+      "expected": {
+        "eventCount": 12,
+        "cumulativeRelaxed": false,
+        "overriddenDates": ["2024-06-15"],
+        "overriddenShares": {
+          "2024-06-15": 10000000
+        }
+      }
+    }
+  ]
+}

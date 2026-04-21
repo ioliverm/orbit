@@ -139,7 +139,7 @@ fn grant_strategy_for_employer(
                         double_trigger,
                         liquidity_event_date,
                     };
-                    let events = derive_vesting_events(&input, today).expect("legal input");
+                    let events = derive_vesting_events(&input, today, &[]).expect("legal input");
                     let id = Uuid::from_u128(id_bits);
                     // Silence unused destructuring (these fields are
                     // implicit in the generated `events`).

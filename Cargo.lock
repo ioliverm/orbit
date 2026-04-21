@@ -1326,6 +1326,7 @@ dependencies = [
  "orbit-api",
  "orbit-db",
  "orbit-log",
+ "orbit-worker",
  "reqwest",
  "thiserror",
  "tokio",
@@ -1448,6 +1449,18 @@ version = "0.0.0"
 [[package]]
 name = "orbit-worker"
 version = "0.0.0"
+dependencies = [
+ "chrono",
+ "orbit-db",
+ "orbit-log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "parking"

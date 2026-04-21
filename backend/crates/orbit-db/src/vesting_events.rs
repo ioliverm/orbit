@@ -440,7 +440,7 @@ pub async fn clear_override(
     // 3. Derive the algorithmic schedule. Failure here is a handler-
     // level bug (invalid grant params); surface as a decode error so
     // the caller's `?` propagates a 500.
-    let derived = derive_vesting_events(&grant_input, today).map_err(|e| {
+    let derived = derive_vesting_events(&grant_input, today, &[]).map_err(|e| {
         sqlx::Error::Decode(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("derive_vesting_events failed during clear_override: {e}"),

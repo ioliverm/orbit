@@ -128,6 +128,37 @@ pub fn router(state: AppState) -> Router {
             get(handlers::modelo_720_inputs::get_current),
         )
         .route("/dashboard/stacked", get(handlers::dashboard::stacked))
+        // Slice 3 T29 — current prices, vesting-event overrides, paper-gains,
+        // M720 threshold, rule-set chip.
+        .route("/current-prices", get(handlers::current_prices::list))
+        .route(
+            "/current-prices/:ticker",
+            axum::routing::put(handlers::current_prices::upsert)
+                .delete(handlers::current_prices::delete),
+        )
+        .route(
+            "/grants/:id/current-price-override",
+            get(handlers::current_prices::get_grant_override)
+                .put(handlers::current_prices::upsert_grant_override)
+                .delete(handlers::current_prices::delete_grant_override),
+        )
+        .route(
+            "/grants/:grantId/vesting-events/:eventId",
+            axum::routing::put(handlers::vesting_events::upsert_override),
+        )
+        .route(
+            "/grants/:grantId/vesting-events/bulk-fmv",
+            post(handlers::vesting_events::bulk_fmv),
+        )
+        .route(
+            "/dashboard/paper-gains",
+            get(handlers::dashboard_paper_gains::paper_gains),
+        )
+        .route(
+            "/dashboard/modelo-720-threshold",
+            get(handlers::dashboard_m720::threshold),
+        )
+        .route("/rule-set-chip", get(handlers::rule_set_chip::get))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             mw::onboarding::require_first_grant_or_later,
@@ -157,7 +188,11 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/residency/autonomias",
             get(handlers::residency::list_autonomias),
-        );
+        )
+        // Slice 3 T29 — FX reads are reference-data (no auth, not
+        // RLS-scoped). Same posture as /residency/autonomias.
+        .route("/fx/rate", get(handlers::fx::get_rate))
+        .route("/fx/latest", get(handlers::fx::get_latest));
 
     let api = Router::new().merge(public_api).merge(authed);
 

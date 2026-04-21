@@ -134,7 +134,7 @@ fn every_case_matches_dashboard_output() {
                     double_trigger: g.vesting.double_trigger,
                     liquidity_event_date: g.vesting.liquidity_event_date.as_deref().map(parse_date),
                 };
-                let events = derive_vesting_events(&vi, today).unwrap_or_else(|e| {
+                let events = derive_vesting_events(&vi, today, &[]).unwrap_or_else(|e| {
                     panic!(
                         "case {}: grant {} vesting derive failed: {:?}",
                         case.name, g.id, e

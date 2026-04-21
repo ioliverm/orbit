@@ -122,7 +122,7 @@ fn every_fixture_case_matches_derive_output() {
             liquidity_event_date: case.inputs.liquidity_event_date.as_deref().map(parse_date),
         };
         let today = parse_date(&case.today);
-        let events = derive_vesting_events(&input, today)
+        let events = derive_vesting_events(&input, today, &[])
             .unwrap_or_else(|e| panic!("case {}: derive error {:?}", case.name, e));
 
         // eventCount
