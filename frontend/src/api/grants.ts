@@ -35,12 +35,19 @@ export interface GrantDto {
 }
 
 export interface VestingEventDto {
+  /** Slice 3: present on persisted rows, absent on derivation-preview rows. */
+  id?: string;
   vestDate: string;
   sharesVestedThisEvent: string;
   sharesVestedThisEventScaled: number;
   cumulativeSharesVested: string;
   cumulativeSharesVestedScaled: number;
   state: VestingState;
+  /** Slice 3 additions. Present on the persisted-row emit path. */
+  fmvAtVest?: string | null;
+  fmvCurrency?: string | null;
+  isUserOverride?: boolean;
+  updatedAt?: string;
 }
 
 export interface GrantBody {
@@ -72,6 +79,9 @@ export interface GrantListResponse {
 
 export interface GrantGetResponse {
   grant: GrantDto;
+  /** Slice 3: true iff the grant has ≥1 vesting_events row with is_user_override = true. */
+  overridesWarning?: boolean;
+  overrideCount?: number;
 }
 
 export interface VestingResponse {

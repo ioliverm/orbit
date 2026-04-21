@@ -322,6 +322,92 @@ describe('axe-core smoke (G-21) — critical-path screens', () => {
   // exercises the per-employer panel, the drill-down rows, and the
   // multi-tile grid in one render — the Slice-1 axe test above covered
   // only the single-grant case.
+  // T30: paper-gains dashboard seeded + partial-data banner present.
+  it('/app/dashboard with paper-gains + partial-data banner has no violations', async () => {
+    seedAuthed();
+    const g1 = grantFixture({
+      id: 'g-acme-rsu',
+      instrument: 'rsu',
+      employerName: 'ACME Inc.',
+      ticker: 'ACME',
+    });
+    const paperGainsPayload = {
+      perGrant: [{ grantId: g1.id, complete: false, missingReason: 'fmv_missing' }],
+      combinedEurBand: null,
+      incompleteGrants: [{ grantId: g1.id, employer: 'ACME Inc.', instrument: 'rsu' }],
+      stalenessFx: 'fresh' as const,
+      fxDate: '2026-04-17',
+    };
+    mockGrantsList([g1], {
+      '/dashboard/stacked': { byEmployer: [], combined: [] },
+      '/dashboard/paper-gains': paperGainsPayload,
+      '/dashboard/modelo-720-threshold': {
+        bankAccountsEur: '10000.00',
+        realEstateEur: null,
+        securitiesEur: '0.00',
+        perCategoryBreach: false,
+        aggregateBreach: false,
+        thresholdEur: '50000.00',
+        fxSensitivityBand: null,
+        fxDate: '2026-04-17',
+      },
+      '/api/v1/current-prices': {
+        prices: [{ ticker: 'ACME', price: '50.00', currency: 'USD', enteredAt: '2026-04-19T00:00:00Z' }],
+      },
+      '/rule-set-chip': { fxDate: '2026-04-17', stalenessDays: 0, engineVersion: '0.3.0' },
+    });
+    const container = renderPage(<DashboardPage />, '/app/dashboard');
+    await waitFor(() => {
+      expect(screen.getByTestId('paper-gains-tile')).toBeInTheDocument();
+      expect(screen.getByTestId('paper-gains-partial-banner')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(container, '/app/dashboard (paper-gains)');
+  });
+
+  it('/app/grants/:id with vesting editor + price override has no violations', async () => {
+    seedAuthed();
+    const g = grantFixture({ ticker: 'ACME' });
+    mockGrantsList([g], {
+      [`/api/v1/grants/${g.id}/vesting`]: {
+        vestingEvents: [
+          {
+            id: 'e-1',
+            vestDate: '2025-10-15',
+            sharesVestedThisEvent: '500',
+            sharesVestedThisEventScaled: 5_000_000,
+            cumulativeSharesVested: '500',
+            cumulativeSharesVestedScaled: 5_000_000,
+            state: 'vested',
+            fmvAtVest: '40.00',
+            fmvCurrency: 'USD',
+            isUserOverride: true,
+            updatedAt: '2026-04-19T00:00:00Z',
+          },
+        ],
+        vestedToDate: '500',
+        vestedToDateScaled: 5_000_000,
+        awaitingLiquidity: '0',
+        awaitingLiquidityScaled: 0,
+      },
+      [`/api/v1/grants/${g.id}`]: { grant: g, overridesWarning: true, overrideCount: 1 },
+      '/current-price-override': { override: null },
+      '/rule-set-chip': { fxDate: '2026-04-17', stalenessDays: 0, engineVersion: '0.3.0' },
+    });
+    const container = renderPage(
+      <Routes>
+        <Route path="/app/grants/:grantId" element={<GrantDetailPage />} />
+      </Routes>,
+      `/app/grants/${g.id}`,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('vesting-editor')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/grants/:id (vesting editor)',
+    );
+  });
+
   it('/app/dashboard with seeded multi-employer multi-instrument state has no violations', async () => {
     seedAuthed();
     const g1 = grantFixture({

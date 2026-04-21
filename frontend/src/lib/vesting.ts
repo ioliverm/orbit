@@ -49,6 +49,23 @@ export interface VestingEvent {
   /** Scaled cumulative shares through this event. */
   cumulativeSharesVestedScaled: bigint;
   state: VestingState;
+  /** Slice 3: FMV captured verbatim from an override; `null` for algorithm-derived. */
+  fmvAtVest?: string | null;
+  /** Slice 3: currency paired with `fmvAtVest`. */
+  fmvCurrency?: string | null;
+}
+
+/**
+ * Slice-3 override record (AC-8.4.2). Mirrors `orbit_core::vesting::VestingEventOverride`.
+ * The `(vestDate, originalDerivationIndex)` tuple is the deterministic
+ * tie-break ordering key when two overrides share a `vestDate`.
+ */
+export interface VestingEventOverride {
+  vestDate: Date;
+  sharesVestedThisEventScaled: bigint;
+  fmvAtVest: string | null;
+  fmvCurrency: string | null;
+  originalDerivationIndex: number;
 }
 
 export type VestingErrorCode =
@@ -156,10 +173,35 @@ function stateFor(g: GrantInput, today: Date, vestDate: Date): VestingState {
 /**
  * Derive the full vesting schedule for `grant` as of `today`. Returns
  * events in chronological order. Throws `VestingError` on invalid input.
+ *
+ * # Slice 3 override preservation (ADR-017 §2)
+ *
+ * `existingOverrides` carries the user's previously-edited rows across a
+ * grant-param change (AC-8.4.2). When the slice is empty the function is
+ * bit-identical to its Slice-1 shape: pure derivation from `grant`, with
+ * cumulative invariant `SUM == shareCountScaled`.
+ *
+ * When any override is present:
+ *   * Every override is returned verbatim at its `vestDate`, carrying its
+ *     shares and FMV unchanged; `state` is recomputed against `today`.
+ *   * Algorithm-derived slots that do NOT collide with an override by
+ *     `vestDate` are emitted from the standard derivation.
+ *   * The cumulative-invariant is relaxed (AC-8.5.2).
+ *   * Sort by (vestDate ASC, originalDerivationIndex ASC) for determinism.
  */
-export function deriveVestingEvents(g: GrantInput, today: Date): VestingEvent[] {
+export function deriveVestingEvents(
+  g: GrantInput,
+  today: Date,
+  existingOverrides: VestingEventOverride[] = [],
+): VestingEvent[] {
   validate(g);
 
+  const base = deriveNoOverrides(g, today);
+  if (existingOverrides.length === 0) return base;
+  return deriveWithOverrides(g, today, base, existingOverrides);
+}
+
+function deriveNoOverrides(g: GrantInput, today: Date): VestingEvent[] {
   const total = g.shareCountScaled;
   const totalMonths = g.vestingTotalMonths;
   const cliff = g.cliffMonths;
@@ -207,6 +249,83 @@ export function deriveVestingEvents(g: GrantInput, today: Date): VestingEvent[] 
   }
 
   return events;
+}
+
+function deriveWithOverrides(
+  g: GrantInput,
+  today: Date,
+  base: VestingEvent[],
+  existingOverrides: VestingEventOverride[],
+): VestingEvent[] {
+  // Match by vest_date. First unconsumed override wins (a stable walk
+  // because we visit slots in order).
+  const consumed: boolean[] = existingOverrides.map(() => false);
+  const merged: Array<{ index: number; event: VestingEvent }> = [];
+
+  for (let slotIdx = 0; slotIdx < base.length; slotIdx++) {
+    const slot = base[slotIdx]!;
+    let hit: { i: number; o: VestingEventOverride } | null = null;
+    for (let i = 0; i < existingOverrides.length; i++) {
+      if (consumed[i]) continue;
+      const o = existingOverrides[i]!;
+      if (cmpDate(o.vestDate, slot.vestDate) === 0) {
+        hit = { i, o };
+        break;
+      }
+    }
+    if (hit) {
+      consumed[hit.i] = true;
+      merged.push({
+        index: hit.o.originalDerivationIndex,
+        event: overrideToEvent(hit.o, g, today),
+      });
+    } else {
+      merged.push({ index: slotIdx, event: slot });
+    }
+  }
+
+  // Overrides without a matching base slot survive (AC-8.4.2 outside-window).
+  for (let i = 0; i < existingOverrides.length; i++) {
+    if (consumed[i]) continue;
+    const o = existingOverrides[i]!;
+    merged.push({
+      index: o.originalDerivationIndex,
+      event: overrideToEvent(o, g, today),
+    });
+  }
+
+  // Sort by (vestDate ASC, originalDerivationIndex ASC).
+  merged.sort((a, b) => {
+    const c = cmpDate(a.event.vestDate, b.event.vestDate);
+    if (c !== 0) return c;
+    return a.index - b.index;
+  });
+
+  // Recompute cumulative across the merged sequence.
+  let cumulative: bigint = 0n;
+  return merged.map(({ event }) => {
+    cumulative = cumulative + event.sharesVestedThisEventScaled;
+    return {
+      ...event,
+      cumulativeSharesVestedScaled: cumulative,
+    };
+  });
+}
+
+function overrideToEvent(
+  o: VestingEventOverride,
+  g: GrantInput,
+  today: Date,
+): VestingEvent {
+  return {
+    vestDate: o.vestDate,
+    sharesVestedThisEventScaled: o.sharesVestedThisEventScaled,
+    // Cumulative is recomputed by the merging caller.
+    cumulativeSharesVestedScaled: 0n,
+    state: stateFor(g, today, o.vestDate),
+    fmvAtVest: o.fmvAtVest,
+    fmvCurrency: o.fmvCurrency,
+  };
 }
 
 /**

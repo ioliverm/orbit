@@ -23,6 +23,8 @@ import {
 } from '../../api/dashboard';
 import { listGrants, type GrantDto, type GrantListResponse } from '../../api/grants';
 import { VestingSparkline } from '../../components/vesting/VestingSparkline';
+import { PaperGainsTile } from '../../components/dashboard/PaperGainsTile';
+import { M720ThresholdBanner } from '../../components/feedback/M720ThresholdBanner';
 import { useOnboardingGate } from '../../hooks/useOnboardingGate';
 import { deriveVestingEvents, type Cadence } from '../../lib/vesting';
 import { vestedToDate } from '../../lib/vesting';
@@ -115,6 +117,10 @@ export default function DashboardPage(): JSX.Element {
           </Link>
         </div>
       </div>
+
+      <M720ThresholdBanner />
+
+      <PaperGainsTile grants={grants} />
 
       <EmployerPortfolioPanel
         stacked={stackedQ.data}

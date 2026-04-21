@@ -154,17 +154,34 @@ impl From<Grant> for GrantDto {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VestingEventDto {
+    /// Slice-3 addition. `None` when the DTO comes from an in-memory
+    /// `VestingEvent` (derivation preview); `Some` when the DTO comes
+    /// from a persisted DB row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Uuid>,
     pub vest_date: NaiveDate,
     pub shares_vested_this_event: String,
     pub shares_vested_this_event_scaled: i64,
     pub cumulative_shares_vested: String,
     pub cumulative_shares_vested_scaled: i64,
     pub state: &'static str,
+    /// Slice-3 additions. Carried on the DB row; rendered on the
+    /// editable vesting-events table per AC-8.1.3.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fmv_at_vest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fmv_currency: Option<String>,
+    #[serde(default)]
+    pub is_user_override: bool,
+    /// OCC token per AC-10.5. Only present for persisted rows.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl From<&VestingEvent> for VestingEventDto {
     fn from(e: &VestingEvent) -> Self {
         VestingEventDto {
+            id: None,
             vest_date: e.vest_date,
             shares_vested_this_event: scaled_to_whole_string(e.shares_vested_this_event),
             shares_vested_this_event_scaled: e.shares_vested_this_event,
@@ -175,6 +192,32 @@ impl From<&VestingEvent> for VestingEventDto {
                 VestingState::TimeVestedAwaitingLiquidity => "time_vested_awaiting_liquidity",
                 VestingState::Vested => "vested",
             },
+            fmv_at_vest: e.fmv_at_vest.clone(),
+            fmv_currency: e.fmv_currency.clone(),
+            is_user_override: false,
+            updated_at: None,
+        }
+    }
+}
+
+impl From<&orbit_db::vesting_events::VestingEventRow> for VestingEventDto {
+    fn from(r: &orbit_db::vesting_events::VestingEventRow) -> Self {
+        VestingEventDto {
+            id: Some(r.id),
+            vest_date: r.vest_date,
+            shares_vested_this_event: scaled_to_whole_string(r.shares_vested_this_event),
+            shares_vested_this_event_scaled: r.shares_vested_this_event,
+            cumulative_shares_vested: scaled_to_whole_string(r.cumulative_shares_vested),
+            cumulative_shares_vested_scaled: r.cumulative_shares_vested,
+            state: match r.state {
+                VestingState::Upcoming => "upcoming",
+                VestingState::TimeVestedAwaitingLiquidity => "time_vested_awaiting_liquidity",
+                VestingState::Vested => "vested",
+            },
+            fmv_at_vest: r.fmv_at_vest.clone(),
+            fmv_currency: r.fmv_currency.clone(),
+            is_user_override: r.is_user_override,
+            updated_at: Some(r.updated_at),
         }
     }
 }
@@ -394,7 +437,10 @@ pub async fn vesting_for_grant(
         })
         .collect();
     let (vested, awaiting) = vesting::vested_to_date(&events, Utc::now().date_naive());
-    let events_dto: Vec<VestingEventDto> = events.iter().map(VestingEventDto::from).collect();
+    // Slice 3: emit the row-based DTO so the editable vesting-events
+    // table on grant-detail has `id`, `updatedAt`, `fmvAtVest`,
+    // `fmvCurrency`, and `isUserOverride` (AC-8.1.3 + AC-10.5).
+    let events_dto: Vec<VestingEventDto> = rows.iter().map(VestingEventDto::from).collect();
 
     Ok((
         StatusCode::OK,

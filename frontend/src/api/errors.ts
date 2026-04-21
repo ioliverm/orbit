@@ -73,6 +73,11 @@ export class AppError extends Error {
     return this.code === 'network';
   }
 
+  /** Slice 3 OCC 409 per AC-10.5. */
+  isStaleClientState(): boolean {
+    return this.status === 409 || this.code === 'resource.stale_client_state';
+  }
+
   /** First validation-field code for a given field name, or null. */
   fieldCode(field: string): string | null {
     const fields = this.details.fields ?? [];

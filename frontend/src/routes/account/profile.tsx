@@ -11,6 +11,7 @@ import { createResidency, type ResidencyBody } from '../../api/residency';
 import { AppError } from '../../api/errors';
 import { ResidencyForm } from '../../components/grants/ResidencyForm';
 import { Modelo720Section } from '../../components/modelo720/Modelo720Section';
+import { M720ThresholdBanner } from '../../components/feedback/M720ThresholdBanner';
 import { ME_QUERY_KEY } from '../../hooks/useAuth';
 import { useAuthStore } from '../../store/auth';
 
@@ -60,6 +61,8 @@ export default function ProfilePage(): JSX.Element {
           </p>
         </div>
       </div>
+      <M720ThresholdBanner />
+
       {flash ? (
         <div className="alert alert--info" role="status">
           <strong>{flash}</strong>

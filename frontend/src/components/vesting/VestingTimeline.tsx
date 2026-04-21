@@ -60,7 +60,7 @@ export function VestingTimeline({ events, totalScaled, mode, locale }: Props): J
                 ) : null}
               </span>
             </div>
-            <div className="vesting__bar" aria-label={`${pct.toFixed(1)}% ${mode}`}>
+            <div className="vesting__bar" role="img" aria-label={`${pct.toFixed(1)}% ${mode}`}>
               <div
                 className={fillClass}
                 style={{

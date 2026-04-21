@@ -19,11 +19,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   deleteGrant,
   getGrant,
+  getGrantVesting,
   updateGrant,
   type GrantBody,
   type GrantDto,
   type GrantGetResponse,
   type GrantListResponse,
+  type VestingResponse,
 } from '../../../api/grants';
 import {
   listPurchases,
@@ -33,6 +35,12 @@ import {
 import { AppError } from '../../../api/errors';
 import { GrantForm, type GrantFormValues } from '../../../components/grants/GrantForm';
 import { VestingTimeline } from '../../../components/vesting/VestingTimeline';
+import {
+  VestingEventsEditor,
+  type EditableVestingEvent,
+} from '../../../components/vesting/VestingEventsEditor';
+import { PriceOverrideCard } from '../../../components/grants/PriceOverrideCard';
+import type { PriceCurrency } from '../../../api/currentPrices';
 import { deriveVestingEvents, type Cadence, type VestingEvent } from '../../../lib/vesting';
 import { formatLongDate, formatShares, parseIsoDate } from '../../../lib/format';
 import { useLocaleStore } from '../../../store/locale';
@@ -84,7 +92,17 @@ export default function GrantDetailPage(): JSX.Element {
     },
     onError: (err: unknown) => {
       if (err instanceof AppError && err.isValidation()) {
-        setSubmitError(i18n._(t`Revisa el formulario e inténtalo de nuevo.`));
+        // AC-8.9.1: SHRINK_BELOW_OVERRIDES field error surfaces per-field.
+        const shrinkCode = err.fieldCode('shareCount');
+        if (shrinkCode === 'grant.share_count_below_overrides') {
+          setSubmitError(
+            i18n._(
+              t`Reduce las ediciones manuales de vesting antes de cambiar el total de acciones (hay ajustes manuales que superan el total solicitado).`,
+            ),
+          );
+        } else {
+          setSubmitError(i18n._(t`Revisa el formulario e inténtalo de nuevo.`));
+        }
         throw err;
       } else {
         setSubmitError(i18n._(t`No se pudo guardar. Inténtalo de nuevo.`));
@@ -146,6 +164,7 @@ export default function GrantDetailPage(): JSX.Element {
   const grant = q.data.grant;
 
   if (editing) {
+    const overrideCount = q.data.overrideCount ?? 0;
     return (
       <>
         <div className="page-title">
@@ -168,6 +187,25 @@ export default function GrantDetailPage(): JSX.Element {
             </button>
           </div>
         </div>
+        {q.data.overridesWarning && overrideCount > 0 ? (
+          <aside
+            className="alert alert--warning"
+            role="status"
+            data-testid="grant-edit-override-warning"
+          >
+            <strong>
+              <Trans>
+                Este grant tiene {overrideCount} vesting(s) ajustado(s) manualmente.
+              </Trans>
+            </strong>
+            <p>
+              <Trans>
+                Al modificar los parámetros del grant, esos ajustes se
+                conservan tal y como los editaste.
+              </Trans>
+            </p>
+          </aside>
+        ) : null}
         <section className="account-panel">
           <GrantForm
             initial={grantToFormValues(grant)}
@@ -233,6 +271,15 @@ export default function GrantDetailPage(): JSX.Element {
       ) : null}
 
       <SummaryTiles grant={grant} />
+
+      {grant.ticker ? (
+        <PriceOverrideCard
+          grantId={grant.id}
+          defaultCurrency={(grant.strikeCurrency as PriceCurrency | null) ?? 'USD'}
+        />
+      ) : null}
+
+      <VestingEventsSection grant={grant} />
 
       <div className="section-head" id="vesting">
         <div className="section-head__title">
@@ -608,6 +655,56 @@ function PurchaseRow({
         <Trans>Editar</Trans>
       </Link>
     </div>
+  );
+}
+
+function VestingEventsSection({ grant }: { grant: GrantDto }): JSX.Element {
+  const q = useQuery<VestingResponse>({
+    queryKey: ['grant', grant.id, 'vesting'],
+    queryFn: () => getGrantVesting(grant.id),
+    staleTime: 30_000,
+    retry: false,
+  });
+  if (q.isPending) {
+    return (
+      <section className="card mb-8">
+        <p className="muted">
+          <Trans>Cargando vestings…</Trans>
+        </p>
+      </section>
+    );
+  }
+  if (q.isError) {
+    return (
+      <section className="card mb-8">
+        <div className="alert alert--danger" role="alert">
+          <strong>
+            <Trans>No se pudieron cargar los vestings.</Trans>
+          </strong>
+        </div>
+      </section>
+    );
+  }
+  const events: EditableVestingEvent[] = [];
+  for (const e of q.data?.vestingEvents ?? []) {
+    if (!e.id || !e.updatedAt) continue;
+    events.push({
+      id: e.id,
+      vestDate: e.vestDate,
+      sharesVestedThisEventScaled: e.sharesVestedThisEventScaled,
+      fmvAtVest: e.fmvAtVest ?? null,
+      fmvCurrency: e.fmvCurrency ?? null,
+      isUserOverride: e.isUserOverride ?? false,
+      updatedAt: e.updatedAt,
+      state: e.state,
+    });
+  }
+  return (
+    <VestingEventsEditor
+      grantId={grant.id}
+      events={events}
+      defaultCurrency={(grant.strikeCurrency as PriceCurrency | null) ?? 'USD'}
+    />
   );
 }
 
