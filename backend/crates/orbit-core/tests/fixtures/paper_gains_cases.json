@@ -269,6 +269,149 @@
         "incompleteGrants": [],
         "hasCombinedBand": false
       }
+    },
+    {
+      "name": "zero-grants-edge",
+      "today": "2026-04-19",
+      "fxRateEurNative": "0.9000",
+      "grants": [],
+      "tickerPrices": [],
+      "grantOverrides": [],
+      "expected": {
+        "completeIds": [],
+        "incompleteGrants": [],
+        "hasCombinedBand": false
+      }
+    },
+    {
+      "name": "fx-null-and-no-prices",
+      "today": "2026-04-19",
+      "fxRateEurNative": null,
+      "grants": [
+        {
+          "id": "88888888-8888-8888-8888-888888888888",
+          "instrument": "rsu",
+          "nativeCurrency": "USD",
+          "ticker": "ACME",
+          "doubleTrigger": false,
+          "liquidityEventDate": null,
+          "vestingEvents": [
+            {
+              "vestDate": "2025-10-15",
+              "state": "vested",
+              "sharesVestedScaled": 1000000,
+              "fmvAtVest": "40.0000",
+              "fmvCurrency": "USD"
+            }
+          ],
+          "esppPurchases": []
+        }
+      ],
+      "tickerPrices": [],
+      "grantOverrides": [],
+      "expected": {
+        "completeIds": [],
+        "incompleteGrants": ["88888888-8888-8888-8888-888888888888"],
+        "hasCombinedBand": false
+      }
+    },
+    {
+      "name": "mixed-rsu-and-espp-same-employer",
+      "today": "2026-04-19",
+      "fxRateEurNative": "0.9000",
+      "grants": [
+        {
+          "id": "99999999-9999-9999-9999-999999999999",
+          "instrument": "rsu",
+          "nativeCurrency": "USD",
+          "ticker": "ACME",
+          "doubleTrigger": false,
+          "liquidityEventDate": null,
+          "vestingEvents": [
+            {
+              "vestDate": "2025-10-15",
+              "state": "vested",
+              "sharesVestedScaled": 2000000,
+              "fmvAtVest": "40.0000",
+              "fmvCurrency": "USD"
+            }
+          ],
+          "esppPurchases": []
+        },
+        {
+          "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "instrument": "espp",
+          "nativeCurrency": "USD",
+          "ticker": "ACME",
+          "doubleTrigger": false,
+          "liquidityEventDate": null,
+          "vestingEvents": [],
+          "esppPurchases": [
+            {
+              "purchaseDate": "2025-06-30",
+              "sharesPurchasedScaled": 500000,
+              "fmvAtPurchase": "30.0000",
+              "currency": "USD"
+            }
+          ]
+        }
+      ],
+      "tickerPrices": [
+        { "ticker": "ACME", "price": "50.0000", "currency": "USD" }
+      ],
+      "grantOverrides": [],
+      "expected": {
+        "completeIds": [
+          "99999999-9999-9999-9999-999999999999",
+          "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        ],
+        "incompleteGrants": [],
+        "hasCombinedBand": true
+      }
+    },
+    {
+      "name": "all-nso-excluded-entirely",
+      "today": "2026-04-19",
+      "fxRateEurNative": "0.9000",
+      "grants": [
+        {
+          "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "instrument": "nso",
+          "nativeCurrency": "USD",
+          "ticker": "ACME",
+          "doubleTrigger": false,
+          "liquidityEventDate": null,
+          "vestingEvents": [
+            {
+              "vestDate": "2025-10-15",
+              "state": "vested",
+              "sharesVestedScaled": 1000000,
+              "fmvAtVest": "40.0000",
+              "fmvCurrency": "USD"
+            }
+          ],
+          "esppPurchases": []
+        },
+        {
+          "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "instrument": "nso",
+          "nativeCurrency": "USD",
+          "ticker": "BETA",
+          "doubleTrigger": false,
+          "liquidityEventDate": null,
+          "vestingEvents": [],
+          "esppPurchases": []
+        }
+      ],
+      "tickerPrices": [
+        { "ticker": "ACME", "price": "50.0000", "currency": "USD" }
+      ],
+      "grantOverrides": [],
+      "expected": {
+        "completeIds": [],
+        "incompleteGrants": [],
+        "hasCombinedBand": false
+      }
     }
   ]
 }

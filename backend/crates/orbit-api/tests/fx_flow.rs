@@ -118,3 +118,59 @@ async fn fx_rate_rejects_invalid_quote() {
     let (status, _c, _body) = body_json(r).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+/// T31 — 7-day walkback should find an intermediate rate when some of
+/// the intervening dates are missing. Seeds a rate 7 days old with
+/// nothing in between; expects `walkback = 7` and `staleness = "walkback"`.
+#[tokio::test]
+async fn fx_rate_lookup_walkback_returns_7_day_old_rate_when_intervening_dates_missing() {
+    let (state, app) = app().await;
+    wipe_fx(&state.pool).await;
+    let today = Utc::now().date_naive();
+    let seven_days_ago = today - chrono::Duration::days(7);
+    seed_fx(&state.pool, seven_days_ago, "1.0700").await;
+
+    let r = get(
+        &app,
+        &format!("/api/v1/fx/rate?quote=USD&on={today}"),
+        vec![],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["walkback"], 7);
+    assert_eq!(body["staleness"], "walkback");
+    assert_eq!(body["rate"], "1.0700");
+}
+
+/// T31 — beyond the 7-day window returns unavailable (mirrors the
+/// existing 14-day case but pins the 8-day boundary).
+#[tokio::test]
+async fn fx_rate_lookup_beyond_7_days_returns_unavailable() {
+    let (state, app) = app().await;
+    wipe_fx(&state.pool).await;
+    let today = Utc::now().date_naive();
+    seed_fx(&state.pool, today - chrono::Duration::days(8), "1.0600").await;
+
+    let r = get(
+        &app,
+        &format!("/api/v1/fx/rate?quote=USD&on={today}"),
+        vec![],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["staleness"], "unavailable");
+    assert!(body["rate"].is_null());
+}
+
+/// T31 — `/fx/latest` with an empty `fx_rates` returns a null rate.
+#[tokio::test]
+async fn fx_latest_returns_null_when_fx_rates_empty() {
+    let (state, app) = app().await;
+    wipe_fx(&state.pool).await;
+    let r = get(&app, "/api/v1/fx/latest?quote=USD", vec![]).await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["rate"].is_null() || body["rate"] == serde_json::Value::Null);
+}

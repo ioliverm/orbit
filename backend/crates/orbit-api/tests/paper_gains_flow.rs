@@ -78,6 +78,86 @@ async fn paper_gains_empty_when_no_prices_entered() {
     assert_eq!(body["fxDate"], today.format("%Y-%m-%d").to_string());
 }
 
+/// T31 — empty portfolio: the endpoint returns an empty `perGrant`
+/// array and null combined band.
+#[tokio::test]
+async fn paper_gains_empty_portfolio_returns_empty_arrays() {
+    let (state, app) = app().await;
+    wipe_fx(&state.pool).await;
+    let today = Utc::now().date_naive();
+    seed_fx(&state.pool, today, "0.9000").await;
+    // `onboarded` does NOT create a grant; the user is `complete` after
+    // residency + disclaimer, but has zero grants.
+    let s = onboarded(&state, &app, "pg-empty").await;
+
+    let r = get(
+        &app,
+        "/api/v1/dashboard/paper-gains",
+        vec![(header::COOKIE.as_str(), s.cookie.clone())],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["perGrant"].as_array().unwrap().len(), 0);
+    assert!(body["combinedEurBand"].is_null());
+    assert_eq!(body["incompleteGrants"].as_array().unwrap().len(), 0);
+}
+
+/// T31 — all-NSO portfolio: AC-5.4.3 says NSO grants do not surface in
+/// `incompleteGrants` nor in combined bands. `perGrant` carries the
+/// NsoDeferred row but it's flagged incomplete.
+#[tokio::test]
+async fn paper_gains_all_nso_portfolio_hides_from_incomplete_banner() {
+    let (state, app) = app().await;
+    wipe_fx(&state.pool).await;
+    let today = Utc::now().date_naive();
+    seed_fx(&state.pool, today, "0.9000").await;
+    let s = onboarded(&state, &app, "pg-nso").await;
+
+    let body = json!({
+        "instrument": "nso",
+        "grantDate": "2024-09-15",
+        "shareCount": 10000,
+        "vestingStart": "2024-09-15",
+        "vestingTotalMonths": 48,
+        "cliffMonths": 12,
+        "vestingCadence": "monthly",
+        "doubleTrigger": false,
+        "employerName": "ACME Inc.",
+        "strikeAmount": "8.00",
+        "strikeCurrency": "USD"
+    });
+    let r = post(
+        &app,
+        "/api/v1/grants",
+        body,
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::CREATED);
+
+    let r = get(
+        &app,
+        "/api/v1/dashboard/paper-gains",
+        vec![(header::COOKIE.as_str(), s.cookie.clone())],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    let per_grant = body["perGrant"].as_array().unwrap();
+    assert_eq!(per_grant.len(), 1);
+    assert_eq!(per_grant[0]["complete"], false);
+    assert_eq!(per_grant[0]["missingReason"], "nso_deferred");
+    assert_eq!(
+        body["incompleteGrants"].as_array().unwrap().len(),
+        0,
+        "NSO grants must NOT surface in incompleteGrants (AC-5.4.3)",
+    );
+}
+
 #[tokio::test]
 async fn paper_gains_price_and_fmv_yields_band() {
     let (state, app) = app().await;

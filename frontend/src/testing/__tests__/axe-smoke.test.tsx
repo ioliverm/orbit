@@ -491,4 +491,152 @@ describe('axe-core smoke (G-21) — critical-path screens', () => {
       '/app/dashboard (seeded multi-grant)',
     );
   });
+
+  // T31 extension: dashboard with paper-gains state covering BOTH
+  // complete and incomplete grants. Exercises the combined band
+  // render + the per-grant incomplete row + the partial-data banner
+  // link targets in one jsdom pass.
+  it('/app/dashboard with mixed complete + incomplete paper-gains has no violations', async () => {
+    seedAuthed();
+    const gComplete = grantFixture({
+      id: 'g-complete',
+      instrument: 'rsu',
+      employerName: 'ACME Inc.',
+      ticker: 'ACME',
+    });
+    const gIncomplete = grantFixture({
+      id: 'g-incomplete',
+      instrument: 'rsu',
+      employerName: 'Bravo Corp.',
+      ticker: 'BETA',
+    });
+    const paperGainsPayload = {
+      perGrant: [
+        {
+          grantId: gComplete.id,
+          complete: true,
+          gainNative: '1800.0000',
+          gainEurBand: { low: '1572.30', mid: '1597.05', high: '1620.00' },
+        },
+        { grantId: gIncomplete.id, complete: false, missingReason: 'fmv_missing' },
+      ],
+      combinedEurBand: { low: '1572.30', mid: '1597.05', high: '1620.00' },
+      incompleteGrants: [
+        { grantId: gIncomplete.id, employer: 'Bravo Corp.', instrument: 'rsu' },
+      ],
+      stalenessFx: 'fresh' as const,
+      fxDate: '2026-04-17',
+    };
+    mockGrantsList([gComplete, gIncomplete], {
+      '/dashboard/stacked': { byEmployer: [], combined: [] },
+      '/dashboard/paper-gains': paperGainsPayload,
+      '/dashboard/modelo-720-threshold': {
+        bankAccountsEur: '30000.00',
+        realEstateEur: null,
+        securitiesEur: '1800.00',
+        perCategoryBreach: false,
+        aggregateBreach: false,
+        thresholdEur: '50000.00',
+        fxSensitivityBand: null,
+        fxDate: '2026-04-17',
+      },
+      '/api/v1/current-prices': {
+        prices: [
+          { ticker: 'ACME', price: '50.00', currency: 'USD', enteredAt: '2026-04-19T00:00:00Z' },
+          { ticker: 'BETA', price: '75.00', currency: 'USD', enteredAt: '2026-04-19T00:00:00Z' },
+        ],
+      },
+      '/rule-set-chip': { fxDate: '2026-04-17', stalenessDays: 0, engineVersion: '0.3.0' },
+    });
+    const container = renderPage(<DashboardPage />, '/app/dashboard');
+    await waitFor(() => {
+      expect(screen.getByTestId('paper-gains-tile')).toBeInTheDocument();
+      expect(screen.getByTestId('paper-gains-partial-banner')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/dashboard (paper-gains complete + incomplete)',
+    );
+  });
+
+  // T31 extension: grant-detail with a fully-populated "Precios de
+  // vesting" table — past vests carrying manual overrides AND
+  // future vests still without FMV. Exercises the override-pill
+  // render, the edit-in-place affordances, and the
+  // cumulative-relaxed banner when any override changed shares.
+  it('/app/grants/:id with populated vesting editor (past + future) has no violations', async () => {
+    seedAuthed();
+    const g = grantFixture({
+      ticker: 'ACME',
+      vestingTotalMonths: 12,
+      cliffMonths: 0,
+      shareCount: '12000',
+      shareCountScaled: 12_000 * 10_000,
+    });
+    mockGrantsList([g], {
+      [`/api/v1/grants/${g.id}/vesting`]: {
+        vestingEvents: [
+          {
+            id: 'e-past-1',
+            vestDate: '2025-02-15',
+            sharesVestedThisEvent: '1000',
+            sharesVestedThisEventScaled: 10_000_000,
+            cumulativeSharesVested: '1000',
+            cumulativeSharesVestedScaled: 10_000_000,
+            state: 'vested',
+            fmvAtVest: '40.00',
+            fmvCurrency: 'USD',
+            isUserOverride: true,
+            updatedAt: '2026-04-19T00:00:00Z',
+          },
+          {
+            id: 'e-past-2',
+            vestDate: '2025-05-15',
+            sharesVestedThisEvent: '900',
+            sharesVestedThisEventScaled: 9_000_000,
+            cumulativeSharesVested: '1900',
+            cumulativeSharesVestedScaled: 19_000_000,
+            state: 'vested',
+            fmvAtVest: '42.00',
+            fmvCurrency: 'USD',
+            isUserOverride: true,
+            updatedAt: '2026-04-19T00:00:00Z',
+          },
+          {
+            id: 'e-future-1',
+            vestDate: '2026-08-15',
+            sharesVestedThisEvent: '1000',
+            sharesVestedThisEventScaled: 10_000_000,
+            cumulativeSharesVested: '2900',
+            cumulativeSharesVestedScaled: 29_000_000,
+            state: 'upcoming',
+            fmvAtVest: null,
+            fmvCurrency: null,
+            isUserOverride: false,
+            updatedAt: '2026-04-19T00:00:00Z',
+          },
+        ],
+        vestedToDate: '1900',
+        vestedToDateScaled: 19_000_000,
+        awaitingLiquidity: '0',
+        awaitingLiquidityScaled: 0,
+      },
+      [`/api/v1/grants/${g.id}`]: { grant: g, overridesWarning: true, overrideCount: 2 },
+      '/current-price-override': { override: null },
+      '/rule-set-chip': { fxDate: '2026-04-17', stalenessDays: 0, engineVersion: '0.3.0' },
+    });
+    const container = renderPage(
+      <Routes>
+        <Route path="/app/grants/:grantId" element={<GrantDetailPage />} />
+      </Routes>,
+      `/app/grants/${g.id}`,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('vesting-editor')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/grants/:id (vesting editor past+future populated)',
+    );
+  });
 });

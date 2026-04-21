@@ -174,6 +174,161 @@ pub async fn replace_for_grant(
     Ok(())
 }
 
+/// Pre-DELETE snapshot of the override metadata for a grant. Used by
+/// [`replace_for_grant_preserving_overrides`] to re-stitch the
+/// Slice-3 override columns onto the freshly-derived rows — matching
+/// by `vest_date`, which [`orbit_core::derive_vesting_events`]
+/// guarantees is the authoritative substitution key.
+#[derive(Debug, Clone)]
+pub struct OverrideMeta {
+    pub vest_date: NaiveDate,
+    pub fmv_at_vest: Option<String>,
+    pub fmv_currency: Option<String>,
+    pub overridden_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// List `vest_date`-keyed override metadata for every overridden row
+/// on this grant (i.e., `is_user_override = true`). Used by the Slice-3
+/// override-preserving grant-update path (AC-8.4.2).
+pub async fn list_overrides_for_grant(
+    tx: &mut Tx<'_>,
+    user_id: Uuid,
+    grant_id: Uuid,
+) -> Result<Vec<OverrideMeta>, sqlx::Error> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            vest_date,
+            fmv_at_vest::text AS fmv_at_vest_text,
+            fmv_currency,
+            overridden_at,
+            (shares_vested_this_event * 10000)::bigint AS shares_scaled
+          FROM vesting_events
+         WHERE user_id = $1
+           AND grant_id = $2
+           AND is_user_override = true
+         ORDER BY vest_date ASC
+        "#,
+    )
+    .bind(user_id)
+    .bind(grant_id)
+    .fetch_all(tx.as_executor())
+    .await?;
+
+    rows.iter()
+        .map(|r| {
+            Ok(OverrideMeta {
+                vest_date: r.try_get("vest_date")?,
+                fmv_at_vest: r.try_get("fmv_at_vest_text")?,
+                fmv_currency: r.try_get("fmv_currency")?,
+                overridden_at: r.try_get("overridden_at")?,
+            })
+        })
+        .collect()
+}
+
+/// Slice-3 override-preserving variant of [`replace_for_grant`]
+/// (AC-8.4.2).
+///
+/// Semantics: same DELETE + batch-INSERT shape as Slice-1, but for each
+/// event whose `vest_date` appears in `override_meta`, the insert
+/// carries `fmv_at_vest`, `fmv_currency`, `overridden_at`, and
+/// `is_user_override = true` verbatim from the prior override. Events
+/// whose `vest_date` does NOT appear in `override_meta` are inserted
+/// with the defaults (no FMV, no override flag) — matching the Slice-1
+/// behaviour for non-overridden rows.
+///
+/// Caller contract: `events` must already be the output of
+/// `derive_vesting_events(grant, today, overrides)` (Slice-3
+/// override-aware path), so that every override's `vest_date` is
+/// present in `events`. Violating the contract silently drops the
+/// override — this is surfaced by the T31 integration probe
+/// `grant_update_preserves_user_override_rows`.
+pub async fn replace_for_grant_preserving_overrides(
+    tx: &mut Tx<'_>,
+    user_id: Uuid,
+    grant_id: Uuid,
+    events: Vec<VestingEvent>,
+    override_meta: &[OverrideMeta],
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM vesting_events WHERE grant_id = $1 AND user_id = $2")
+        .bind(grant_id)
+        .bind(user_id)
+        .execute(tx.as_executor())
+        .await?;
+
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    // Index the override metadata for O(n) stitching (no HashMap allocation
+    // for the typical small-N case; tight loop is still O(events × overrides)
+    // in the worst case).
+    let find_meta = |d: NaiveDate| override_meta.iter().find(|m| m.vest_date == d);
+
+    let mut qb: QueryBuilder<sqlx::Postgres> = QueryBuilder::new(
+        "INSERT INTO vesting_events (\
+            user_id, grant_id, vest_date, \
+            shares_vested_this_event, cumulative_shares_vested, state, \
+            fmv_at_vest, fmv_currency, is_user_override, overridden_at\
+        ) ",
+    );
+    qb.push_values(events.iter(), |mut b, event| {
+        let meta = find_meta(event.vest_date);
+        b.push_bind(user_id)
+            .push_bind(grant_id)
+            .push_bind(event.vest_date)
+            .push_bind(event.shares_vested_this_event)
+            .push_unseparated("::numeric / 10000")
+            .push_bind(event.cumulative_shares_vested)
+            .push_unseparated("::numeric / 10000")
+            .push_bind(vesting_state_str(event.state));
+        // Slice-3 override columns. When there's no matching override
+        // we push NULL / false to mirror the Slice-1 defaults.
+        match meta {
+            Some(m) => {
+                match m.fmv_at_vest.as_deref() {
+                    Some(s) => {
+                        b.push_bind(s.to_string()).push_unseparated("::numeric");
+                    }
+                    None => {
+                        b.push("NULL");
+                    }
+                }
+                match m.fmv_currency.as_deref() {
+                    Some(c) => {
+                        b.push_bind(c.to_string());
+                    }
+                    None => {
+                        b.push("NULL");
+                    }
+                }
+                b.push_bind(true);
+                match m.overridden_at {
+                    Some(t) => {
+                        b.push_bind(t);
+                    }
+                    None => {
+                        // `is_user_override = true` requires
+                        // `overridden_at IS NOT NULL` (CHECK). Snap to
+                        // NOW() to keep the row coherent.
+                        b.push("now()");
+                    }
+                }
+            }
+            None => {
+                b.push("NULL");
+                b.push("NULL");
+                b.push_bind(false);
+                b.push("NULL");
+            }
+        }
+    });
+
+    qb.build().execute(tx.as_executor()).await?;
+    Ok(())
+}
+
 /// List every `vesting_events` row for `grant_id`, oldest first. RLS scopes
 /// the visible rows to the owner (`user_id` filter is redundant with the
 /// RLS policy but keeps the query self-describing).

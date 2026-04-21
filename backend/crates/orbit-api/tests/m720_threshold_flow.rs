@@ -97,6 +97,82 @@ async fn m720_threshold_per_category_breach_on_bank_accounts_over_limit() {
     assert_eq!(body["aggregateBreach"], true);
 }
 
+/// T31 — real-estate breach: bank_accounts under threshold; real_estate
+/// over. Per-category true (real_estate); aggregate also true.
+#[tokio::test]
+async fn m720_threshold_real_estate_only_breach() {
+    let (state, app) = app().await;
+    wipe_fx(&state.pool).await;
+    let today = Utc::now().date_naive();
+    seed_fx(&state.pool, today, "1.0000").await;
+    let s = onboarded_with_grant(&state, &app, "m720-re").await;
+
+    let _ = post(
+        &app,
+        "/api/v1/modelo-720-inputs",
+        json!({ "category": "real_estate", "totalEur": "60000.00" }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+
+    let r = get(
+        &app,
+        "/api/v1/dashboard/modelo-720-threshold",
+        vec![(header::COOKIE.as_str(), s.cookie.clone())],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["perCategoryBreach"], true);
+    assert_eq!(body["aggregateBreach"], true);
+}
+
+/// T31 — aggregate-only breach: two categories each below 50k but sum
+/// above 50k. `perCategoryBreach` false; `aggregateBreach` true.
+#[tokio::test]
+async fn m720_threshold_aggregate_only_breach() {
+    let (state, app) = app().await;
+    wipe_fx(&state.pool).await;
+    let today = Utc::now().date_naive();
+    seed_fx(&state.pool, today, "1.0000").await;
+    let s = onboarded_with_grant(&state, &app, "m720-agg").await;
+
+    let _ = post(
+        &app,
+        "/api/v1/modelo-720-inputs",
+        json!({ "category": "bank_accounts", "totalEur": "30000.00" }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let _ = post(
+        &app,
+        "/api/v1/modelo-720-inputs",
+        json!({ "category": "real_estate", "totalEur": "30000.00" }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+
+    let r = get(
+        &app,
+        "/api/v1/dashboard/modelo-720-threshold",
+        vec![(header::COOKIE.as_str(), s.cookie.clone())],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["perCategoryBreach"], false);
+    assert_eq!(body["aggregateBreach"], true);
+}
+
 #[tokio::test]
 async fn m720_threshold_securities_null_when_fmv_missing() {
     let (state, app) = app().await;

@@ -66,4 +66,30 @@ async fn chip_fx_date_null_when_fx_empty() {
     let (status, _c, body) = body_json(r).await;
     assert_eq!(status, StatusCode::OK);
     assert!(body["fxDate"].is_null());
+    // engine_version is always populated, regardless of FX.
+    assert!(body["engineVersion"].is_string());
+}
+
+/// T31 — the chip's `fxDate` is the latest `rate_date` in
+/// `fx_rates` for the user's primary currency (EUR → USD pair).
+/// Multiple seeded dates; assert the chip picks the newest.
+#[tokio::test]
+async fn chip_fx_date_matches_latest_rate_date_for_primary_currency() {
+    let (state, app) = app().await;
+    wipe_fx(&state.pool).await;
+    let today = Utc::now().date_naive();
+    seed_fx(&state.pool, today - chrono::Duration::days(3), "1.0700").await;
+    seed_fx(&state.pool, today - chrono::Duration::days(1), "1.0750").await;
+    seed_fx(&state.pool, today, "1.0820").await;
+    let s = onboarded_with_grant(&state, &app, "chip-latest").await;
+
+    let r = get(
+        &app,
+        "/api/v1/rule-set-chip",
+        vec![(header::COOKIE.as_str(), s.cookie.clone())],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["fxDate"], today.format("%Y-%m-%d").to_string());
 }

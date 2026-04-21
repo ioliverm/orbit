@@ -341,6 +341,29 @@ pub async fn update(
         }]));
     }
 
+    // AC-8.4.2 preservation: read the pre-existing override rows BEFORE
+    // the grant update. Every `is_user_override = true` row is carried
+    // across to the re-derived schedule via `derive_vesting_events`
+    // override-aware branch (ADR-017 §2) + the preserve variant of
+    // `replace_for_grant`.
+    let existing_overrides =
+        orbit_db::vesting_events::list_overrides_for_grant(&mut tx, auth.user_id, grant_id).await?;
+    // Compose the `VestingEventOverride` inputs for the algorithm.
+    let existing_event_rows =
+        orbit_db::vesting_events::list_for_grant(&mut tx, auth.user_id, grant_id).await?;
+    let algo_overrides: Vec<vesting::VestingEventOverride> = existing_event_rows
+        .iter()
+        .filter(|r| r.is_user_override)
+        .enumerate()
+        .map(|(idx, r)| vesting::VestingEventOverride {
+            vest_date: r.vest_date,
+            shares_vested_this_event: r.shares_vested_this_event,
+            fmv_at_vest: r.fmv_at_vest.clone(),
+            fmv_currency: r.fmv_currency.clone(),
+            original_derivation_index: idx,
+        })
+        .collect();
+
     // Confirm the row is owned by the caller before UPDATE — `update_grant`
     // returns `RowNotFound` via RLS scoping, which the `From<sqlx::Error>`
     // impl maps to 404 (AC-7.3).
@@ -349,10 +372,16 @@ pub async fn update(
         Err(sqlx::Error::RowNotFound) => return Err(AppError::NotFound),
         Err(e) => return Err(e.into()),
     };
-    let events =
-        vesting::derive_vesting_events(&grant_input, today, &[]).map_err(map_vesting_error)?;
-    orbit_db::vesting_events::replace_for_grant(&mut tx, auth.user_id, grant.id, events.clone())
-        .await?;
+    let events = vesting::derive_vesting_events(&grant_input, today, &algo_overrides)
+        .map_err(map_vesting_error)?;
+    orbit_db::vesting_events::replace_for_grant_preserving_overrides(
+        &mut tx,
+        auth.user_id,
+        grant.id,
+        events.clone(),
+        &existing_overrides,
+    )
+    .await?;
 
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
     audit::record_wizard_in_tx(

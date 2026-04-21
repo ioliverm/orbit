@@ -276,6 +276,155 @@
           "2024-06-15": 10000000
         }
       }
+    },
+    {
+      "name": "override-preserves-across-share-count-change",
+      "inputs": {
+        "shareCountScaled": 240000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-06-15",
+          "sharesVestedScaled": 25000000,
+          "fmvAtVest": "42.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 5
+        }
+      ],
+      "expected": {
+        "eventCount": 12,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2024-06-15"],
+        "overriddenShares": {
+          "2024-06-15": 25000000
+        }
+      }
+    },
+    {
+      "name": "override-outside-vesting-window",
+      "inputs": {
+        "shareCountScaled": 120000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2023-06-15",
+          "sharesVestedScaled": 5000000,
+          "fmvAtVest": "38.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 99
+        }
+      ],
+      "expected": {
+        "eventCount": 13,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2023-06-15"],
+        "overriddenShares": {
+          "2023-06-15": 5000000
+        }
+      }
+    },
+    {
+      "name": "override-with-null-fmv",
+      "inputs": {
+        "shareCountScaled": 120000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 12,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-06-15",
+          "sharesVestedScaled": 11000000,
+          "fmvAtVest": null,
+          "fmvCurrency": null,
+          "originalDerivationIndex": 5
+        }
+      ],
+      "expected": {
+        "eventCount": 12,
+        "cumulativeRelaxed": true,
+        "overriddenDates": ["2024-06-15"],
+        "overriddenShares": {
+          "2024-06-15": 11000000
+        }
+      }
+    },
+    {
+      "name": "override-count-exceeds-derived-after-shortening",
+      "inputs": {
+        "shareCountScaled": 30000000,
+        "vestingStart": "2024-01-15",
+        "vestingTotalMonths": 3,
+        "cliffMonths": 0,
+        "cadence": "monthly",
+        "doubleTrigger": false,
+        "liquidityEventDate": null
+      },
+      "today": "2030-01-01",
+      "overrides": [
+        {
+          "vestDate": "2024-02-15",
+          "sharesVestedScaled": 5000000,
+          "fmvAtVest": "20.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 0
+        },
+        {
+          "vestDate": "2024-03-15",
+          "sharesVestedScaled": 5000000,
+          "fmvAtVest": "21.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 1
+        },
+        {
+          "vestDate": "2024-05-15",
+          "sharesVestedScaled": 7000000,
+          "fmvAtVest": "22.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 3
+        },
+        {
+          "vestDate": "2024-06-15",
+          "sharesVestedScaled": 8000000,
+          "fmvAtVest": "23.0000",
+          "fmvCurrency": "USD",
+          "originalDerivationIndex": 4
+        }
+      ],
+      "expected": {
+        "eventCount": 5,
+        "cumulativeRelaxed": true,
+        "overriddenDates": [
+          "2024-02-15",
+          "2024-03-15",
+          "2024-05-15",
+          "2024-06-15"
+        ],
+        "overriddenShares": {
+          "2024-02-15": 5000000,
+          "2024-03-15": 5000000,
+          "2024-05-15": 7000000,
+          "2024-06-15": 8000000
+        }
+      }
     }
   ]
 }
