@@ -1103,3 +1103,574 @@ async fn espp_notes_lift_first_purchase_rewrites_grant_notes() {
 
     cleanup_user(&migrate_pool, user_a).await;
 }
+
+// ---------------------------------------------------------------------------
+// Slice 3 T28 — cross-tenant probes for ticker_current_prices,
+// grant_current_price_overrides, and the vesting-event override surface.
+// fx_rates is shared reference data — NOT RLS-scoped — so it has no probe
+// (ADR-017 §1 "Why `fx_rates` is NOT RLS-scoped").
+// ---------------------------------------------------------------------------
+
+/// Seed a `ticker_current_prices` row via the migrate pool (owner
+/// bypasses the permissive RLS).
+async fn seed_ticker_price(
+    migrate_pool: &PgPool,
+    user_id: Uuid,
+    ticker: &str,
+    price: &str,
+) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO ticker_current_prices (user_id, ticker, price, currency)
+        VALUES ($1, $2, $3::numeric, 'USD')
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(ticker)
+    .bind(price)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed ticker price for {user_id} ({ticker}) failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("ticker_current_prices.id missing from RETURNING")
+}
+
+/// Seed a `grant_current_price_overrides` row for `grant_id`.
+async fn seed_grant_price_override(
+    migrate_pool: &PgPool,
+    user_id: Uuid,
+    grant_id: Uuid,
+    price: &str,
+) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO grant_current_price_overrides (user_id, grant_id, price, currency)
+        VALUES ($1, $2, $3::numeric, 'USD')
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(grant_id)
+    .bind(price)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed grant price override for {user_id} failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("grant_current_price_overrides.id missing from RETURNING")
+}
+
+/// Probe 13 — `ticker_current_prices` isolation. User A upserts a row;
+/// user B's tx cannot SELECT it.
+#[tokio::test]
+async fn ticker_current_prices_cross_tenant_select_is_isolated() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_tp").await;
+    ensure_user(&migrate_pool, user_b, "b_tp").await;
+    let pid_a = seed_ticker_price(&migrate_pool, user_a, "ACME", "42.00").await;
+    let pid_b = seed_ticker_price(&migrate_pool, user_b, "ACME", "99.99").await;
+
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a)");
+
+    let rows = sqlx::query("SELECT id, user_id FROM ticker_current_prices WHERE id IN ($1, $2)")
+        .bind(pid_a)
+        .bind(pid_b)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select ticker_current_prices under RLS");
+
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on ticker_current_prices under Tx::for_user({user_a}) returned {} rows \
+         for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    let seen_user: Uuid = rows[0].try_get("user_id").expect("row user_id");
+    assert_eq!(
+        seen_id, pid_a,
+        "RLS leak: Tx::for_user({user_a}) returned user B's ticker_current_prices id {seen_id} \
+         (expected {pid_a})"
+    );
+    assert_eq!(
+        seen_user, user_a,
+        "RLS leak: Tx::for_user({user_a}) returned a ticker_current_prices row for user {seen_user}"
+    );
+
+    tx.rollback().await.expect("rollback");
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Probe 14 — `grant_current_price_overrides` mutation isolation. User A
+/// has an override on A's grant; user B's tx cannot UPDATE/DELETE it.
+#[tokio::test]
+async fn grant_current_price_overrides_cross_tenant_mutation_cannot_touch_other_tenants_rows() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_gpo").await;
+    ensure_user(&migrate_pool, user_b, "b_gpo").await;
+    let ga = seed_grant(&migrate_pool, user_a, "a_gpo").await;
+    let gb = seed_grant(&migrate_pool, user_b, "b_gpo").await;
+    let oid_a = seed_grant_price_override(&migrate_pool, user_a, ga, "42.00").await;
+    let oid_b = seed_grant_price_override(&migrate_pool, user_b, gb, "99.99").await;
+
+    // --- SELECT probe
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) select");
+    let rows =
+        sqlx::query("SELECT id, user_id FROM grant_current_price_overrides WHERE id IN ($1, $2)")
+            .bind(oid_a)
+            .bind(oid_b)
+            .fetch_all(tx.as_executor())
+            .await
+            .expect("select grant_current_price_overrides under RLS");
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on grant_current_price_overrides under Tx::for_user({user_a}) returned \
+         {} rows for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    assert_eq!(
+        seen_id, oid_a,
+        "RLS leak: Tx::for_user({user_a}) returned user B's override id {seen_id}"
+    );
+    tx.rollback().await.expect("rollback select probe");
+
+    // --- UPDATE probe (target user B's override)
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) update");
+    let updated =
+        sqlx::query("UPDATE grant_current_price_overrides SET price = 1.00::numeric WHERE id = $1")
+            .bind(oid_b)
+            .execute(tx.as_executor())
+            .await
+            .expect("cross-tenant UPDATE should return 0 rows, not error");
+    assert_eq!(
+        updated.rows_affected(),
+        0,
+        "RLS leak: UPDATE from Tx::for_user({user_a}) affected {} rows on user B's override {oid_b}.",
+        updated.rows_affected()
+    );
+    tx.commit().await.expect("commit empty update");
+
+    // --- DELETE probe (target user B's override)
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) delete");
+    let deleted = sqlx::query("DELETE FROM grant_current_price_overrides WHERE id = $1")
+        .bind(oid_b)
+        .execute(tx.as_executor())
+        .await
+        .expect("cross-tenant DELETE should return 0 rows, not error");
+    assert_eq!(
+        deleted.rows_affected(),
+        0,
+        "RLS leak: DELETE from Tx::for_user({user_a}) removed {} rows on user B's override {oid_b}.",
+        deleted.rows_affected()
+    );
+    tx.commit().await.expect("commit empty delete");
+
+    // Sanity: user B's override is still present with its original price.
+    let surviving = sqlx::query(
+        "SELECT price::text AS price_text FROM grant_current_price_overrides WHERE id = $1",
+    )
+    .bind(oid_b)
+    .fetch_optional(&migrate_pool)
+    .await
+    .expect("post-check lookup");
+    let surviving = surviving.expect(
+        "user B's grant_current_price_overrides row must still exist after cross-tenant DELETE",
+    );
+    let price: String = surviving.try_get("price_text").expect("price");
+    assert!(
+        price.starts_with("99.99"),
+        "RLS leak: user B's grant_current_price_overrides.price mutated to {price:?} by a \
+         Tx::for_user(user_a) UPDATE"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Seed a vesting_events row with an active FMV override for
+/// `user_id`/`grant_id`, bypassing the permissive RLS via the migrate
+/// pool. Mirrors the slice-3 "user has already saved a manual override"
+/// state used by the override probe.
+async fn seed_overridden_vesting_event(
+    migrate_pool: &PgPool,
+    user_id: Uuid,
+    grant_id: Uuid,
+) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO vesting_events (
+            user_id, grant_id, vest_date,
+            shares_vested_this_event, cumulative_shares_vested, state,
+            fmv_at_vest, fmv_currency, is_user_override, overridden_at
+        )
+        VALUES ($1, $2, DATE '2025-09-15',
+                250, 250, 'vested',
+                42.00::numeric, 'USD', true, now())
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(grant_id)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed overridden vesting_event for {user_id} failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("vesting_events.id missing from RETURNING")
+}
+
+/// Probe 15 — vesting-event override is isolated across tenants.
+/// User A creates a grant + an override; user B's tx calling
+/// `apply_override` on A's event returns `Conflict` (RLS denies the
+/// UPDATE's row-set), and user B's tx calling SELECT sees zero rows.
+#[tokio::test]
+async fn vesting_events_override_cross_tenant_is_isolated() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_vo").await;
+    ensure_user(&migrate_pool, user_b, "b_vo").await;
+    let ga = seed_grant(&migrate_pool, user_a, "a_vo").await;
+    let eid_a = seed_overridden_vesting_event(&migrate_pool, user_a, ga).await;
+
+    // Read the current `updated_at` (as the owner) so we can pass a
+    // realistic-looking token to apply_override. The point of the
+    // probe is that RLS gates the UPDATE's row set to zero regardless
+    // of whether the token matches.
+    let row = sqlx::query("SELECT updated_at FROM vesting_events WHERE id = $1")
+        .bind(eid_a)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("read updated_at");
+    let updated_at: chrono::DateTime<chrono::Utc> = row.try_get("updated_at").expect("updated_at");
+
+    // --- SELECT probe: user B sees zero rows for A's event.
+    let mut tx = Tx::for_user(&app_pool, user_b)
+        .await
+        .expect("Tx::for_user(user_b) select");
+    let rows = sqlx::query("SELECT id FROM vesting_events WHERE id = $1")
+        .bind(eid_a)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select vesting_events under RLS as user_b");
+    assert_eq!(
+        rows.len(),
+        0,
+        "RLS leak: Tx::for_user({user_b}) saw {} rows for user A's vesting_event {eid_a}; \
+         expected 0.",
+        rows.len()
+    );
+    tx.rollback().await.expect("rollback select");
+
+    // --- apply_override probe: from user B's tx, target user A's event.
+    // RLS USING on UPDATE matches zero rows → OverrideOutcome::Conflict.
+    let mut tx = Tx::for_user(&app_pool, user_b)
+        .await
+        .expect("Tx::for_user(user_b) override");
+    let patch = orbit_db::vesting_events::VestingEventOverridePatch {
+        fmv_at_vest: Some(Some("1.00".to_string())),
+        fmv_currency: Some(Some("USD".to_string())),
+        ..Default::default()
+    };
+    let outcome =
+        orbit_db::vesting_events::apply_override(&mut tx, user_b, eid_a, &patch, updated_at)
+            .await
+            .expect("apply_override call");
+    assert_eq!(
+        outcome,
+        orbit_db::vesting_events::OverrideOutcome::Conflict,
+        "RLS leak: apply_override from Tx::for_user({user_b}) on user A's event {eid_a} \
+         returned {outcome:?}; expected Conflict (0 rows matched under RLS)."
+    );
+    tx.commit().await.expect("commit empty override");
+
+    // Sanity: user A's event is still present with its original FMV
+    // (read via the migrate pool — owner bypasses RLS).
+    let surviving = sqlx::query(
+        "SELECT fmv_at_vest::text AS fmv_text, is_user_override FROM vesting_events WHERE id = $1",
+    )
+    .bind(eid_a)
+    .fetch_one(&migrate_pool)
+    .await
+    .expect("post-check lookup");
+    let fmv: String = surviving.try_get("fmv_text").expect("fmv_text");
+    let flag: bool = surviving
+        .try_get("is_user_override")
+        .expect("is_user_override");
+    assert!(
+        fmv.starts_with("42."),
+        "RLS leak: user A's vesting_event.fmv_at_vest mutated to {fmv:?} by a Tx::for_user(user_b) \
+         apply_override call"
+    );
+    assert!(
+        flag,
+        "user A's is_user_override flag must still be true after the cross-tenant no-op"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+// ---------------------------------------------------------------------------
+// Slice 3 T28 — apply_override + clear_override round-trip unit test.
+// Validates that the override columns advance together and that
+// clear_override preserves FMV per AC-8.7.1.
+// ---------------------------------------------------------------------------
+
+/// Probe 16 — override round-trip. Apply an override (vest_date +
+/// shares + FMV), verify the four override columns advance; call
+/// clear_override and verify per AC-8.7.1 that (a) vest_date and
+/// shares revert to the algorithm's output, (b) FMV is preserved, and
+/// (c) is_user_override stays `true` because the FMV itself is still
+/// a manual edit.
+///
+/// Matches the T28 task's "apply + verify flags, clear + verify FMV
+/// preservation" ask but follows AC-8.7.1 (d) precisely: when the row
+/// still carries an FMV after the clear, the override flag stays true.
+#[tokio::test]
+async fn vesting_events_override_round_trip_preserves_fmv() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    ensure_user(&migrate_pool, user_a, "a_rt").await;
+    // seed_grant creates an RSU grant with vesting_start = 2024-09-15,
+    // 48 months, 12-month cliff, monthly, 1000 shares. Algorithm output
+    // for the 2025-09-15 cliff row: 250 shares (12/48 * 1000).
+    let grant_id = seed_grant(&migrate_pool, user_a, "a_rt").await;
+    // Seed the cliff row with the algorithmic values so apply_override
+    // has a row to mutate.
+    let event_id = seed_vesting_event(&migrate_pool, user_a, grant_id, "a_rt").await;
+
+    // Read initial updated_at.
+    let row = sqlx::query("SELECT updated_at FROM vesting_events WHERE id = $1")
+        .bind(event_id)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("read initial updated_at");
+    let initial_updated_at: chrono::DateTime<chrono::Utc> =
+        row.try_get("updated_at").expect("updated_at");
+
+    // --- apply_override: change vest_date + shares + fmv.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) apply");
+    let patch = orbit_db::vesting_events::VestingEventOverridePatch {
+        vest_date: Some(chrono::NaiveDate::from_ymd_opt(2025, 10, 1).unwrap()),
+        shares_vested_this_event: Some(300 * orbit_core::SHARES_SCALE),
+        fmv_at_vest: Some(Some("42.5000".to_string())),
+        fmv_currency: Some(Some("USD".to_string())),
+    };
+    let outcome = orbit_db::vesting_events::apply_override(
+        &mut tx,
+        user_a,
+        event_id,
+        &patch,
+        initial_updated_at,
+    )
+    .await
+    .expect("apply_override call");
+    tx.commit().await.expect("commit apply");
+
+    let applied = match outcome {
+        orbit_db::vesting_events::OverrideOutcome::Applied(r) => r,
+        orbit_db::vesting_events::OverrideOutcome::Conflict => {
+            panic!("apply_override returned Conflict on fresh token; expected Applied")
+        }
+    };
+    assert!(
+        applied.is_user_override,
+        "is_user_override must be true after apply_override"
+    );
+    assert!(
+        applied.overridden_at.is_some(),
+        "overridden_at must be non-null after apply_override"
+    );
+    assert!(
+        applied.updated_at > initial_updated_at,
+        "updated_at must advance after apply_override: {:?} vs initial {:?}",
+        applied.updated_at,
+        initial_updated_at
+    );
+    assert_eq!(
+        applied.vest_date,
+        chrono::NaiveDate::from_ymd_opt(2025, 10, 1).unwrap(),
+        "vest_date must reflect the patch"
+    );
+    assert_eq!(
+        applied.shares_vested_this_event,
+        300 * orbit_core::SHARES_SCALE,
+        "shares_vested_this_event must reflect the patch"
+    );
+    assert!(
+        applied
+            .fmv_at_vest
+            .as_deref()
+            .map(|s| s.starts_with("42.5"))
+            .unwrap_or(false),
+        "fmv_at_vest must be 42.5000 (got {:?})",
+        applied.fmv_at_vest
+    );
+    assert_eq!(applied.fmv_currency.as_deref(), Some("USD"));
+
+    // --- clear_override: revert date + shares; preserve FMV.
+    // `today = 2030-01-01` pins every derived row to a state that isn't
+    // Upcoming; the 2025-09-15 cliff row is what the algorithm outputs.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) clear");
+    let today = chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap();
+    let clear_outcome = orbit_db::vesting_events::clear_override(&mut tx, user_a, event_id, today)
+        .await
+        .expect("clear_override call");
+    tx.commit().await.expect("commit clear");
+
+    let cleared = match clear_outcome {
+        orbit_db::vesting_events::ClearOutcome::Cleared(r) => r,
+        other => panic!("clear_override returned {other:?}; expected Cleared"),
+    };
+
+    // vest_date + shares revert to the algorithm output.
+    assert_eq!(
+        cleared.vest_date,
+        chrono::NaiveDate::from_ymd_opt(2025, 9, 15).unwrap(),
+        "clear_override must revert vest_date to the algorithm output (2025-09-15 cliff)"
+    );
+    assert_eq!(
+        cleared.shares_vested_this_event,
+        250 * orbit_core::SHARES_SCALE,
+        "clear_override must revert shares to the algorithm output (250 at cliff)"
+    );
+
+    // FMV is preserved per AC-8.7.1 (b).
+    assert!(
+        cleared
+            .fmv_at_vest
+            .as_deref()
+            .map(|s| s.starts_with("42.5"))
+            .unwrap_or(false),
+        "FMV must be preserved after clear_override (got {:?})",
+        cleared.fmv_at_vest
+    );
+    assert_eq!(cleared.fmv_currency.as_deref(), Some("USD"));
+
+    // Per AC-8.7.1 (d): the row still carries an FMV, so the override
+    // flag stays true and overridden_at stays non-null (coherence
+    // CHECK requires it).
+    assert!(
+        cleared.is_user_override,
+        "is_user_override must remain true when FMV is still set (AC-8.7.1 d)"
+    );
+    assert!(
+        cleared.overridden_at.is_some(),
+        "overridden_at must remain non-null while is_user_override is true \
+         (override_flag_coherent CHECK)"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+}
+
+/// Probe 17 — clear_override on a row with no FMV drops the override
+/// flag cleanly. Covers the AC-8.7.1 (c) branch of the biconditional.
+#[tokio::test]
+async fn vesting_events_clear_override_without_fmv_resets_flags() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    ensure_user(&migrate_pool, user_a, "a_rt_nofmv").await;
+    let grant_id = seed_grant(&migrate_pool, user_a, "a_rt_nofmv").await;
+    let event_id = seed_vesting_event(&migrate_pool, user_a, grant_id, "a_rt_nofmv").await;
+
+    // Read initial updated_at.
+    let row = sqlx::query("SELECT updated_at FROM vesting_events WHERE id = $1")
+        .bind(event_id)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("read initial updated_at");
+    let initial_updated_at: chrono::DateTime<chrono::Utc> =
+        row.try_get("updated_at").expect("updated_at");
+
+    // Apply an override that changes vest_date + shares but leaves FMV unset.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user apply");
+    let patch = orbit_db::vesting_events::VestingEventOverridePatch {
+        vest_date: Some(chrono::NaiveDate::from_ymd_opt(2025, 10, 1).unwrap()),
+        shares_vested_this_event: Some(300 * orbit_core::SHARES_SCALE),
+        fmv_at_vest: None,
+        fmv_currency: None,
+    };
+    let outcome = orbit_db::vesting_events::apply_override(
+        &mut tx,
+        user_a,
+        event_id,
+        &patch,
+        initial_updated_at,
+    )
+    .await
+    .expect("apply_override");
+    tx.commit().await.expect("commit apply");
+    let applied = match outcome {
+        orbit_db::vesting_events::OverrideOutcome::Applied(r) => r,
+        other => panic!("expected Applied, got {other:?}"),
+    };
+    assert!(applied.fmv_at_vest.is_none());
+    assert!(applied.is_user_override);
+
+    // Now clear; expect full reset since FMV is NULL.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user clear");
+    let today = chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap();
+    let clear_outcome = orbit_db::vesting_events::clear_override(&mut tx, user_a, event_id, today)
+        .await
+        .expect("clear_override");
+    tx.commit().await.expect("commit clear");
+
+    let cleared = match clear_outcome {
+        orbit_db::vesting_events::ClearOutcome::Cleared(r) => r,
+        other => panic!("expected Cleared, got {other:?}"),
+    };
+    assert!(
+        !cleared.is_user_override,
+        "is_user_override must reset to false when no FMV remains (AC-8.7.1 c)"
+    );
+    assert!(
+        cleared.overridden_at.is_none(),
+        "overridden_at must reset to NULL when no FMV remains (override_flag_coherent CHECK)"
+    );
+    assert!(
+        cleared.fmv_at_vest.is_none(),
+        "fmv_at_vest must remain NULL"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+}
