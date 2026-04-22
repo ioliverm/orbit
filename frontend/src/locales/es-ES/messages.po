@@ -14,6 +14,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: src/components/grants/ResidencyForm.tsx:159
+#: src/routes/account/profile.tsx:311
 msgid "— selecciona —"
 msgstr "— selecciona —"
 
@@ -21,7 +22,7 @@ msgstr "— selecciona —"
 msgid "¿Confirmas cerrar todas las demás sesiones?"
 msgstr "¿Confirmas cerrar todas las demás sesiones?"
 
-#: src/routes/app/grants/detail.tsx:511
+#: src/routes/app/grants/detail.tsx:510
 #: src/routes/app/grants/espp-edit.tsx:205
 #: src/routes/app/trips/edit.tsx:169
 msgid "¿Confirmas la eliminación definitiva?"
@@ -67,6 +68,10 @@ msgstr "{0} sesiones activas."
 msgid "% de descuento del empleador"
 msgstr "% de descuento del empleador"
 
+#: src/components/vesting/VestingEventDialog.tsx:693
+msgid "% de retención"
+msgstr "% de retención"
+
 #: src/components/grants/GrantForm.tsx:518
 msgid "3 años · sin cliff · mensual"
 msgstr "3 años · sin cliff · mensual"
@@ -87,36 +92,49 @@ msgstr "Abre el enlace desde el correo que te enviamos."
 msgid "Abrir explicación del conjunto de reglas usado en esta página"
 msgstr "Abrir explicación del conjunto de reglas usado en esta página"
 
-#: src/components/vesting/VestingEventsEditor.tsx:173
-#: src/components/vesting/VestingEventsEditor.tsx:217
+#: src/components/vesting/VestingEventsEditor.tsx:175
+#: src/components/vesting/VestingEventsEditor.tsx:219
 msgid "Acción"
 msgstr "Acción"
 
-#: src/components/vesting/VestingEventsEditor.tsx:164
-#: src/components/vesting/VestingEventsEditor.tsx:208
+#: src/components/vesting/VestingEventsEditor.tsx:166
+#: src/components/vesting/VestingEventsEditor.tsx:210
 #: src/routes/app/dashboard.tsx:419
 msgid "Acciones"
 msgstr "Acciones"
 
+#: src/components/vesting/VestingEventDialog.tsx:592
+msgid "Acciones en este vesting"
+msgstr "Acciones en este vesting"
+
 #: src/components/grants/GrantForm.tsx:659
-#: src/routes/app/grants/detail.tsx:372
+#: src/routes/app/grants/detail.tsx:371
 msgid "Acciones totales"
 msgstr "Acciones totales"
+
+#: src/components/vesting/VestingEventDialog.tsx:525
+msgid "Acciones vendidas"
+msgstr "Acciones vendidas"
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:136
 msgid "Aceptar y continuar"
 msgstr "Aceptar y continuar"
 
+#: src/routes/account/profile.tsx:366
+msgid "Actívalo si tu empleador vende parte de las acciones vestidas para cubrir impuestos."
+msgstr "Actívalo si tu empleador vende parte de las acciones vestidas para cubrir impuestos."
+
 #: src/components/modelo720/Modelo720Section.tsx:307
+#: src/routes/account/profile.tsx:259
 #: src/routes/account/sessions.tsx:221
 msgid "actual"
 msgstr "actual"
 
-#: src/routes/account/profile.tsx:57
+#: src/routes/account/profile.tsx:88
 msgid "Actualiza tu autonomía o tu moneda principal. Al guardar se abre un nuevo período de residencia y se cierra el anterior."
 msgstr "Actualiza tu autonomía o tu moneda principal. Al guardar se abre un nuevo período de residencia y se cierra el anterior."
 
-#: src/routes/app/grants/detail.tsx:291
+#: src/routes/app/grants/detail.tsx:290
 msgid "Acumulado mensual. Acciones que cumplen las dos condiciones (tiempo + liquidez) en sólido; RSU con sólo tiempo cumplido aparecen con trama."
 msgstr "Acumulado mensual. Acciones que cumplen las dos condiciones (tiempo + liquidez) en sólido; RSU con sólo tiempo cumplido aparecen con trama."
 
@@ -128,16 +146,20 @@ msgstr "Afecta a cómo se muestran los valores en tu dashboard. En Slice 1 no ha
 msgid "Al crear una cuenta aceptas nuestra Política de privacidad. Sólo usamos cookies esenciales; no necesitas aceptar analíticas."
 msgstr "Al crear una cuenta aceptas nuestra Política de privacidad. Sólo usamos cookies esenciales; no necesitas aceptar analíticas."
 
+#: src/routes/account/profile.tsx:377
+msgid "Al guardar abriremos un nuevo período"
+msgstr "Al guardar abriremos un nuevo período"
+
 #: src/components/feedback/M720ThresholdBanner.tsx:64
 msgid "Al menos una categoría supera el umbral individual. Revisa los valores en Perfil → Modelo 720."
 msgstr "Al menos una categoría supera el umbral individual. Revisa los valores en Perfil → Modelo 720."
 
-#: src/routes/app/grants/detail.tsx:203
+#: src/routes/app/grants/detail.tsx:202
 msgid "Al modificar los parámetros del grant, esos ajustes se conservan tal y como los editaste."
 msgstr "Al modificar los parámetros del grant, esos ajustes se conservan tal y como los editaste."
 
-#: src/components/vesting/VestingEventsEditor.tsx:414
-#: src/components/vesting/VestingEventsEditor.tsx:537
+#: src/components/vesting/VestingEventDialog.tsx:386
+#: src/components/vesting/VestingEventsEditor.tsx:305
 msgid "algoritmo"
 msgstr "algoritmo"
 
@@ -167,17 +189,21 @@ msgstr "Año fiscal"
 msgid "Antes de continuar — lo que Orbit es y no es"
 msgstr "Antes de continuar — lo que Orbit es y no es"
 
-#: src/components/vesting/VestingEventsEditor.tsx:684
+#: src/components/vesting/VestingEventsEditor.tsx:431
 msgid "Aplicar"
 msgstr "Aplicar"
 
-#: src/components/vesting/VestingEventsEditor.tsx:107
+#: src/components/vesting/VestingEventsEditor.tsx:133
 msgid "Aplicar FMV a todos"
 msgstr "Aplicar FMV a todos"
 
-#: src/components/vesting/VestingEventsEditor.tsx:618
+#: src/components/vesting/VestingEventsEditor.tsx:365
 msgid "Aplicar FMV a todos (pre-IPO)"
 msgstr "Aplicar FMV a todos (pre-IPO)"
+
+#: src/routes/account/profile.tsx:363
+msgid "Aplicar sell-to-cover por defecto"
+msgstr "Aplicar sell-to-cover por defecto"
 
 #: src/routes/app/trips/index.tsx:157
 msgid "Apto · 5/5"
@@ -192,11 +218,11 @@ msgstr "Aún no disponible"
 msgid "Aún no has registrado ningún desplazamiento para {year}. Pulsa «Añadir desplazamiento» para empezar."
 msgstr "Aún no has registrado ningún desplazamiento para {year}. Pulsa «Añadir desplazamiento» para empezar."
 
-#: src/routes/app/grants/detail.tsx:611
+#: src/routes/app/grants/detail.tsx:610
 msgid "Aún no has registrado ninguna compra ESPP para este grant."
 msgstr "Aún no has registrado ninguna compra ESPP para este grant."
 
-#: src/components/vesting/VestingEventsEditor.tsx:154
+#: src/components/vesting/VestingEventsEditor.tsx:156
 msgid "Aún no hay vestings pasados para este grant."
 msgstr "Aún no hay vestings pasados para este grant."
 
@@ -216,7 +242,11 @@ msgstr "Bajo (3 %)"
 msgid "Bienvenido de nuevo."
 msgstr "Bienvenido de nuevo."
 
-#: src/routes/app/grants/detail.tsx:592
+#: src/components/vesting/VestingEventDialog.tsx:512
+msgid "Bruto"
+msgstr "Bruto"
+
+#: src/routes/app/grants/detail.tsx:591
 msgid "Cada compra registrada queda asociada a este grant. Muestra en moneda nativa; la conversión a EUR llega en Slice 3."
 msgstr "Cada compra registrada queda asociada a este grant. Muestra en moneda nativa; la conversión a EUR llega en Slice 3."
 
@@ -237,7 +267,7 @@ msgid "Cálculo parcial — tus datos faltan"
 msgstr "Cálculo parcial — tus datos faltan"
 
 #: src/components/grants/GrantForm.tsx:509
-#: src/routes/app/grants/detail.tsx:288
+#: src/routes/app/grants/detail.tsx:287
 msgid "Calendario de vesting"
 msgstr "Calendario de vesting"
 
@@ -250,12 +280,11 @@ msgid "Cambiar idioma"
 msgstr "Cambiar idioma"
 
 #: src/components/grants/PriceOverrideCard.tsx:146
-#: src/components/vesting/VestingEventsEditor.tsx:393
-#: src/components/vesting/VestingEventsEditor.tsx:558
-#: src/components/vesting/VestingEventsEditor.tsx:674
+#: src/components/vesting/VestingEventDialog.tsx:756
+#: src/components/vesting/VestingEventsEditor.tsx:421
 #: src/routes/account/sessions.tsx:159
-#: src/routes/app/grants/detail.tsx:187
-#: src/routes/app/grants/detail.tsx:516
+#: src/routes/app/grants/detail.tsx:186
+#: src/routes/app/grants/detail.tsx:515
 #: src/routes/app/grants/espp-edit.tsx:210
 #: src/routes/app/trips/edit.tsx:178
 msgid "Cancelar"
@@ -273,7 +302,7 @@ msgstr "Capturado · {met}/5"
 msgid "Capturamos tus respuestas para que el motor fiscal las evalúe en Slice 4. Responde a los cinco criterios antes de guardar."
 msgstr "Capturamos tus respuestas para que el motor fiscal las evalúe en Slice 4. Responde a los cinco criterios antes de guardar."
 
-#: src/routes/app/grants/detail.tsx:607
+#: src/routes/app/grants/detail.tsx:606
 msgid "Cargando compras…"
 msgstr "Cargando compras…"
 
@@ -285,13 +314,13 @@ msgstr "Cargando desplazamientos…"
 msgid "Cargando sesiones…"
 msgstr "Cargando sesiones…"
 
-#: src/routes/app/grants/detail.tsx:673
+#: src/routes/app/grants/detail.tsx:672
 msgid "Cargando vestings…"
 msgstr "Cargando vestings…"
 
 #: src/components/Spinner.tsx:11
 #: src/routes/app/dashboard.tsx:64
-#: src/routes/app/grants/detail.tsx:159
+#: src/routes/app/grants/detail.tsx:158
 #: src/routes/app/grants/espp-edit.tsx:102
 #: src/routes/app/grants/espp-new.tsx:106
 #: src/routes/app/trips/edit.tsx:96
@@ -307,9 +336,13 @@ msgid "Cartera por empleador"
 msgstr "Cartera por empleador"
 
 #: src/components/Layout/RuleSetChip.tsx:127
-#: src/components/vesting/VestingEventsEditor.tsx:674
+#: src/components/vesting/VestingEventsEditor.tsx:421
 msgid "Cerrar"
 msgstr "Cerrar"
+
+#: src/components/vesting/VestingEventDialog.tsx:412
+msgid "Cerrar diálogo"
+msgstr "Cerrar diálogo"
 
 #: src/routes/account/sessions.tsx:247
 msgid "Cerrar esta sesión"
@@ -334,6 +367,10 @@ msgstr "Cerrar sesión"
 msgid "Cliff (meses)"
 msgstr "Cliff (meses)"
 
+#: src/components/vesting/VestingEventDialog.tsx:288
+msgid "Completa el precio de venta y su moneda antes de aplicar un porcentaje de retención."
+msgstr "Completa el precio de venta y su moneda antes de aplicar un porcentaje de retención."
+
 #: src/components/grants/GrantForm.tsx:701
 msgid "Completa los campos de vesting para ver la previsualización."
 msgstr "Completa los campos de vesting para ver la previsualización."
@@ -342,7 +379,7 @@ msgstr "Completa los campos de vesting para ver la previsualización."
 msgid "Compra no encontrada"
 msgstr "Compra no encontrada"
 
-#: src/routes/app/grants/detail.tsx:589
+#: src/routes/app/grants/detail.tsx:588
 msgid "Compras ESPP"
 msgstr "Compras ESPP"
 
@@ -354,11 +391,15 @@ msgstr "Comprobación adicional"
 msgid "Comprobación CAPTCHA (integración disponible en Slice 7+)."
 msgstr "Comprobación CAPTCHA (integración disponible en Slice 7+)."
 
-#: src/routes/app/grants/detail.tsx:239
+#: src/components/vesting/VestingEventDialog.tsx:274
+msgid "Con un 100% de retención, el precio de venta tiene que ser >= FMV. Ajusta los valores."
+msgstr "Con un 100% de retención, el precio de venta tiene que ser >= FMV. Ajusta los valores."
+
+#: src/routes/app/grants/detail.tsx:238
 msgid "concedida"
 msgstr "concedida"
 
-#: src/routes/app/grants/detail.tsx:376
+#: src/routes/app/grants/detail.tsx:375
 msgid "concedidas"
 msgstr "concedidas"
 
@@ -371,7 +412,7 @@ msgid "Confirmo que es una compra distinta; guardar igualmente."
 msgstr "Confirmo que es una compra distinta; guardar igualmente."
 
 #: src/routes/account/sessions.tsx:167
-#: src/routes/app/grants/detail.tsx:525
+#: src/routes/app/grants/detail.tsx:524
 #: src/routes/app/grants/espp-edit.tsx:219
 #: src/routes/app/trips/edit.tsx:186
 #: src/routes/auth/signup.tsx:147
@@ -418,7 +459,7 @@ msgstr "Cuenta"
 msgid "Cumplimiento"
 msgstr "Cumplimiento"
 
-#: src/routes/app/grants/detail.tsx:304
+#: src/routes/app/grants/detail.tsx:303
 msgid "Curva"
 msgstr "Curva"
 
@@ -452,6 +493,10 @@ msgstr "Debe ser menor o igual a los meses totales."
 msgid "Decisiones"
 msgstr "Decisiones"
 
+#: src/components/vesting/VestingEventDialog.tsx:684
+msgid "Déjalo vacío para no aplicar sell-to-cover. Si lo rellenas, completa también el % de retención."
+msgstr "Déjalo vacío para no aplicar sell-to-cover. Si lo rellenas, completa también el % de retención."
+
 #: src/components/grants/GrantForm.tsx:610
 msgid "Déjalo vacío si aún no ha ocurrido. El timeline mostrará las acciones time-vested con trama de rayas hasta que el evento se cumpla."
 msgstr "Déjalo vacío si aún no ha ocurrido. El timeline mostrará las acciones time-vested con trama de rayas hasta que el evento se cumpla."
@@ -469,9 +514,17 @@ msgstr "Demasiados intentos. Espera unos minutos y vuelve a probar."
 msgid "Dentro del tope anual (€60 100)"
 msgstr "Dentro del tope anual (€60 100)"
 
+#: src/components/vesting/VestingEventDialog.tsx:452
+msgid "Descartar cambios"
+msgstr "Descartar cambios"
+
 #: src/components/grants/GrantForm.tsx:476
 msgid "Descuento estimado (%)"
 msgstr "Descuento estimado (%)"
+
+#: src/routes/account/profile.tsx:435
+msgid "Desde"
+msgstr "Desde"
 
 #: src/routes/app/trips/edit.tsx:73
 msgid "Desplazamiento no encontrado"
@@ -522,9 +575,9 @@ msgid "Double-trigger (sólo RSU)"
 msgstr "Double-trigger (sólo RSU)"
 
 #: src/components/grants/PriceOverrideCard.tsx:172
-#: src/components/vesting/VestingEventsEditor.tsx:425
-#: src/routes/app/grants/detail.tsx:256
-#: src/routes/app/grants/detail.tsx:656
+#: src/components/vesting/VestingEventsEditor.tsx:316
+#: src/routes/app/grants/detail.tsx:255
+#: src/routes/app/grants/detail.tsx:655
 msgid "Editar"
 msgstr "Editar"
 
@@ -542,12 +595,16 @@ msgid "Editar desplazamiento Art. 7.p"
 msgstr "Editar desplazamiento Art. 7.p"
 
 #: src/components/vesting/VestingEventsEditor.tsx:568
-msgid "Editar FMV"
-msgstr "Editar FMV"
+#~ msgid "Editar FMV"
+#~ msgstr "Editar FMV"
 
-#: src/routes/app/grants/detail.tsx:174
+#: src/routes/app/grants/detail.tsx:173
 msgid "Editar grant"
 msgstr "Editar grant"
+
+#: src/components/vesting/VestingEventDialog.tsx:366
+msgid "Editar vesting del {0}"
+msgstr "Editar vesting del {0}"
 
 #: src/components/grants/GrantForm.tsx:216
 msgid "El cliff no puede superar el periodo total de vesting."
@@ -565,6 +622,10 @@ msgstr "El descuento ESPP (p. ej. 15%) se usa sólo como referencia; los detalle
 #~ msgid "El detalle del grant llega en la siguiente iteración (T14b)."
 #~ msgstr "El detalle del grant llega en la siguiente iteración (T14b)."
 
+#: src/components/vesting/VestingEventDialog.tsx:283
+msgid "El FMV y el precio de venta deben estar en la misma moneda."
+msgstr "El FMV y el precio de venta deben estar en la misma moneda."
+
 #: src/routes/onboarding/residency.tsx:16
 #~ msgid "El formulario de residencia llega en la siguiente iteración (T14b)."
 #~ msgstr "El formulario de residencia llega en la siguiente iteración (T14b)."
@@ -577,7 +638,7 @@ msgstr "El descuento ESPP (p. ej. 15%) se usa sólo como referencia; los detalle
 #~ msgid "El formulario del primer grant llega en la siguiente iteración (T14b)."
 #~ msgstr "El formulario del primer grant llega en la siguiente iteración (T14b)."
 
-#: src/routes/app/grants/detail.tsx:459
+#: src/routes/app/grants/detail.tsx:458
 #: src/routes/app/grants/espp-new.tsx:193
 msgid "El grant no existe o no pertenece a tu cuenta."
 msgstr "El grant no existe o no pertenece a tu cuenta."
@@ -607,7 +668,7 @@ msgstr "El total agregado supera el umbral. Revisa las categorías con tu gestor
 msgid "Elige una contraseña nueva"
 msgstr "Elige una contraseña nueva"
 
-#: src/routes/app/grants/detail.tsx:263
+#: src/routes/app/grants/detail.tsx:262
 #: src/routes/app/grants/espp-edit.tsx:128
 #: src/routes/app/trips/edit.tsx:123
 msgid "Eliminar"
@@ -617,7 +678,7 @@ msgstr "Eliminar"
 msgid "Eliminar compra ESPP"
 msgstr "Eliminar compra ESPP"
 
-#: src/routes/app/grants/detail.tsx:535
+#: src/routes/app/grants/detail.tsx:534
 #: src/routes/app/grants/espp-edit.tsx:229
 #: src/routes/app/trips/edit.tsx:195
 msgid "Eliminar definitivamente"
@@ -627,7 +688,7 @@ msgstr "Eliminar definitivamente"
 msgid "Eliminar desplazamiento"
 msgstr "Eliminar desplazamiento"
 
-#: src/routes/app/grants/detail.tsx:491
+#: src/routes/app/grants/detail.tsx:490
 msgid "Eliminar grant"
 msgstr "Eliminar grant"
 
@@ -675,7 +736,7 @@ msgstr "Escenarios"
 msgid "Esta contraseña aparece en listas públicas de filtraciones. Elige otra."
 msgstr "Esta contraseña aparece en listas públicas de filtraciones. Elige otra."
 
-#: src/components/vesting/VestingEventsEditor.tsx:116
+#: src/components/vesting/VestingEventsEditor.tsx:142
 msgid "Esta curva de vesting incluye ajustes manuales. El total puede no coincidir con el número original de acciones del grant (esperado)."
 msgstr "Esta curva de vesting incluye ajustes manuales. El total puede no coincidir con el número original de acciones del grant (esperado)."
 
@@ -687,6 +748,14 @@ msgstr "Esta función llega en una iteración posterior. Gracias por tu pacienci
 msgid "Esta sesión"
 msgstr "Esta sesión"
 
+#: src/routes/account/profile.tsx:257
+msgid "Estado: período abierto activo"
+msgstr "Estado: período abierto activo"
+
+#: src/routes/account/profile.tsx:264
+msgid "Estado: sin preferencias guardadas"
+msgstr "Estado: sin preferencias guardadas"
+
 #: src/routes/app/grants/espp-new.tsx:208
 msgid "Este grant no es ESPP"
 msgstr "Este grant no es ESPP"
@@ -695,7 +764,7 @@ msgstr "Este grant no es ESPP"
 msgid "Este grant requiere un evento de liquidez (IPO, adquisición o tender offer) además del tiempo para considerarse totalmente vesting."
 msgstr "Este grant requiere un evento de liquidez (IPO, adquisición o tender offer) además del tiempo para considerarse totalmente vesting."
 
-#: src/routes/app/grants/detail.tsx:198
+#: src/routes/app/grants/detail.tsx:197
 msgid "Este grant tiene {overrideCount} vesting(s) ajustado(s) manualmente."
 msgstr "Este grant tiene {overrideCount} vesting(s) ajustado(s) manualmente."
 
@@ -707,7 +776,7 @@ msgstr "Esto cerrará todas tus demás sesiones. Este dispositivo seguirá conec
 msgid "Esto eliminará el desplazamiento. Esta acción no se puede deshacer."
 msgstr "Esto eliminará el desplazamiento. Esta acción no se puede deshacer."
 
-#: src/routes/app/grants/detail.tsx:504
+#: src/routes/app/grants/detail.tsx:503
 msgid "Esto eliminará el grant y todo su historial de vesting. Esta acción no se puede deshacer."
 msgstr "Esto eliminará el grant y todo su historial de vesting. Esta acción no se puede deshacer."
 
@@ -739,8 +808,8 @@ msgstr "Falta el token"
 msgid "Faltan FMV de vesting en:"
 msgstr "Faltan FMV de vesting en:"
 
-#: src/components/vesting/VestingEventsEditor.tsx:161
-#: src/components/vesting/VestingEventsEditor.tsx:205
+#: src/components/vesting/VestingEventsEditor.tsx:163
+#: src/components/vesting/VestingEventsEditor.tsx:207
 msgid "Fecha"
 msgstr "Fecha"
 
@@ -764,6 +833,10 @@ msgstr "Fecha de oferta"
 msgid "Fecha de referencia"
 msgstr "Fecha de referencia"
 
+#: src/components/vesting/VestingEventDialog.tsx:573
+msgid "Fecha de vesting"
+msgstr "Fecha de vesting"
+
 #: src/components/grants/GrantForm.tsx:603
 msgid "Fecha del evento de liquidez"
 msgstr "Fecha del evento de liquidez"
@@ -777,8 +850,8 @@ msgstr "Fecha del grant"
 msgid "Fecha ECB: {dateStr}"
 msgstr "Fecha ECB: {dateStr}"
 
-#: src/components/vesting/VestingEventsEditor.tsx:167
-#: src/components/vesting/VestingEventsEditor.tsx:211
+#: src/components/vesting/VestingEventsEditor.tsx:169
+#: src/components/vesting/VestingEventsEditor.tsx:213
 msgid "FMV"
 msgstr "FMV"
 
@@ -790,9 +863,13 @@ msgstr "FMV en fecha de compra"
 msgid "FMV en fecha de oferta"
 msgstr "FMV en fecha de oferta"
 
-#: src/components/vesting/VestingEventsEditor.tsx:642
+#: src/components/vesting/VestingEventsEditor.tsx:389
 msgid "FMV por acción"
 msgstr "FMV por acción"
+
+#: src/components/vesting/VestingEventDialog.tsx:611
+msgid "FMV por acción (nativa)"
+msgstr "FMV por acción (nativa)"
 
 #: src/components/grants/GrantForm.tsx:401
 msgid "Formato inválido."
@@ -810,29 +887,45 @@ msgstr "Formulario de nuevo desplazamiento"
 msgid "Formulario de nuevo grant"
 msgstr "Formulario de nuevo grant"
 
-#: src/components/vesting/VestingEventsEditor.tsx:170
-#: src/components/vesting/VestingEventsEditor.tsx:214
+#: src/components/vesting/VestingEventsEditor.tsx:172
+#: src/components/vesting/VestingEventsEditor.tsx:216
 msgid "Fuente"
 msgstr "Fuente"
+
+#: src/components/vesting/VestingEventDialog.tsx:370
+msgid "Fuente de los valores de esta fila"
+msgstr "Fuente de los valores de esta fila"
+
+#: src/components/vesting/VestingEventDialog.tsx:383
+msgid "Fuente: algoritmo"
+msgstr "Fuente: algoritmo"
+
+#: src/components/vesting/VestingEventDialog.tsx:375
+msgid "Fuente: manual"
+msgstr "Fuente: manual"
 
 #: src/components/dashboard/PaperGainsTile.tsx:93
 msgid "Ganancias latentes (EUR)"
 msgstr "Ganancias latentes (EUR)"
 
-#: src/routes/app/grants/detail.tsx:312
+#: src/routes/app/grants/detail.tsx:311
 msgid "Gantt"
 msgstr "Gantt"
+
+#: src/routes/account/profile.tsx:319
+msgid "GeoIP está desactivado — elige el país manualmente. En v1 solo ES tiene cálculo fiscal; el resto se guarda con fines de historial."
+msgstr "GeoIP está desactivado — elige el país manualmente. En v1 solo ES tiene cálculo fiscal; el resto se guarda con fines de historial."
 
 #: src/routes/account/profile.tsx:16
 #~ msgid "Gestión de datos disponible a partir de la siguiente iteración."
 #~ msgstr "Gestión de datos disponible a partir de la siguiente iteración."
 
-#: src/routes/app/grants/detail.tsx:138
-#: src/routes/app/grants/detail.tsx:155
+#: src/routes/app/grants/detail.tsx:137
+#: src/routes/app/grants/detail.tsx:154
 msgid "Grant"
 msgstr "Grant"
 
-#: src/routes/app/grants/detail.tsx:454
+#: src/routes/app/grants/detail.tsx:453
 #: src/routes/app/grants/espp-new.tsx:188
 msgid "Grant no encontrado"
 msgstr "Grant no encontrado"
@@ -847,12 +940,12 @@ msgid "Grants individuales"
 msgstr "Grants individuales"
 
 #: src/components/grants/PriceOverrideCard.tsx:139
-#: src/components/vesting/VestingEventsEditor.tsx:385
-#: src/components/vesting/VestingEventsEditor.tsx:551
+#: src/routes/account/profile.tsx:399
 msgid "Guardar"
 msgstr "Guardar"
 
-#: src/routes/app/grants/detail.tsx:213
+#: src/components/vesting/VestingEventDialog.tsx:765
+#: src/routes/app/grants/detail.tsx:212
 #: src/routes/app/grants/espp-edit.tsx:139
 #: src/routes/app/trips/edit.tsx:134
 msgid "Guardar cambios"
@@ -875,7 +968,7 @@ msgstr "Guardar grant"
 msgid "Guardar Modelo 720"
 msgstr "Guardar Modelo 720"
 
-#: src/routes/account/profile.tsx:77
+#: src/routes/account/profile.tsx:108
 msgid "Guardar residencia"
 msgstr "Guardar residencia"
 
@@ -883,9 +976,29 @@ msgstr "Guardar residencia"
 msgid "Guardar residencia y continuar"
 msgstr "Guardar residencia y continuar"
 
+#: src/routes/account/profile.tsx:390
+msgid "Guardar sólo se activa cuando hay cambios que aplicar."
+msgstr "Guardar sólo se activa cuando hay cambios que aplicar."
+
+#: src/routes/account/profile.tsx:380
+msgid "Guardaremos un registro nuevo con fecha de inicio hoy y cerraremos el período actual con fecha de fin hoy. Los vestings existentes mantienen sus valores."
+msgstr "Guardaremos un registro nuevo con fecha de inicio hoy y cerraremos el período actual con fecha de fin hoy. Los vestings existentes mantienen sus valores."
+
+#: src/routes/account/profile.tsx:438
+msgid "Hasta"
+msgstr "Hasta"
+
 #: src/components/espp/EsppPurchaseForm.tsx:418
 msgid "Hasta 2 048 caracteres. Útil para tu asesor fiscal."
 msgstr "Hasta 2 048 caracteres. Útil para tu asesor fiscal."
+
+#: src/components/vesting/VestingEventDialog.tsx:642
+msgid "Hasta 4 decimales. Debe ser > 0."
+msgstr "Hasta 4 decimales. Debe ser > 0."
+
+#: src/components/vesting/VestingEventDialog.tsx:605
+msgid "Hasta 4 decimales. Editable sólo en vestings pasados."
+msgstr "Hasta 4 decimales. Editable sólo en vestings pasados."
 
 #: src/components/trips/TripForm.tsx:303
 msgid "Hasta 500 caracteres. Útil para tu asesor fiscal."
@@ -911,6 +1024,10 @@ msgstr "Hemos enviado un enlace a tu correo. El enlace caduca en 24 horas."
 msgid "Hemos migrado el descuento que tenías guardado en las notas del grant al nuevo registro de compra."
 msgstr "Hemos migrado el descuento que tenías guardado en las notas del grant al nuevo registro de compra."
 
+#: src/routes/account/profile.tsx:410
+msgid "Histórico"
+msgstr "Histórico"
+
 #: src/components/modelo720/Modelo720Section.tsx:268
 msgid "Histórico · cuentas bancarias"
 msgstr "Histórico · cuentas bancarias"
@@ -919,15 +1036,27 @@ msgstr "Histórico · cuentas bancarias"
 msgid "Histórico · inmuebles"
 msgstr "Histórico · inmuebles"
 
+#: src/routes/account/profile.tsx:429
+msgid "Histórico de preferencias fiscales"
+msgstr "Histórico de preferencias fiscales"
+
 #: src/components/Layout/LocaleSwitcher.tsx:17
 msgid "Idioma"
 msgstr "Idioma"
+
+#: src/components/vesting/VestingEventDialog.tsx:675
+msgid "igual que FMV"
+msgstr "igual que FMV"
+
+#: src/routes/account/profile.tsx:271
+msgid "Indica dónde pagas tus impuestos y la configuración que usamos en los cálculos de vesting. Cada cambio abre un nuevo período y cierra el anterior."
+msgstr "Indica dónde pagas tus impuestos y la configuración que usamos en los cálculos de vesting. Cada cambio abre un nuevo período y cierra el anterior."
 
 #: src/routes/app/dashboard.tsx:455
 msgid "Ingresos imponibles hasta la fecha: <0>0 acciones</0>"
 msgstr "Ingresos imponibles hasta la fecha: <0>0 acciones</0>"
 
-#: src/routes/app/grants/detail.tsx:333
+#: src/routes/app/grants/detail.tsx:332
 msgid "Ingresos imponibles hasta la fecha: 0 acciones"
 msgstr "Ingresos imponibles hasta la fecha: 0 acciones"
 
@@ -1069,7 +1198,7 @@ msgstr "La fecha es futura. ¿Estás seguro?"
 msgid "La trama rayada indica acciones time-vested pendientes de evento de liquidez."
 msgstr "La trama rayada indica acciones time-vested pendientes de evento de liquidez."
 
-#: src/routes/app/grants/detail.tsx:327
+#: src/routes/app/grants/detail.tsx:326
 msgid "Las acciones time-vested aparecen con trama diagonal: están vested por tiempo pero no cuentan como rendimiento del trabajo hasta que ocurra el evento de liquidez."
 msgstr "Las acciones time-vested aparecen con trama diagonal: están vested por tiempo pero no cuentan como rendimiento del trabajo hasta que ocurra el evento de liquidez."
 
@@ -1089,12 +1218,12 @@ msgstr "Los enlaces de verificación caducan a las 24 horas y sólo pueden usars
 msgid "Los meses totales deben estar entre 1 y 240."
 msgstr "Los meses totales deben estar entre 1 y 240."
 
-#: src/components/vesting/VestingEventsEditor.tsx:414
-#: src/components/vesting/VestingEventsEditor.tsx:537
+#: src/components/vesting/VestingEventDialog.tsx:378
+#: src/components/vesting/VestingEventsEditor.tsx:305
 msgid "manual"
 msgstr "manual"
 
-#: src/routes/app/grants/detail.tsx:399
+#: src/routes/app/grants/detail.tsx:398
 msgid "mensual"
 msgstr "mensual"
 
@@ -1138,12 +1267,12 @@ msgstr "Modelo 720: guardado."
 msgid "Modelo 720: sin cambios respecto al valor anterior."
 msgstr "Modelo 720: sin cambios respecto al valor anterior."
 
-#: src/routes/app/grants/detail.tsx:297
+#: src/routes/app/grants/detail.tsx:296
 msgid "Modo de vista"
 msgstr "Modo de vista"
 
 #: src/components/grants/PriceOverrideCard.tsx:117
-#: src/components/vesting/VestingEventsEditor.tsx:655
+#: src/components/vesting/VestingEventsEditor.tsx:402
 msgid "Moneda"
 msgstr "Moneda"
 
@@ -1154,6 +1283,14 @@ msgstr "Moneda de la compra"
 #: src/components/espp/EsppPurchaseForm.tsx:340
 msgid "Moneda de la compra."
 msgstr "Moneda de la compra."
+
+#: src/components/vesting/VestingEventDialog.tsx:631
+msgid "Moneda del FMV"
+msgstr "Moneda del FMV"
+
+#: src/components/vesting/VestingEventDialog.tsx:672
+msgid "Moneda del precio de venta"
+msgstr "Moneda del precio de venta"
 
 #: src/components/grants/GrantForm.tsx:461
 msgid "Moneda del strike"
@@ -1175,6 +1312,14 @@ msgstr "motor"
 msgid "Motor: v{0}"
 msgstr "Motor: v{0}"
 
+#: src/components/vesting/VestingEventDialog.tsx:536
+msgid "Neto entregado"
+msgstr "Neto entregado"
+
+#: src/routes/account/profile.tsx:474
+msgid "no"
+msgstr "no"
+
 #: src/components/grants/ResidencyForm.tsx:190
 #: src/components/trips/TripForm.tsx:260
 #: src/components/trips/TripForm.tsx:475
@@ -1190,7 +1335,7 @@ msgstr "No aplicado en esta fase. El motor fiscal lo evaluará en Slice 4."
 msgid "No aplicas otra exención equivalente"
 msgstr "No aplicas otra exención equivalente"
 
-#: src/components/vesting/VestingEventsEditor.tsx:198
+#: src/components/vesting/VestingEventsEditor.tsx:200
 msgid "No hay vestings futuros."
 msgstr "No hay vestings futuros."
 
@@ -1202,7 +1347,7 @@ msgstr "No pudimos verificar el enlace"
 msgid "No se pudieron cargar las sesiones."
 msgstr "No se pudieron cargar las sesiones."
 
-#: src/routes/app/grants/detail.tsx:683
+#: src/routes/app/grants/detail.tsx:682
 msgid "No se pudieron cargar los vestings."
 msgstr "No se pudieron cargar los vestings."
 
@@ -1210,7 +1355,7 @@ msgstr "No se pudieron cargar los vestings."
 msgid "No se pudieron obtener tipos de cambio recientes del BCE. Las ganancias latentes no se muestran hasta que se restaure la fuente."
 msgstr "No se pudieron obtener tipos de cambio recientes del BCE. Las ganancias latentes no se muestran hasta que se restaure la fuente."
 
-#: src/routes/app/grants/detail.tsx:143
+#: src/routes/app/grants/detail.tsx:142
 msgid "No se pudo cargar el grant."
 msgstr "No se pudo cargar el grant."
 
@@ -1226,7 +1371,7 @@ msgstr "No se pudo crear la cuenta"
 msgid "No se pudo crear la cuenta. Inténtalo de nuevo."
 msgstr "No se pudo crear la cuenta. Inténtalo de nuevo."
 
-#: src/routes/app/grants/detail.tsx:498
+#: src/routes/app/grants/detail.tsx:497
 #: src/routes/app/grants/espp-edit.tsx:192
 #: src/routes/app/trips/edit.tsx:156
 msgid "No se pudo eliminar. Inténtalo de nuevo."
@@ -1252,9 +1397,11 @@ msgstr "No se pudo guardar la compra"
 
 #: src/components/grants/PriceOverrideCard.tsx:61
 #: src/components/modelo720/Modelo720Section.tsx:103
-#: src/components/vesting/VestingEventsEditor.tsx:609
-#: src/routes/account/profile.tsx:36
-#: src/routes/app/grants/detail.tsx:109
+#: src/components/vesting/VestingEventDialog.tsx:296
+#: src/components/vesting/VestingEventsEditor.tsx:356
+#: src/routes/account/profile.tsx:67
+#: src/routes/account/profile.tsx:232
+#: src/routes/app/grants/detail.tsx:108
 #: src/routes/app/grants/espp-edit.tsx:57
 #: src/routes/app/grants/espp-new.tsx:90
 #: src/routes/app/grants/new.tsx:43
@@ -1277,6 +1424,11 @@ msgstr "No se pudo iniciar sesión. Inténtalo de nuevo."
 msgid "No se pudo registrar la aceptación. Inténtalo de nuevo."
 msgstr "No se pudo registrar la aceptación. Inténtalo de nuevo."
 
+#: src/components/vesting/VestingEventDialog.tsx:311
+#: src/components/vesting/VestingEventDialog.tsx:327
+msgid "No se pudo revertir. Inténtalo de nuevo."
+msgstr "No se pudo revertir. Inténtalo de nuevo."
+
 #: src/components/grants/GrantForm.tsx:342
 msgid "Non-qualified Stock Options. Bargain element como rendimiento del trabajo al ejercer."
 msgstr "Non-qualified Stock Options. Bargain element como rendimiento del trabajo al ejercer."
@@ -1293,6 +1445,10 @@ msgstr "Nuevo desplazamiento Art. 7.p"
 #: src/components/grants/GrantForm.tsx:426
 msgid "Número de acciones"
 msgstr "Número de acciones"
+
+#: src/components/vesting/VestingEventDialog.tsx:658
+msgid "opcional"
+msgstr "opcional"
 
 #: src/components/Disclaimer/DisclaimerModal.tsx:83
 msgid "Orbit calcula, visualiza y exporta. No te dice qué hacer ni te da recomendaciones. Para actuar sobre estos números, consulta con tu asesor fiscal o tu gestor. Orbit no está registrado en CNMV ni presta servicios regulados."
@@ -1319,9 +1475,25 @@ msgstr "Orbit no es asesoramiento fiscal ni financiero."
 msgid "Orbit no resuelve la lista por ti — responde según tu criterio o el de tu asesor."
 msgstr "Orbit no resuelve la lista por ti — responde según tu criterio o el de tu asesor."
 
+#: src/components/vesting/VestingEventDialog.tsx:465
+msgid "Otra sesión modificó este vesting"
+msgstr "Otra sesión modificó este vesting"
+
 #: src/components/vesting/VestingEventsEditor.tsx:132
-msgid "Otra sesión modificó este vesting; recarga para continuar."
-msgstr "Otra sesión modificó este vesting; recarga para continuar."
+#~ msgid "Otra sesión modificó este vesting; recarga para continuar."
+#~ msgstr "Otra sesión modificó este vesting; recarga para continuar."
+
+#: src/components/vesting/VestingEventDialog.tsx:705
+msgid "p.ej. {profilePercentPlaceholder}.00 %"
+msgstr "p.ej. {profilePercentPlaceholder}.00 %"
+
+#: src/components/vesting/VestingEventDialog.tsx:706
+msgid "p.ej. 45.00 %"
+msgstr "p.ej. 45.00 %"
+
+#: src/routes/account/profile.tsx:441
+msgid "País"
+msgstr "País"
 
 #: src/components/trips/TripForm.tsx:227
 msgid "País de destino"
@@ -1330,6 +1502,10 @@ msgstr "País de destino"
 #: src/components/trips/TripForm.tsx:383
 msgid "País de destino no clasificado como paraíso fiscal"
 msgstr "País de destino no clasificado como paraíso fiscal"
+
+#: src/routes/account/profile.tsx:301
+msgid "País de residencia fiscal"
+msgstr "País de residencia fiscal"
 
 #: src/routes/account/sessions.tsx:206
 msgid "Para cerrar esta sesión, usa \"Cerrar sesión\"."
@@ -1347,7 +1523,7 @@ msgstr "Parece un duplicado"
 #~ msgid "Paso 5 — Añade tu primer grant"
 #~ msgstr "Paso 5 — Añade tu primer grant"
 
-#: src/routes/app/grants/detail.tsx:386
+#: src/routes/app/grants/detail.tsx:385
 msgid "Pendiente de evento de liquidez"
 msgstr "Pendiente de evento de liquidez"
 
@@ -1357,15 +1533,19 @@ msgid "Pendiente de liquidez"
 msgstr "Pendiente de liquidez"
 
 #: src/components/Layout/Sidebar.tsx:76
-#: src/routes/account/profile.tsx:54
+#: src/routes/account/profile.tsx:85
 msgid "Perfil y residencia"
 msgstr "Perfil y residencia"
+
+#: src/routes/account/profile.tsx:413
+msgid "Períodos anteriores cerrados, más recientes primero. La fila activa vive en el formulario."
+msgstr "Períodos anteriores cerrados, más recientes primero. La fila activa vive en el formulario."
 
 #: src/components/grants/GrantForm.tsx:519
 msgid "Personalizado…"
 msgstr "Personalizado…"
 
-#: src/routes/app/grants/detail.tsx:392
+#: src/routes/app/grants/detail.tsx:391
 msgid "Plan de vesting"
 msgstr "Plan de vesting"
 
@@ -1385,6 +1565,10 @@ msgstr "Por ejemplo, la matriz extranjera del grupo que se beneficia del trabajo
 msgid "Por tu seguridad, hemos pausado los inicios de sesión durante unos minutos. Inténtalo de nuevo en ~{mins} min. Si no reconoces esta actividad, restablece tu contraseña."
 msgstr "Por tu seguridad, hemos pausado los inicios de sesión durante unos minutos. Inténtalo de nuevo en ~{mins} min. Si no reconoces esta actividad, restablece tu contraseña."
 
+#: src/routes/account/profile.tsx:344
+msgid "Porcentaje que tu empleador usa para calcular las retenciones por sell-to-cover. Déjalo en blanco si no lo sabes."
+msgstr "Porcentaje que tu empleador usa para calcular las retenciones por sell-to-cover. Déjalo en blanco si no lo sabes."
+
 #: src/components/grants/PriceOverrideCard.tsx:85
 msgid "Precio actual (override)"
 msgstr "Precio actual (override)"
@@ -1397,6 +1581,10 @@ msgstr "Precio actual × acciones vested, menos FMV capturado. Rango a 0 % / 1,5
 msgid "Precio de compra por acción"
 msgstr "Precio de compra por acción"
 
+#: src/components/vesting/VestingEventDialog.tsx:648
+msgid "Precio de venta por acción"
+msgstr "Precio de venta por acción"
+
 #: src/components/grants/PriceOverrideCard.tsx:104
 msgid "Precio por acción"
 msgstr "Precio por acción"
@@ -1405,13 +1593,29 @@ msgstr "Precio por acción"
 msgid "Precio que pagaste tras aplicar el descuento del empleador."
 msgstr "Precio que pagaste tras aplicar el descuento del empleador."
 
-#: src/components/vesting/VestingEventsEditor.tsx:90
+#: src/components/vesting/VestingEventsEditor.tsx:115
 msgid "Precios de vesting"
 msgstr "Precios de vesting"
 
 #: src/components/dashboard/PaperGainsTile.tsx:153
 msgid "Precios por ticker"
 msgstr "Precios por ticker"
+
+#: src/routes/account/profile.tsx:252
+msgid "Preferencias fiscales"
+msgstr "Preferencias fiscales"
+
+#: src/routes/account/profile.tsx:223
+msgid "Preferencias fiscales actualizadas (mismo día — sin crear un período nuevo)."
+msgstr "Preferencias fiscales actualizadas (mismo día — sin crear un período nuevo)."
+
+#: src/routes/account/profile.tsx:217
+msgid "Preferencias fiscales actualizadas. Abrimos un nuevo período y cerramos el anterior."
+msgstr "Preferencias fiscales actualizadas. Abrimos un nuevo período y cerramos el anterior."
+
+#: src/routes/account/profile.tsx:212
+msgid "Preferencias fiscales guardadas."
+msgstr "Preferencias fiscales guardadas."
 
 #: src/routes/app/dashboard.tsx:450
 msgid "Progreso"
@@ -1434,11 +1638,15 @@ msgstr "Qué muestra esto"
 msgid "Quitar"
 msgstr "Quitar"
 
-#: src/components/vesting/VestingEventsEditor.tsx:144
+#: src/components/vesting/VestingEventDialog.tsx:468
+msgid "Recarga los datos para ver los valores actuales; después puedes volver a abrir el diálogo si todavía quieres editar."
+msgstr "Recarga los datos para ver los valores actuales; después puedes volver a abrir el diálogo si todavía quieres editar."
+
+#: src/components/vesting/VestingEventDialog.tsx:480
 msgid "Recargar datos"
 msgstr "Recargar datos"
 
-#: src/routes/app/grants/detail.tsx:101
+#: src/routes/app/grants/detail.tsx:100
 msgid "Reduce las ediciones manuales de vesting antes de cambiar el total de acciones (hay ajustes manuales que superan el total solicitado)."
 msgstr "Reduce las ediciones manuales de vesting antes de cambiar el total de acciones (hay ajustes manuales que superan el total solicitado)."
 
@@ -1458,11 +1666,11 @@ msgstr "Régimen foral (no soportado en v1)"
 msgid "Registra aquí tus desplazamientos profesionales al extranjero. Orbit guarda los hechos y tu lista de verificación; el motor fiscal los evaluará en Slice 4."
 msgstr "Registra aquí tus desplazamientos profesionales al extranjero. Orbit guarda los hechos y tu lista de verificación; el motor fiscal los evaluará en Slice 4."
 
-#: src/routes/app/grants/detail.tsx:600
+#: src/routes/app/grants/detail.tsx:599
 msgid "Registrar compra"
 msgstr "Registrar compra"
 
-#: src/routes/app/grants/detail.tsx:248
+#: src/routes/app/grants/detail.tsx:247
 #: src/routes/app/grants/espp-new.tsx:102
 #: src/routes/app/grants/espp-new.tsx:122
 msgid "Registrar compra ESPP"
@@ -1472,15 +1680,27 @@ msgstr "Registrar compra ESPP"
 msgid "Reglas: ECB · {dateStr} · motor v{0}"
 msgstr "Reglas: ECB · {dateStr} · motor v{0}"
 
-#: src/components/vesting/VestingEventsEditor.tsx:623
+#: src/components/vesting/VestingEventsEditor.tsx:370
 msgid "Rellena los vestings sin FMV con un único valor. Los que ya tengan un valor manual no se tocan."
 msgstr "Rellena los vestings sin FMV con un único valor. Los que ya tengan un valor manual no se tocan."
 
-#: src/routes/account/profile.tsx:30
+#: src/routes/account/profile.tsx:444
+msgid "Rendimiento"
+msgstr "Rendimiento"
+
+#: src/components/vesting/VestingEventDialog.tsx:714
+msgid "Rendimiento del trabajo — valor de tus Preferencias fiscales. Rango 0–100, hasta 4 decimales."
+msgstr "Rendimiento del trabajo — valor de tus Preferencias fiscales. Rango 0–100, hasta 4 decimales."
+
+#: src/routes/account/profile.tsx:328
+msgid "Rendimiento del trabajo (%)"
+msgstr "Rendimiento del trabajo (%)"
+
+#: src/routes/account/profile.tsx:61
 msgid "Residencia actualizada. Los cambios aplicarán a los próximos períodos."
 msgstr "Residencia actualizada. Los cambios aplicarán a los próximos períodos."
 
-#: src/routes/account/profile.tsx:73
+#: src/routes/account/profile.tsx:104
 msgid "Residencia fiscal"
 msgstr "Residencia fiscal"
 
@@ -1496,12 +1716,25 @@ msgstr "Restablecer contraseña"
 msgid "Restricted Stock Units. Tributan como rendimiento del trabajo al vestear."
 msgstr "Restricted Stock Units. Tributan como rendimiento del trabajo al vestear."
 
-#: src/components/vesting/VestingEventsEditor.tsx:439
-msgid "Revertir"
-msgstr "Revertir"
+#: src/components/vesting/VestingEventDialog.tsx:547
+msgid "Retenido en efectivo"
+msgstr "Retenido en efectivo"
 
-#: src/routes/account/profile.tsx:34
-#: src/routes/app/grants/detail.tsx:105
+#: src/components/vesting/VestingEventsEditor.tsx:439
+#~ msgid "Revertir"
+#~ msgstr "Revertir"
+
+#: src/components/vesting/VestingEventDialog.tsx:735
+msgid "Revertir solo sell-to-cover"
+msgstr "Revertir solo sell-to-cover"
+
+#: src/components/vesting/VestingEventDialog.tsx:745
+msgid "Revertir todos los ajustes"
+msgstr "Revertir todos los ajustes"
+
+#: src/components/vesting/VestingEventDialog.tsx:292
+#: src/routes/account/profile.tsx:65
+#: src/routes/app/grants/detail.tsx:104
 #: src/routes/app/grants/espp-edit.tsx:54
 #: src/routes/app/grants/espp-new.tsx:87
 #: src/routes/app/grants/new.tsx:40
@@ -1517,11 +1750,15 @@ msgstr "Revisa el formulario e inténtalo de nuevo."
 msgid "Revisa los campos del Modelo 720 e inténtalo de nuevo."
 msgstr "Revisa los campos del Modelo 720 e inténtalo de nuevo."
 
+#: src/routes/account/profile.tsx:230
+msgid "Revisa los campos e inténtalo de nuevo."
+msgstr "Revisa los campos e inténtalo de nuevo."
+
 #: src/routes/auth/signup-verify-sent.tsx:20
 msgid "Revisa tu correo"
 msgstr "Revisa tu correo"
 
-#: src/routes/app/grants/detail.tsx:324
+#: src/routes/app/grants/detail.tsx:323
 msgid "RSU double-trigger — estado actual"
 msgstr "RSU double-trigger — estado actual"
 
@@ -1534,13 +1771,17 @@ msgstr "Saldo total de cuentas bancarias en el extranjero"
 msgid "Saltar al contenido"
 msgstr "Saltar al contenido"
 
-#: src/components/vesting/VestingEventsEditor.tsx:603
+#: src/components/vesting/VestingEventsEditor.tsx:350
 msgid "Se aplicaron a {0} vestings; {1} se saltaron (tenían valor manual)."
 msgstr "Se aplicaron a {0} vestings; {1} se saltaron (tenían valor manual)."
 
 #: src/components/modelo720/Modelo720Section.tsx:179
 msgid "Se calculará cuando actives seguimiento fiscal"
 msgstr "Se calculará cuando actives seguimiento fiscal"
+
+#: src/components/vesting/VestingEventDialog.tsx:444
+msgid "Seguir editando"
+msgstr "Seguir editando"
 
 #: src/components/trips/TripForm.tsx:239
 msgid "selecciona"
@@ -1566,6 +1807,20 @@ msgstr "Seleccionar año fiscal"
 msgid "Sell-now"
 msgstr "Sell-now"
 
+#: src/routes/account/profile.tsx:447
+msgid "Sell-to-cover"
+msgstr "Sell-to-cover"
+
+#: src/components/vesting/VestingEventDialog.tsx:400
+#: src/components/vesting/VestingEventDialog.tsx:403
+msgid "sell-to-cover: no"
+msgstr "sell-to-cover: no"
+
+#: src/components/vesting/VestingEventDialog.tsx:392
+#: src/components/vesting/VestingEventDialog.tsx:395
+msgid "sell-to-cover: sí"
+msgstr "sell-to-cover: sí"
+
 #: src/components/trips/TripForm.tsx:355
 msgid "Servicios prestados fuera de España"
 msgstr "Servicios prestados fuera de España"
@@ -1574,6 +1829,10 @@ msgstr "Servicios prestados fuera de España"
 #: src/routes/account/sessions.tsx:74
 msgid "Sesiones activas"
 msgstr "Sesiones activas"
+
+#: src/routes/account/profile.tsx:471
+msgid "sí"
+msgstr "sí"
 
 #: src/components/trips/TripForm.tsx:254
 #: src/components/trips/TripForm.tsx:463
@@ -1584,6 +1843,14 @@ msgstr "Sí"
 #: src/components/grants/ResidencyForm.tsx:201
 msgid "Si aplicas el régimen especial de impatriados (Beckham), v1 no calcula tu IRPF bajo ese régimen. Guardamos tu respuesta para cuando lleguen los cálculos."
 msgstr "Si aplicas el régimen especial de impatriados (Beckham), v1 no calcula tu IRPF bajo ese régimen. Guardamos tu respuesta para cuando lleguen los cálculos."
+
+#: src/components/vesting/VestingEventDialog.tsx:279
+msgid "Si aplicas retención, introduce un precio de venta mayor que 0."
+msgstr "Si aplicas retención, introduce un precio de venta mayor que 0."
+
+#: src/components/vesting/VestingEventDialog.tsx:432
+msgid "Si cierras ahora perderás las modificaciones que has hecho en este vesting. ¿Quieres descartarlas?"
+msgstr "Si cierras ahora perderás las modificaciones que has hecho en este vesting. ¿Quieres descartarlas?"
 
 #: src/components/trips/TripForm.tsx:357
 msgid "Si durante esos días trabajaste físicamente fuera de España, marca Sí. Teletrabajo desde España no cuenta."
@@ -1605,17 +1872,37 @@ msgstr "Si para esos días ya aplicas exención por expatriación u otro régime
 msgid "Sí, estoy bajo el régimen"
 msgstr "Sí, estoy bajo el régimen"
 
+#: src/routes/account/profile.tsx:209
+msgid "Sin cambios."
+msgstr "Sin cambios."
+
+#: src/routes/account/profile.tsx:266
+msgid "sin configurar"
+msgstr "sin configurar"
+
 #: src/components/dashboard/PaperGainsTile.tsx:295
 msgid "sin guardar"
 msgstr "sin guardar"
+
+#: src/routes/account/profile.tsx:421
+msgid "Sin historial aún. Cuando guardes, este período será tu actual; las siguientes ediciones crearán el histórico."
+msgstr "Sin historial aún. Cuando guardes, este período será tu actual; las siguientes ediciones crearán el histórico."
 
 #: src/components/grants/PriceOverrideCard.tsx:159
 msgid "Sin override"
 msgstr "Sin override"
 
+#: src/components/vesting/VestingEventDialog.tsx:506
+msgid "Sólo lectura · se recalculan al editar los campos"
+msgstr "Sólo lectura · se recalculan al editar los campos"
+
 #: src/routes/app/grants/espp-new.tsx:213
 msgid "Solo los grants ESPP admiten registros de compra."
 msgstr "Solo los grants ESPP admiten registros de compra."
+
+#: src/components/vesting/VestingEventDialog.tsx:586
+msgid "Solo los vestings pasados pueden cambiar fecha o acciones."
+msgstr "Solo los vestings pasados pueden cambiar fecha o acciones."
 
 #: src/components/espp/EsppPurchaseForm.tsx:368
 msgid "Sólo si tu plan tiene lookback."
@@ -1666,11 +1953,15 @@ msgstr "This is not tax or financial advice — Orbit calculates, it doesn't rec
 msgid "Ticker"
 msgstr "Ticker"
 
+#: src/components/vesting/VestingEventDialog.tsx:429
+msgid "Tienes cambios sin guardar"
+msgstr "Tienes cambios sin guardar"
+
 #: src/routes/app/dashboard.tsx:431
 msgid "Time-vested"
 msgstr "Time-vested"
 
-#: src/routes/app/grants/detail.tsx:381
+#: src/routes/app/grants/detail.tsx:380
 msgid "Time-vested (pendiente)"
 msgstr "Time-vested (pendiente)"
 
@@ -1694,7 +1985,7 @@ msgstr "Tope anual (referencia)"
 msgid "Tope anual Art. 7.p"
 msgstr "Tope anual Art. 7.p"
 
-#: src/routes/app/grants/detail.tsx:401
+#: src/routes/app/grants/detail.tsx:400
 msgid "trimestral"
 msgstr "trimestral"
 
@@ -1766,8 +2057,12 @@ msgid "Valor actual: €{0} desde {1}."
 msgstr "Valor actual: €{0} desde {1}."
 
 #: src/components/vesting/VestingEventsEditor.tsx:93
-msgid "Valor razonable (FMV) por vesting. Los vestings pasados editan fecha, acciones y FMV; los futuros sólo FMV (caso pre-IPO)."
-msgstr "Valor razonable (FMV) por vesting. Los vestings pasados editan fecha, acciones y FMV; los futuros sólo FMV (caso pre-IPO)."
+#~ msgid "Valor razonable (FMV) por vesting. Los vestings pasados editan fecha, acciones y FMV; los futuros sólo FMV (caso pre-IPO)."
+#~ msgstr "Valor razonable (FMV) por vesting. Los vestings pasados editan fecha, acciones y FMV; los futuros sólo FMV (caso pre-IPO)."
+
+#: src/components/vesting/VestingEventsEditor.tsx:118
+msgid "Valor razonable (FMV) por vesting. Pulsa Editar para abrir el diálogo con los campos editables, incluyendo sell-to-cover (precio de venta + % de retención)."
+msgstr "Valor razonable (FMV) por vesting. Pulsa Editar para abrir el diálogo con los campos editables, incluyendo sell-to-cover (precio de venta + % de retención)."
 
 #: src/components/espp/EsppPurchaseForm.tsx:282
 msgid "Valor razonable del activo el día de la compra."
@@ -1780,6 +2075,10 @@ msgstr "Valor total de inmuebles en el extranjero"
 #: src/components/modelo720/Modelo720Section.tsx:175
 msgid "Valores / participaciones en el extranjero"
 msgstr "Valores / participaciones en el extranjero"
+
+#: src/components/vesting/VestingEventDialog.tsx:503
+msgid "Valores derivados"
+msgstr "Valores derivados"
 
 #: src/components/modelo720/Modelo720Section.tsx:169
 msgid "Valores en la fecha de referencia"
@@ -1805,17 +2104,17 @@ msgstr "Vested"
 msgid "vested · {0} pendientes"
 msgstr "vested · {0} pendientes"
 
-#: src/routes/app/grants/detail.tsx:381
+#: src/routes/app/grants/detail.tsx:380
 msgid "Vested hasta la fecha"
 msgstr "Vested hasta la fecha"
 
-#: src/components/vesting/VestingEventsEditor.tsx:194
-#: src/components/vesting/VestingEventsEditor.tsx:201
+#: src/components/vesting/VestingEventsEditor.tsx:196
+#: src/components/vesting/VestingEventsEditor.tsx:203
 msgid "Vestings futuros"
 msgstr "Vestings futuros"
 
-#: src/components/vesting/VestingEventsEditor.tsx:150
-#: src/components/vesting/VestingEventsEditor.tsx:157
+#: src/components/vesting/VestingEventsEditor.tsx:152
+#: src/components/vesting/VestingEventsEditor.tsx:159
 msgid "Vestings pasados"
 msgstr "Vestings pasados"
 
@@ -1845,7 +2144,7 @@ msgstr "Volver a desplazamientos"
 msgid "Volver a iniciar sesión"
 msgstr "Volver a iniciar sesión"
 
-#: src/routes/app/grants/detail.tsx:462
+#: src/routes/app/grants/detail.tsx:461
 #: src/routes/app/grants/espp-new.tsx:196
 msgid "Volver al dashboard"
 msgstr "Volver al dashboard"

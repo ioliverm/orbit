@@ -697,6 +697,15 @@ function VestingEventsSection({ grant }: { grant: GrantDto }): JSX.Element {
       isUserOverride: e.isUserOverride ?? false,
       updatedAt: e.updatedAt,
       state: e.state,
+      // Slice 3b — sell-to-cover captured + derived (ADR-018 §3).
+      taxWithholdingPercent: e.taxWithholdingPercent ?? null,
+      shareSellPrice: e.shareSellPrice ?? null,
+      shareSellCurrency: e.shareSellCurrency ?? null,
+      isSellToCoverOverride: e.isSellToCoverOverride ?? false,
+      grossAmount: e.grossAmount ?? null,
+      sharesSoldForTaxes: e.sharesSoldForTaxes ?? null,
+      netSharesDelivered: e.netSharesDelivered ?? null,
+      cashWithheld: e.cashWithheld ?? null,
     });
   }
   return (

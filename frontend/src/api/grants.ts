@@ -48,6 +48,19 @@ export interface VestingEventDto {
   fmvCurrency?: string | null;
   isUserOverride?: boolean;
   updatedAt?: string;
+
+  // --- Slice 3b additions (ADR-018 §3). Optional for back-compat with
+  //     the Slice-3 emit path; the row endpoint populates them. ---
+  taxWithholdingPercent?: string | null;
+  shareSellPrice?: string | null;
+  shareSellCurrency?: string | null;
+  isSellToCoverOverride?: boolean;
+  sellToCoverOverriddenAt?: string | null;
+  /** Derived values; `null` when the triplet is incomplete. */
+  grossAmount?: string | null;
+  sharesSoldForTaxes?: string | null;
+  netSharesDelivered?: string | null;
+  cashWithheld?: string | null;
 }
 
 export interface GrantBody {

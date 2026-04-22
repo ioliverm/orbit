@@ -281,6 +281,8 @@ describe('axe-core smoke (G-21) — critical-path screens', () => {
     mockGrantsList([], {
       '/modelo-720-inputs?category=bank_accounts': { history: [] },
       '/modelo-720-inputs?category=real_estate': { history: [] },
+      '/user-tax-preferences/current': { current: null },
+      '/user-tax-preferences': { preferences: [] },
     });
     const container = renderPage(<ProfilePage />, '/app/account/profile');
     await waitFor(() => {
@@ -291,6 +293,142 @@ describe('axe-core smoke (G-21) — critical-path screens', () => {
     await assertNoCriticalOrSeriousViolations(
       container,
       '/app/account/profile (M720)',
+    );
+  });
+
+  // Slice 3b T39 — Profile with Preferencias fiscales seeded (ES + 45% + STC on).
+  it('/app/account/profile with Preferencias fiscales seeded has no violations', async () => {
+    seedAuthed();
+    const current = {
+      id: 'p-1',
+      countryIso2: 'ES',
+      rendimientoDelTrabajoPercent: '0.4500',
+      sellToCoverEnabled: true,
+      fromDate: '2026-04-19',
+      toDate: null,
+      createdAt: '2026-04-19T00:00:00Z',
+      updatedAt: '2026-04-19T00:00:00Z',
+    };
+    mockGrantsList([], {
+      '/modelo-720-inputs?category=bank_accounts': { history: [] },
+      '/modelo-720-inputs?category=real_estate': { history: [] },
+      '/user-tax-preferences/current': { current },
+      '/user-tax-preferences': { preferences: [current] },
+    });
+    const container = renderPage(<ProfilePage />, '/app/account/profile');
+    await waitFor(() => {
+      expect(screen.getByTestId('tax-preferences-section')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/account/profile (preferencias fiscales seeded)',
+    );
+  });
+
+  // Slice 3b T39 — grant-detail with the vesting-event dialog open
+  // (derived-panel populated + pills + focus-trap structural landmarks).
+  it('/app/grants/:id with VestingEventDialog open (populated) has no violations', async () => {
+    seedAuthed();
+    const g = grantFixture({ ticker: 'ACME' });
+    mockGrantsList([g], {
+      [`/api/v1/grants/${g.id}/vesting`]: {
+        vestingEvents: [
+          {
+            id: 'e-1',
+            vestDate: '2025-10-15',
+            sharesVestedThisEvent: '100',
+            sharesVestedThisEventScaled: 1_000_000,
+            cumulativeSharesVested: '100',
+            cumulativeSharesVestedScaled: 1_000_000,
+            state: 'vested',
+            fmvAtVest: '42.0000',
+            fmvCurrency: 'USD',
+            isUserOverride: true,
+            updatedAt: '2026-04-19T00:00:00Z',
+            taxWithholdingPercent: '0.4500',
+            shareSellPrice: '42.2500',
+            shareSellCurrency: 'USD',
+            isSellToCoverOverride: true,
+          },
+        ],
+        vestedToDate: '100',
+        vestedToDateScaled: 1_000_000,
+        awaitingLiquidity: '0',
+        awaitingLiquidityScaled: 0,
+      },
+      [`/api/v1/grants/${g.id}`]: { grant: g, overridesWarning: true, overrideCount: 1 },
+      '/current-price-override': { override: null },
+      '/user-tax-preferences/current': { current: null },
+      '/rule-set-chip': { fxDate: '2026-04-17', stalenessDays: 0, engineVersion: '0.3.0' },
+    });
+    const container = renderPage(
+      <Routes>
+        <Route path="/app/grants/:grantId" element={<GrantDetailPage />} />
+      </Routes>,
+      `/app/grants/${g.id}`,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('vesting-editor')).toBeInTheDocument();
+    });
+    // Open the dialog for the first row.
+    const editBtn = await screen.findByTestId('vesting-row-edit');
+    editBtn.click();
+    await waitFor(() => {
+      expect(screen.getByTestId('vesting-dialog')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/grants/:id (dialog open + derived panel populated)',
+    );
+  });
+
+  it('/app/grants/:id with VestingEventDialog open (empty derived panel) has no violations', async () => {
+    seedAuthed();
+    const g = grantFixture({ ticker: 'ACME' });
+    mockGrantsList([g], {
+      [`/api/v1/grants/${g.id}/vesting`]: {
+        vestingEvents: [
+          {
+            id: 'e-1',
+            vestDate: '2025-10-15',
+            sharesVestedThisEvent: '100',
+            sharesVestedThisEventScaled: 1_000_000,
+            cumulativeSharesVested: '100',
+            cumulativeSharesVestedScaled: 1_000_000,
+            state: 'vested',
+            fmvAtVest: null,
+            fmvCurrency: null,
+            isUserOverride: false,
+            updatedAt: '2026-04-19T00:00:00Z',
+          },
+        ],
+        vestedToDate: '0',
+        vestedToDateScaled: 0,
+        awaitingLiquidity: '0',
+        awaitingLiquidityScaled: 0,
+      },
+      [`/api/v1/grants/${g.id}`]: { grant: g },
+      '/current-price-override': { override: null },
+      '/user-tax-preferences/current': { current: null },
+      '/rule-set-chip': { fxDate: '2026-04-17', stalenessDays: 0, engineVersion: '0.3.0' },
+    });
+    const container = renderPage(
+      <Routes>
+        <Route path="/app/grants/:grantId" element={<GrantDetailPage />} />
+      </Routes>,
+      `/app/grants/${g.id}`,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('vesting-editor')).toBeInTheDocument();
+    });
+    const editBtn = await screen.findByTestId('vesting-row-edit');
+    editBtn.click();
+    await waitFor(() => {
+      expect(screen.getByTestId('vesting-dialog')).toBeInTheDocument();
+    });
+    await assertNoCriticalOrSeriousViolations(
+      container,
+      '/app/grants/:id (dialog open + derived panel empty)',
     );
   });
 

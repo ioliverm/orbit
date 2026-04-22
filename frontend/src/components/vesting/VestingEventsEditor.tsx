@@ -1,25 +1,33 @@
-// Editable "Precios de vesting" section (Slice 3, §8).
+// Editable "Precios de vesting" section (Slice 3 T30, refactored in
+// Slice 3b T39 per ADR-018 §7).
 //
-// Renders two tables: past vests (editable date/shares/FMV) and future
-// vests (FMV-only editable). The past-row inline editor supports:
-//   * Tab between cells
-//   * Enter to save, Escape to cancel
-//   * OCC via `expectedUpdatedAt`; 409 surfaces the reload banner
+// Slice 3 shipped an INLINE row-edit affordance (tab between cells,
+// Enter to save, Escape to cancel). Slice 3b moves the editor out of
+// the row and into a per-row dialog (`VestingEventDialog`) — the
+// editable surface now covers five tracked columns + four derived
+// values, and the row-level tab/Enter pattern doesn't scale to that.
 //
-// Also hosts:
-//   * "Aplicar FMV a todos" bulk-fill modal (skip existing, AC-8.6.*)
-//   * Per-row "Revertir" (clearOverride) action
-//   * Relaxed-invariant banner when any row carries `is_user_override`.
+// This component remains responsible for:
+//   * Rendering past + future vest rows (read-only display).
+//   * Hosting the bulk-fill modal CTA.
+//   * Surfacing the relaxed-invariant banner when any row has
+//     `isUserOverride || isSellToCoverOverride`.
+//   * Opening `VestingEventDialog` for the clicked row and piping the
+//     "editing" row id back through `data-open-dialog`.
+//
+// OCC/conflict handling lives inside `VestingEventDialog`; this shell
+// does not render its own conflict banner anymore (the dialog owns
+// that surface — AC-7.4.2).
 
 import { t, Trans } from '@lingui/macro';
 import { useLingui } from '@lingui/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { postBulkFmv, putOverride } from '../../api/vestingOverrides';
+import { useMemo, useRef, useState } from 'react';
+import { postBulkFmv } from '../../api/vestingOverrides';
 import type { PriceCurrency } from '../../api/currentPrices';
-import { AppError } from '../../api/errors';
 import { formatLongDate } from '../../lib/format';
 import { useLocaleStore } from '../../store/locale';
+import { VestingEventDialog } from './VestingEventDialog';
 
 const CURRENCIES: PriceCurrency[] = ['USD', 'EUR', 'GBP'];
 
@@ -33,6 +41,17 @@ export interface EditableVestingEvent {
   isUserOverride: boolean;
   updatedAt: string;
   state: string;
+  // --- Slice 3b additions (ADR-018 §3). Optional for back-compat with
+  //     existing test fixtures; the dialog + editor read them when
+  //     present. ---
+  taxWithholdingPercent?: string | null;
+  shareSellPrice?: string | null;
+  shareSellCurrency?: string | null;
+  isSellToCoverOverride?: boolean;
+  grossAmount?: string | null;
+  sharesSoldForTaxes?: string | null;
+  netSharesDelivered?: string | null;
+  cashWithheld?: string | null;
 }
 
 interface VestingEventsEditorProps {
@@ -53,7 +72,9 @@ export function VestingEventsEditor({
   const queryClient = useQueryClient();
 
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [conflictRowId, setConflictRowId] = useState<string | null>(null);
+  const [openDialogId, setOpenDialogId] = useState<string | null>(null);
+  // Focus-return target — the Edit button that opened the dialog.
+  const openerRef = useRef<HTMLButtonElement | null>(null);
 
   const { pastEvents, futureEvents } = useMemo(() => {
     const now = Date.now();
@@ -67,7 +88,9 @@ export function VestingEventsEditor({
     return { pastEvents: past, futureEvents: future };
   }, [events]);
 
-  const hasOverride = events.some((e) => e.isUserOverride);
+  const hasOverride = events.some(
+    (e) => e.isUserOverride || e.isSellToCoverOverride === true,
+  );
   const hasNullFmv = events.some((e) => e.fmvAtVest === null);
 
   const invalidateAll = (): void => {
@@ -76,6 +99,8 @@ export function VestingEventsEditor({
     void queryClient.invalidateQueries({ queryKey: ['m720-threshold'] });
     if (onAfterMutate) onAfterMutate();
   };
+
+  const openEvent = events.find((e) => e.id === openDialogId) ?? null;
 
   return (
     <section
@@ -91,8 +116,9 @@ export function VestingEventsEditor({
           </h2>
           <div className="section-head__sub">
             <Trans>
-              Valor razonable (FMV) por vesting. Los vestings pasados editan
-              fecha, acciones y FMV; los futuros sólo FMV (caso pre-IPO).
+              Valor razonable (FMV) por vesting. Pulsa Editar para abrir el diálogo
+              con los campos editables, incluyendo sell-to-cover (precio de venta
+              + % de retención).
             </Trans>
           </div>
         </div>
@@ -119,30 +145,6 @@ export function VestingEventsEditor({
               (esperado).
             </Trans>
           </p>
-        </aside>
-      ) : null}
-
-      {conflictRowId ? (
-        <aside
-          className="alert alert--warning"
-          role="alert"
-          data-testid="vesting-conflict-banner"
-        >
-          <strong>
-            <Trans>
-              Otra sesión modificó este vesting; recarga para continuar.
-            </Trans>
-          </strong>
-          <button
-            type="button"
-            className="btn btn--secondary btn--sm"
-            onClick={() => {
-              setConflictRowId(null);
-              invalidateAll();
-            }}
-          >
-            <Trans>Recargar datos</Trans>
-          </button>
         </aside>
       ) : null}
 
@@ -176,14 +178,14 @@ export function VestingEventsEditor({
           </thead>
           <tbody>
             {pastEvents.map((ev) => (
-              <PastRow
+              <DisplayRow
                 key={ev.id ?? ev.vestDate}
                 event={ev}
-                grantId={grantId}
-                defaultCurrency={defaultCurrency}
                 locale={locale}
-                onConflict={(id) => setConflictRowId(id)}
-                onAfterMutate={invalidateAll}
+                onEdit={(btn) => {
+                  openerRef.current = btn;
+                  setOpenDialogId(ev.id);
+                }}
               />
             ))}
           </tbody>
@@ -220,19 +222,39 @@ export function VestingEventsEditor({
           </thead>
           <tbody>
             {futureEvents.map((ev) => (
-              <FutureRow
+              <DisplayRow
                 key={ev.id ?? ev.vestDate}
                 event={ev}
-                grantId={grantId}
-                defaultCurrency={defaultCurrency}
                 locale={locale}
-                onConflict={(id) => setConflictRowId(id)}
-                onAfterMutate={invalidateAll}
+                onEdit={(btn) => {
+                  openerRef.current = btn;
+                  setOpenDialogId(ev.id);
+                }}
+                future
               />
             ))}
           </tbody>
         </table>
       )}
+
+      {openEvent ? (
+        <VestingEventDialog
+          grantId={grantId}
+          event={openEvent}
+          defaultCurrency={defaultCurrency}
+          onClose={() => {
+            setOpenDialogId(null);
+            // Return focus to the Edit button that opened the dialog
+            // (G-35 focus-return).
+            if (openerRef.current) openerRef.current.focus();
+          }}
+          onSaved={() => {
+            setOpenDialogId(null);
+            invalidateAll();
+            if (openerRef.current) openerRef.current.focus();
+          }}
+        />
+      ) : null}
 
       {bulkOpen ? (
         <BulkFmvModal
@@ -247,332 +269,52 @@ export function VestingEventsEditor({
 }
 
 // ---------------------------------------------------------------------------
-// Past-row — date + shares + FMV editable.
+// Display-only row. Clicking "Editar" opens the dialog.
 // ---------------------------------------------------------------------------
 
-interface RowProps {
+function DisplayRow({
+  event,
+  locale,
+  onEdit,
+  future = false,
+}: {
   event: EditableVestingEvent;
-  grantId: string;
-  defaultCurrency: PriceCurrency;
   locale: 'es-ES' | 'en';
-  onConflict: (id: string) => void;
-  onAfterMutate: () => void;
-}
-
-function PastRow({
-  event,
-  grantId,
-  defaultCurrency,
-  locale,
-  onConflict,
-  onAfterMutate,
-}: RowProps): JSX.Element {
-  const [editing, setEditing] = useState(false);
-  const [vestDate, setVestDate] = useState(event.vestDate);
-  const [shares, setShares] = useState(
-    scaledToDecimalShares(event.sharesVestedThisEventScaled),
-  );
-  const [fmv, setFmv] = useState(event.fmvAtVest ?? '');
-  const [currency, setCurrency] = useState<PriceCurrency>(
-    (event.fmvCurrency as PriceCurrency) ?? defaultCurrency,
-  );
-
-  const saveM = useMutation({
-    mutationFn: () => {
-      if (!event.id || !event.updatedAt) throw new Error('missing row id');
-      const body: {
-        vestDate?: string;
-        sharesVested?: string;
-        fmvAtVest?: string | null;
-        fmvCurrency?: PriceCurrency | null;
-        expectedUpdatedAt: string;
-      } = { expectedUpdatedAt: event.updatedAt };
-      if (vestDate !== event.vestDate) body.vestDate = vestDate;
-      const originalShares = scaledToDecimalShares(event.sharesVestedThisEventScaled);
-      // Pass the raw string-decimal so the backend keeps the full 4-dp
-      // precision (matches `fmvAtVest`'s convention). `Number()`ing
-      // here would truncate "12.3400" → 12.34 on round-trip.
-      if (shares.trim() !== originalShares) body.sharesVested = shares.trim();
-      body.fmvAtVest = fmv.trim() === '' ? null : fmv;
-      body.fmvCurrency = fmv.trim() === '' ? null : currency;
-      return putOverride(grantId, event.id, body);
-    },
-    onSuccess: () => {
-      setEditing(false);
-      onAfterMutate();
-    },
-    onError: (err: unknown) => {
-      if (err instanceof AppError && err.isStaleClientState() && event.id) {
-        onConflict(event.id);
-      }
-    },
-  });
-
-  const revertM = useMutation({
-    mutationFn: () => {
-      if (!event.id || !event.updatedAt) throw new Error('missing row id');
-      return putOverride(grantId, event.id, {
-        clearOverride: true,
-        expectedUpdatedAt: event.updatedAt,
-      });
-    },
-    onSuccess: () => onAfterMutate(),
-    onError: (err: unknown) => {
-      if (err instanceof AppError && err.isStaleClientState() && event.id) {
-        onConflict(event.id);
-      }
-    },
-  });
-
+  onEdit: (btn: HTMLButtonElement) => void;
+  future?: boolean;
+}): JSX.Element {
+  const stc = event.isSellToCoverOverride === true;
   return (
     <tr
-      className={`${event.isUserOverride ? 'is-override' : ''} ${editing ? 'is-editing' : ''}`}
+      className={event.isUserOverride || stc ? 'is-override' : ''}
       data-testid="vesting-row"
       data-event-id={event.id ?? ''}
-      data-override={event.isUserOverride}
-    >
-      {editing ? (
-        <>
-          <td>
-            <input
-              className="input input--cell"
-              type="date"
-              value={vestDate}
-              onChange={(e) => setVestDate(e.target.value)}
-              onKeyDown={(e) => handleKey(e, saveM.mutate, () => setEditing(false))}
-              aria-label="Fecha"
-            />
-          </td>
-          <td className="num">
-            <input
-              className="input input--cell num"
-              type="number"
-              // 4-dp step matches `SHARES_SCALE = 10_000`; the handler
-              // truncates beyond 4 dp anyway.
-              step="0.0001"
-              value={shares}
-              onChange={(e) => setShares(e.target.value)}
-              onKeyDown={(e) => handleKey(e, saveM.mutate, () => setEditing(false))}
-              aria-label="Acciones"
-            />
-          </td>
-          <td className="num">
-            <input
-              className="input input--cell num"
-              type="text"
-              inputMode="decimal"
-              value={fmv}
-              onChange={(e) => setFmv(e.target.value)}
-              onKeyDown={(e) => handleKey(e, saveM.mutate, () => setEditing(false))}
-              aria-label="FMV"
-              data-testid="vesting-row-fmv"
-            />
-          </td>
-          <td>
-            <select
-              className="select"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value as PriceCurrency)}
-              aria-label="Moneda"
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </td>
-          <td>
-            <div className="vesting-tbl__actions">
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={() => saveM.mutate()}
-                disabled={saveM.isPending}
-                data-testid="vesting-row-save"
-              >
-                <Trans>Guardar</Trans>
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => setEditing(false)}
-                data-testid="vesting-row-cancel"
-              >
-                <Trans>Cancelar</Trans>
-              </button>
-            </div>
-          </td>
-        </>
-      ) : (
-        <>
-          <td>{formatLongDate(event.vestDate, locale)}</td>
-          <td className="num">
-            {formatScaledShares(event.sharesVestedThisEventScaled, locale)}
-          </td>
-          <td className="num">
-            {event.fmvAtVest ? `${event.fmvAtVest} ${event.fmvCurrency ?? ''}` : '—'}
-          </td>
-          <td>
-            <span
-              className={`fuente ${event.isUserOverride ? 'fuente--manual' : 'fuente--auto'}`}
-            >
-              <span className="fuente__dot" />
-              {event.isUserOverride ? <Trans>manual</Trans> : <Trans>algoritmo</Trans>}
-            </span>
-          </td>
-          <td>
-            <div className="vesting-tbl__actions">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => setEditing(true)}
-                data-testid="vesting-row-edit"
-              >
-                <Trans>Editar</Trans>
-              </button>
-              {event.isUserOverride ? (
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  onClick={() => {
-                    // eslint-disable-next-line no-alert
-                    if (confirm('Revertir a cálculo automático?')) {
-                      revertM.mutate();
-                    }
-                  }}
-                  data-testid="vesting-row-revert"
-                >
-                  <Trans>Revertir</Trans>
-                </button>
-              ) : null}
-            </div>
-          </td>
-        </>
-      )}
-    </tr>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Future-row — FMV only editable.
-// ---------------------------------------------------------------------------
-
-function FutureRow({
-  event,
-  grantId,
-  defaultCurrency,
-  locale,
-  onConflict,
-  onAfterMutate,
-}: RowProps): JSX.Element {
-  const [editing, setEditing] = useState(false);
-  const [fmv, setFmv] = useState(event.fmvAtVest ?? '');
-  const [currency, setCurrency] = useState<PriceCurrency>(
-    (event.fmvCurrency as PriceCurrency) ?? defaultCurrency,
-  );
-
-  const saveM = useMutation({
-    mutationFn: () => {
-      if (!event.id || !event.updatedAt) throw new Error('missing row id');
-      return putOverride(grantId, event.id, {
-        fmvAtVest: fmv.trim() === '' ? null : fmv,
-        fmvCurrency: fmv.trim() === '' ? null : currency,
-        expectedUpdatedAt: event.updatedAt,
-      });
-    },
-    onSuccess: () => {
-      setEditing(false);
-      onAfterMutate();
-    },
-    onError: (err: unknown) => {
-      if (err instanceof AppError && err.isStaleClientState() && event.id) {
-        onConflict(event.id);
-      }
-    },
-  });
-
-  return (
-    <tr
-      className={`${event.isUserOverride ? 'is-override' : ''} ${editing ? 'is-editing' : ''}`}
-      data-testid="vesting-row"
-      data-future="true"
-      data-event-id={event.id ?? ''}
+      data-override={event.isUserOverride || stc}
+      data-future={future ? 'true' : undefined}
     >
       <td>{formatLongDate(event.vestDate, locale)}</td>
-      <td className="num muted">
-        {formatScaledShares(event.sharesVestedThisEventScaled, locale)}
-      </td>
+      <td className="num">{formatScaledShares(event.sharesVestedThisEventScaled, locale)}</td>
       <td className="num">
-        {editing ? (
-          <input
-            className="input input--cell num"
-            type="text"
-            inputMode="decimal"
-            value={fmv}
-            onChange={(e) => setFmv(e.target.value)}
-            onKeyDown={(e) => handleKey(e, saveM.mutate, () => setEditing(false))}
-            aria-label="FMV"
-          />
-        ) : event.fmvAtVest ? (
-          `${event.fmvAtVest} ${event.fmvCurrency ?? ''}`
-        ) : (
-          '—'
-        )}
+        {event.fmvAtVest ? `${event.fmvAtVest} ${event.fmvCurrency ?? ''}` : '—'}
       </td>
       <td>
-        {editing ? (
-          <select
-            className="select"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as PriceCurrency)}
-            aria-label="Moneda"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span
-            className={`fuente ${event.isUserOverride ? 'fuente--manual' : 'fuente--auto'}`}
-          >
-            <span className="fuente__dot" />
-            {event.isUserOverride ? <Trans>manual</Trans> : <Trans>algoritmo</Trans>}
-          </span>
-        )}
+        <span
+          className={`fuente ${event.isUserOverride || stc ? 'fuente--manual' : 'fuente--auto'}`}
+        >
+          <span className="fuente__dot" />
+          {event.isUserOverride || stc ? <Trans>manual</Trans> : <Trans>algoritmo</Trans>}
+        </span>
       </td>
       <td>
         <div className="vesting-tbl__actions">
-          {editing ? (
-            <>
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={() => saveM.mutate()}
-                disabled={saveM.isPending}
-              >
-                <Trans>Guardar</Trans>
-              </button>
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => setEditing(false)}
-              >
-                <Trans>Cancelar</Trans>
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() => setEditing(true)}
-              data-testid="vesting-row-edit"
-            >
-              <Trans>Editar FMV</Trans>
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={(e) => onEdit(e.currentTarget)}
+            data-testid="vesting-row-edit"
+          >
+            <Trans>Editar</Trans>
+          </button>
         </div>
       </td>
     </tr>
@@ -580,7 +322,7 @@ function FutureRow({
 }
 
 // ---------------------------------------------------------------------------
-// Bulk-fill modal
+// Bulk-fill modal — unchanged from Slice 3.
 // ---------------------------------------------------------------------------
 
 function BulkFmvModal({
@@ -696,29 +438,17 @@ function BulkFmvModal({
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Display helpers (exported for Slice 3 tests + the dialog).
 // ---------------------------------------------------------------------------
 
-function handleKey(
-  e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
-  onSave: () => void,
-  onCancel: () => void,
-): void {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    onSave();
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    onCancel();
-  }
-}
-
-/// Convert a scaled-i64 share count (1/10_000ths of a share) to a
-/// canonical editor string. Preserves up to 4 dp; trims trailing
-/// zeros and a trailing "." so whole numbers render as "500" rather
-/// than "500.0000".
-///
-/// Matches the Rust `orbit_core::SHARES_SCALE = 10_000` bridge.
+/**
+ * Convert a scaled-i64 share count (1/10_000ths of a share) to a
+ * canonical editor string. Preserves up to 4 dp; trims trailing zeros
+ * and a trailing "." so whole numbers render as "500" rather than
+ * "500.0000".
+ *
+ * Matches the Rust `orbit_core::SHARES_SCALE = 10_000` bridge.
+ */
 export function scaledToDecimalShares(scaled: number): string {
   if (!Number.isFinite(scaled)) return '0';
   const sign = scaled < 0 ? '-' : '';
@@ -736,8 +466,6 @@ function formatScaledShares(scaled: number, locale: 'es-ES' | 'en'): string {
   const fmtLocale = locale === 'es-ES' ? 'es-ES' : 'en-US';
   const wholePart = whole.toLocaleString(fmtLocale);
   if (frac === 0) return wholePart;
-  // Locale-correct decimal separator via toLocaleString on a compound
-  // value; round to the nearest 1/10_000th for display.
   const asNumber = scaled / 10_000;
   return asNumber.toLocaleString(fmtLocale, {
     minimumFractionDigits: 0,
