@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Editar vesting (dialog · referencia visual)</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  vesting-event-dialog.html — Slice 3b §7 (AC-7.1.1..7.8.3).
+
+  A per-row DIALOG opened from grant-detail's "Precios de vesting" section.
+  REPLACES the Slice-3 inline row-editor pattern (Slice-3 AC-8.2/8.3) that
+  the baseline grant-detail-vesting-editor.html renders. The editor moves
+  INTO the dialog in Slice 3b; grant-detail-vesting-editor.html stays in the
+  repo for history but its inline-edit region is removed in Slice 3b.
+
+  This file is a REFERENCE FRAGMENT, not a standalone page. Following the
+  Slice-3 rule-set-chip.html pattern, three dialog states render inline
+  side-by-side (stacked) so engineers can see every state in one view.
+  In production the dialog renders inside a .modal-backdrop with
+  aria-modal="true" and focus-trap; here the dialog shells render inside
+  a .state-demo container with the backdrop omitted so every pixel is
+  inspectable without needing a toggle.
+
+  The three states rendered:
+
+    <!-- state: no sell-to-cover applied -->
+      Row has no tax_withholding_percent / share_sell_price yet.
+      FMV may or may not be set. Derived panel shows either dashes
+      (AC-7.2.2) or only Bruto (AC-7.2.4) depending on FMV presence.
+      No source pills signal "stc on"; the sell-to-cover section is
+      editable and empty.
+
+    <!-- state: sell-to-cover populated with override -->
+      Row has been edited: FMV $42.0000 USD, sell price $42.2500 USD,
+      tax percent 45.0000 %, shares_vested_this_event 100. Both
+      override flags set; both source pills render. Both revert
+      buttons visible (full + narrow).
+
+    <!-- state: OCC conflict -->
+      User opened the dialog and another tab saved first. The dialog
+      shows the conflict banner at the top of the body with a
+      "Recargar" primary action.
+
+  Design-system discipline (§3 of the brief):
+   - Dialog shell = .dialog-shell (new — justified in shared.css for the
+     richer three-region footer and the narrow-viewport sheet transform).
+   - Derived values = .derived-panel (new — justified for the <dl>-based
+     four-cell read-only panel, which the flat Slice-3 .formula primitive
+     does not cover).
+   - Source pills = existing .pill + .pill--manual / .pill--auto for
+     the "fuente" track + new .pill--stc-on / .pill--stc-off for the
+     sell-to-cover track. (Two pills, one track each, per G-23.)
+   - Price + currency = .price-pair (new — justified for the compact
+     grid layout reused across FMV and sell-price inputs).
+   - Unsaved-changes confirm = .inline-confirm (new — lighter than
+     .danger-confirm; used also by the close-while-dirty prompt).
+
+  Accessibility (G-35 + §7.1):
+   - role="dialog" + aria-modal="true" on each dialog shell.
+   - aria-labelledby pointing at the dialog heading node.
+   - Single <h2> inside each dialog (page <h1> owned by grant-detail).
+   - .dialog-shell__close is the explicit × control.
+   - Focus trap + Escape handling belong to the framework layer;
+     this HTML only provides the structural landmarks.
+   - Derived values marked up as <dl><dt>/<dd> for AT pairing.
+   - Keyboard: Enter in a numeric input triggers save (Slice-3 parity).
+
+  Mobile (AC-10.1):
+   - At (max-width: 640px), .dialog-shell becomes full-screen sheet,
+     header sticks top, footer sticks bottom. See shared.css.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<main id="main" class="content">
+
+  <div class="page-title">
+    <div>
+      <h1>Editar vesting · referencia visual del dialog</h1>
+      <div class="page-title__meta">
+        Fragmento de dialog abierto sobre <a href="grant-detail-vesting-editor.html">grant-detail</a>. Slice 3b AC-7.1..7.8.
+        Reemplaza el editor <em>inline</em> de Slice 3: los mismos campos editables más los tres nuevos (<span class="mono">tax_withholding_percent</span>, <span class="mono">share_sell_price</span>, <span class="mono">share_sell_currency</span>) viven aquí.
+      </div>
+    </div>
+  </div>
+
+  <aside class="alert alert--info mb-6" role="note">
+    <strong>Cómo leer este documento</strong>
+    <p>
+      En producción el dialog aparece como modal con fondo oscurecido y <em>focus-trap</em>. Aquí renderizamos tres instancias en línea para poder comparar estados lado a lado (la misma técnica que <a href="rule-set-chip.html">rule-set-chip.html</a>). Los atributos <span class="mono">role="dialog"</span> / <span class="mono">aria-modal="true"</span> / <span class="mono">aria-labelledby</span> se mantienen: el framework añade el fondo y el <em>trap</em> de foco cuando lo monta.
+    </p>
+  </aside>
+
+  <!-- ============================================================
+       state: no sell-to-cover applied
+       ============================================================
+       Row vest_date = 15 sep 2024 · shares = 100 · FMV = NULL · tax = NULL.
+       The user opens the dialog to edit it for the first time.
+       Derived-values panel shows four dashes (AC-7.2.2).
+       No source pills because no override flag is set yet.
+       No revert buttons (neither override flag set — AC-7.5.3 matrix row
+       false/false). Primary footer just has Cancel + Save.
+  -->
+  <div class="state-demo mb-8" aria-labelledby="stateA-title">
+    <div class="state-demo__heading" id="stateA-title">Estado A · sin sell-to-cover todavía</div>
+    <p class="state-demo__intro">
+      El usuario abre el dialog de un vesting que aún no tiene FMV ni sell-to-cover. El panel derivado muestra guiones (AC-7.2.2); el placeholder del % de retención lee el valor de las preferencias fiscales pero no pre-rellena.
+    </p>
+
+    <div class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="dlgA-title">
+
+      <!-- Header: title + source pills + close (×) -->
+      <header class="dialog-shell__header">
+        <div class="dialog-shell__heading">
+          <h2 class="dialog-shell__title" id="dlgA-title">Editar vesting del 15 sep 2024</h2>
+          <div class="dialog-shell__pills" aria-label="Fuente de los valores de esta fila">
+            <span class="pill pill--auto" aria-label="Fuente: algoritmo">
+              <span aria-hidden="true">○</span> algoritmo
+            </span>
+            <span class="pill pill--stc-off" aria-label="sell-to-cover: no">
+              <span aria-hidden="true">○</span> sell-to-cover: no
+            </span>
+          </div>
+        </div>
+        <button class="dialog-shell__close" type="button" aria-label="Cerrar dialog">×</button>
+      </header>
+
+      <div class="dialog-shell__body">
+
+        <!-- Derived-values panel (AC-7.2.1..7.2.5) — pre-data state (AC-7.2.2) -->
+        <section class="derived-panel" aria-labelledby="dlgA-derived-title">
+          <div class="derived-panel__header">
+            <h3 class="derived-panel__title" id="dlgA-derived-title">Valores derivados</h3>
+            <span class="derived-panel__hint">Sólo lectura · se recalculan al editar los campos de abajo (AC-7.2.3)</span>
+          </div>
+          <dl class="derived-panel__grid">
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Bruto <span class="muted">· Gross</span></dt>
+              <dd class="derived-panel__value derived-panel__value--empty">—</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Acciones vendidas <span class="muted">· Shares sold</span></dt>
+              <dd class="derived-panel__value derived-panel__value--empty">—</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Neto entregado <span class="muted">· Net delivered</span></dt>
+              <dd class="derived-panel__value derived-panel__value--empty">—</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Retenido en efectivo <span class="muted">· Cash withheld</span></dt>
+              <dd class="derived-panel__value derived-panel__value--empty">—</dd>
+            </div>
+          </dl>
+          <p class="muted text-xs">Completa FMV, precio de venta y % de retención para ver los valores derivados. <span class="subtle">EN · Fill in FMV, sell price, and withholding % to see derived values.</span></p>
+        </section>
+
+        <!-- Editable fields (AC-7.3.1) -->
+        <form class="stack gap-4" id="dlgA-form" action="/api/v1/grants/abc/vesting-events/xyz" method="post" novalidate>
+          <!-- Hidden OCC token per AC-7.4.1 -->
+          <input type="hidden" name="expectedUpdatedAt" value="2026-04-19T08:12:03Z" />
+
+          <div class="form-grid">
+            <!-- Fecha vest (past-only — editable) -->
+            <div class="field">
+              <label class="field__label" for="dlgA-date">Fecha de vesting</label>
+              <input class="input" id="dlgA-date" type="date" value="2024-09-15" max="2026-04-19" />
+              <p class="field__hint">Solo los vestings pasados pueden cambiar fecha o acciones.</p>
+            </div>
+
+            <!-- Acciones vestidas -->
+            <div class="field">
+              <label class="field__label" for="dlgA-shares">Acciones en este vesting <span class="muted text-xs">· Shares vested this event</span></label>
+              <input class="input num" id="dlgA-shares" name="shares_vested_this_event" type="number" inputmode="numeric" min="1" step="1" value="100" />
+              <p class="field__hint">Entero ≥ 1. Editable sólo en vestings pasados.</p>
+            </div>
+
+            <!-- FMV + ccy -->
+            <div class="field">
+              <label class="field__label" for="dlgA-fmv">FMV por acción (nativa) <span class="muted text-xs">· Fair market value per share</span></label>
+              <div class="price-pair">
+                <input class="input num" id="dlgA-fmv" name="fmv_at_vest" type="number" inputmode="decimal" min="0" step="0.0001" placeholder="0,0000" />
+                <select class="select" name="fmv_currency" aria-label="Moneda del FMV">
+                  <option value="USD" selected>USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+              <p class="field__hint">Hasta 4 decimales. Debe ser &gt; 0.</p>
+            </div>
+
+            <!-- Share sell price + ccy (AC-7.3.4) -->
+            <div class="field">
+              <label class="field__label" for="dlgA-sellprice">Precio de venta por acción <span class="muted text-xs">· Share sell price</span></label>
+              <div class="price-pair">
+                <input class="input num" id="dlgA-sellprice" name="share_sell_price" type="number" inputmode="decimal" min="0" step="0.0001" placeholder="opcional" />
+                <select class="select" name="share_sell_currency" aria-label="Moneda del precio de venta">
+                  <option value="" selected>igual que FMV</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+              <p class="field__hint">El precio al que tu bróker realmente vendió las acciones para cubrir impuestos. Puede diferir ligeramente del FMV. Si lo dejas vacío, no aplicamos sell-to-cover.</p>
+            </div>
+
+            <!-- Tax percent (AC-7.3.5) -->
+            <div class="field form-grid__full">
+              <label class="field__label" for="dlgA-tax">% de retención <span class="muted text-xs">· Withholding % (rendimiento del trabajo default)</span></label>
+              <div class="row gap-2">
+                <input class="input num" id="dlgA-tax" name="tax_withholding_percent" type="number" inputmode="decimal" min="0" max="100" step="0.0001" placeholder="p.ej. 45,0000 %" aria-describedby="dlgA-tax-hint" />
+                <span class="mono text-sm muted">%</span>
+              </div>
+              <p class="field__hint" id="dlgA-tax-hint">
+                Pre-rellenado con el valor de tus <a href="profile-tax-preferences.html">Preferencias fiscales</a> (<span class="mono">45,0000 %</span>) sólo como pista en el placeholder — el valor por defecto se aplica en el servidor al guardar, no en el cliente (AC-7.6 + AC-7.3.5).
+              </p>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Footer: primary actions. No revert row because no override flag is set. -->
+      <footer class="dialog-shell__footer">
+        <div class="dialog-shell__footer-row dialog-shell__footer-row--primary">
+          <button class="btn btn--ghost" type="button">Cancelar</button>
+          <button class="btn btn--primary" type="submit" form="dlgA-form">Guardar cambios</button>
+        </div>
+        <p class="muted text-xs">Enter en cualquier campo numérico guarda · Esc cancela · Tab cicla dentro del dialog (focus-trap, G-35).</p>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       state: sell-to-cover populated with override
+       ============================================================
+       Row vest_date = 15 sep 2024 · shares = 100 · FMV = $42.0000 USD ·
+       sell price = $42.2500 USD · tax percent = 45.0000 %.
+       is_user_override = true · is_sell_to_cover_override = true.
+       Both source pills on. Both revert buttons visible. Derived
+       panel fully populated per §6 formulas:
+         Bruto       = 42.00 × 100   = $4.200,00 USD
+         Retenido    = 4200 × 0.45   = $1.890,00 USD
+         Acc. vend.  = 1890 / 42.25  = 44,7337  (up-rounded @ 4 dp)
+         Neto        = 100 − 44.7337 = 55,2663
+  -->
+  <div class="state-demo mb-8" aria-labelledby="stateB-title">
+    <div class="state-demo__heading" id="stateB-title">Estado B · sell-to-cover aplicado (override)</div>
+    <p class="state-demo__intro">
+      El usuario ya ha guardado un override completo. Ambas pill de fuente renderizan. Aparecen los dos botones de revertir (AC-7.5.1 + AC-7.5.2). El panel derivado muestra los cuatro valores calculados en vivo por <span class="mono">orbit_core::sell_to_cover::compute</span> (AC-6.*). Moneda nativa (USD) — sin conversión a EUR (AC-7.2.5).
+    </p>
+
+    <div class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="dlgB-title">
+
+      <header class="dialog-shell__header">
+        <div class="dialog-shell__heading">
+          <h2 class="dialog-shell__title" id="dlgB-title">Editar vesting del 15 sep 2024</h2>
+          <div class="dialog-shell__pills" aria-label="Fuente de los valores de esta fila">
+            <span class="pill pill--manual" aria-label="Fuente: manual">
+              <span aria-hidden="true">●</span> manual
+            </span>
+            <span class="pill pill--stc-on" aria-label="sell-to-cover: sí">
+              <span aria-hidden="true">●</span> sell-to-cover: sí
+            </span>
+          </div>
+        </div>
+        <button class="dialog-shell__close" type="button" aria-label="Cerrar dialog">×</button>
+      </header>
+
+      <div class="dialog-shell__body">
+
+        <!-- Derived panel (AC-7.2.1 + AC-6.2.*) -->
+        <section class="derived-panel" aria-labelledby="dlgB-derived-title">
+          <div class="derived-panel__header">
+            <h3 class="derived-panel__title" id="dlgB-derived-title">Valores derivados</h3>
+            <span class="derived-panel__hint">Re-cálculo en vivo al editar (≤ 200 ms de debounce, AC-7.2.3)</span>
+          </div>
+          <dl class="derived-panel__grid">
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Bruto <span class="muted">· Gross</span></dt>
+              <dd class="derived-panel__value">$4 200,00 USD</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Acciones vendidas <span class="muted">· Shares sold</span></dt>
+              <dd class="derived-panel__value">44,7337</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Neto entregado <span class="muted">· Net delivered</span></dt>
+              <dd class="derived-panel__value">55,2663</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Retenido en efectivo <span class="muted">· Cash withheld</span></dt>
+              <dd class="derived-panel__value">$1 890,00 USD</dd>
+            </div>
+          </dl>
+          <p class="muted text-xs">
+            <span class="mono">bruto = fmv × acciones · retenido = bruto × % · vendidas = ⌈retenido / precio_venta⌉ @ 4dp · neto = acciones − vendidas</span>
+          </p>
+        </section>
+
+        <!-- Editable fields populated -->
+        <form class="stack gap-4" id="dlgB-form" action="/api/v1/grants/abc/vesting-events/xyz" method="post" novalidate>
+          <input type="hidden" name="expectedUpdatedAt" value="2026-04-18T14:25:47Z" />
+
+          <div class="form-grid">
+            <div class="field">
+              <label class="field__label" for="dlgB-date">Fecha de vesting</label>
+              <input class="input" id="dlgB-date" type="date" value="2024-09-15" max="2026-04-19" />
+              <p class="field__hint">Past-only. El dialog de un vesting futuro renderizaría este input <em>disabled</em>.</p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="dlgB-shares">Acciones en este vesting</label>
+              <input class="input num" id="dlgB-shares" name="shares_vested_this_event" type="number" inputmode="numeric" min="1" step="1" value="100" />
+              <p class="field__hint">Entero ≥ 1.</p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="dlgB-fmv">FMV por acción (nativa)</label>
+              <div class="price-pair">
+                <input class="input num" id="dlgB-fmv" name="fmv_at_vest" type="number" inputmode="decimal" min="0" step="0.0001" value="42,0000" />
+                <select class="select" name="fmv_currency" aria-label="Moneda del FMV">
+                  <option value="USD" selected>USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+              <p class="field__hint">Hasta 4 decimales. Debe ser &gt; 0.</p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="dlgB-sellprice">Precio de venta por acción</label>
+              <div class="price-pair">
+                <input class="input num" id="dlgB-sellprice" name="share_sell_price" type="number" inputmode="decimal" min="0" step="0.0001" value="42,2500" />
+                <select class="select" name="share_sell_currency" aria-label="Moneda del precio de venta">
+                  <option value="">igual que FMV</option>
+                  <option value="USD" selected>USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+              <p class="field__hint">El precio al que tu bróker realmente vendió las acciones para cubrir impuestos. Puede diferir ligeramente del FMV.</p>
+            </div>
+
+            <div class="field form-grid__full">
+              <label class="field__label" for="dlgB-tax">% de retención</label>
+              <div class="row gap-2">
+                <input class="input num" id="dlgB-tax" name="tax_withholding_percent" type="number" inputmode="decimal" min="0" max="100" step="0.0001" value="45,0000" aria-describedby="dlgB-tax-hint" />
+                <span class="mono text-sm muted">%</span>
+              </div>
+              <p class="field__hint" id="dlgB-tax-hint">
+                Valor actual. Cambia el número y el panel derivado recalcula al instante. Déjalo vacío para borrarlo; si además borras el precio de venta, en el siguiente guardado la tripleta completa se deja <span class="mono">NULL</span> (CHECK all-or-none, AC-5.2.1).
+              </p>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Footer: revert row + primary row (AC-7.5.1 + AC-7.5.2 both visible because both override flags are true) -->
+      <footer class="dialog-shell__footer">
+        <!-- Revert affordances (AC-7.5.*) — sit above primary, with dashed separator -->
+        <div class="dialog-shell__footer-row dialog-shell__footer-row--revert">
+          <button class="btn btn--destructive-soft btn--sm" type="button" aria-describedby="revert-narrow-desc">
+            Revertir solo sell-to-cover
+          </button>
+          <button class="btn btn--danger btn--sm" type="button" aria-describedby="revert-all-desc">
+            Revertir todos los ajustes
+          </button>
+          <p class="muted text-xs" id="revert-narrow-desc">
+            <span class="bold">Solo sell-to-cover:</span> borra precio de venta + % de retención. Conserva FMV, fecha y acciones. Confirmación explícita (AC-7.5.5).
+          </p>
+          <p class="muted text-xs" id="revert-all-desc">
+            <span class="bold">Todos los ajustes:</span> borra FMV, precio, % y revierte fecha + acciones al cálculo automático. Acción destructiva (AC-7.5.4).
+          </p>
+        </div>
+
+        <div class="dialog-shell__footer-row dialog-shell__footer-row--primary">
+          <button class="btn btn--ghost" type="button">Cancelar</button>
+          <button class="btn btn--primary" type="submit" form="dlgB-form">Guardar cambios</button>
+        </div>
+
+        <p class="muted text-xs">
+          Orden de tabulación: FMV → FMV ccy → precio venta → venta ccy → % → acciones → fecha → Cancelar → Revertir (narrow) → Revertir (full) → Guardar (AC-7.3.6).
+        </p>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       state: OCC conflict
+       ============================================================
+       Otra pestaña editó este vesting mientras este dialog estaba
+       abierto. En el PUT, el servidor detecta que expectedUpdatedAt
+       quedó atrás → 409. El cliente renderiza una pancarta de
+       conflicto ARRIBA del panel derivado (AC-7.4.2) con CTA
+       "Recargar datos". El panel derivado sigue mostrando los
+       valores que el dialog tenía al abrir (no los actuales del
+       servidor). Los campos quedan bloqueados hasta que el usuario
+       recargue. Ningún audit row se escribió (AC-7.4.3).
+  -->
+  <div class="state-demo mb-8" aria-labelledby="stateC-title">
+    <div class="state-demo__heading" id="stateC-title">Estado C · conflicto de concurrencia (OCC 409)</div>
+    <p class="state-demo__intro">
+      El usuario pulsó <em>Guardar</em> pero otra pestaña modificó esta fila primero. Orbit devuelve 409 y no escribe nada (AC-7.4.3). El dialog renderiza una pancarta roja al principio del cuerpo; los campos se marcan <em>read-only</em> visualmente hasta recargar.
+    </p>
+
+    <div class="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="dlgC-title">
+
+      <header class="dialog-shell__header">
+        <div class="dialog-shell__heading">
+          <h2 class="dialog-shell__title" id="dlgC-title">Editar vesting del 15 sep 2024</h2>
+          <div class="dialog-shell__pills" aria-label="Fuente de los valores">
+            <span class="pill pill--manual" aria-label="Fuente: manual">
+              <span aria-hidden="true">●</span> manual
+            </span>
+            <span class="pill pill--stc-on" aria-label="sell-to-cover: sí">
+              <span aria-hidden="true">●</span> sell-to-cover: sí
+            </span>
+          </div>
+        </div>
+        <button class="dialog-shell__close" type="button" aria-label="Cerrar dialog">×</button>
+      </header>
+
+      <div class="dialog-shell__body">
+
+        <!-- OCC conflict banner (AC-7.4.2) — above the derived panel -->
+        <aside class="alert alert--danger" role="alert" aria-labelledby="dlgC-conflict-title">
+          <strong id="dlgC-conflict-title">Otra sesión modificó este vesting</strong>
+          <p>
+            Este vesting se editó en otra pestaña o dispositivo mientras este diálogo estaba abierto. Para no pisar sus cambios, Orbit no ha guardado nada. Recarga los datos para ver los valores actuales; después puedes volver a abrir el diálogo si todavía quieres editar.
+            <br />
+            <span class="text-xs subtle">EN · <em>This vest was edited in another tab or device. Reload to see the current values.</em></span>
+          </p>
+          <div class="row gap-2">
+            <button class="btn btn--secondary btn--sm" type="button">Recargar datos</button>
+            <button class="btn btn--ghost btn--sm" type="button">Descartar mis cambios y cerrar</button>
+          </div>
+        </aside>
+
+        <!-- Derived panel renders with stale open-time values; visually muted to signal "not the server's current state" -->
+        <section class="derived-panel" aria-labelledby="dlgC-derived-title" aria-describedby="dlgC-derived-note">
+          <div class="derived-panel__header">
+            <h3 class="derived-panel__title" id="dlgC-derived-title">Valores derivados (al abrir el dialog)</h3>
+            <span class="derived-panel__hint" id="dlgC-derived-note">Pueden no coincidir con los actuales del servidor</span>
+          </div>
+          <dl class="derived-panel__grid">
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Bruto</dt>
+              <dd class="derived-panel__value">$4 200,00 USD</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Acciones vendidas</dt>
+              <dd class="derived-panel__value">44,7337</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Neto entregado</dt>
+              <dd class="derived-panel__value">55,2663</dd>
+            </div>
+            <div class="derived-panel__item">
+              <dt class="derived-panel__label">Retenido en efectivo</dt>
+              <dd class="derived-panel__value">$1 890,00 USD</dd>
+            </div>
+          </dl>
+        </section>
+
+        <!-- Form: all inputs disabled while the conflict banner is active. -->
+        <form class="stack gap-4" action="/api/v1/grants/abc/vesting-events/xyz" method="post" novalidate aria-disabled="true">
+          <input type="hidden" name="expectedUpdatedAt" value="2026-04-18T14:25:47Z" />
+
+          <div class="form-grid">
+            <div class="field">
+              <label class="field__label" for="dlgC-date">Fecha de vesting</label>
+              <input class="input" id="dlgC-date" type="date" value="2024-09-15" disabled />
+            </div>
+            <div class="field">
+              <label class="field__label" for="dlgC-shares">Acciones en este vesting</label>
+              <input class="input num" id="dlgC-shares" type="number" value="100" disabled />
+            </div>
+            <div class="field">
+              <label class="field__label" for="dlgC-fmv">FMV por acción (nativa)</label>
+              <div class="price-pair">
+                <input class="input num" id="dlgC-fmv" type="number" value="42,0000" disabled />
+                <select class="select" disabled><option>USD</option></select>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field__label" for="dlgC-sellprice">Precio de venta por acción</label>
+              <div class="price-pair">
+                <input class="input num" id="dlgC-sellprice" type="number" value="42,2500" disabled />
+                <select class="select" disabled><option>USD</option></select>
+              </div>
+            </div>
+            <div class="field form-grid__full">
+              <label class="field__label" for="dlgC-tax">% de retención</label>
+              <div class="row gap-2">
+                <input class="input num" id="dlgC-tax" type="number" value="45,0000" disabled />
+                <span class="mono text-sm muted">%</span>
+              </div>
+            </div>
+          </div>
+        </form>
+
+      </div>
+
+      <footer class="dialog-shell__footer">
+        <div class="dialog-shell__footer-row dialog-shell__footer-row--primary">
+          <button class="btn btn--ghost" type="button">Cerrar</button>
+          <button class="btn btn--primary" type="button" disabled>Guardar cambios</button>
+        </div>
+        <p class="muted text-xs">Guardar queda inhabilitado hasta recargar. Ninguna fila de audit se ha escrito (AC-7.4.3).</p>
+      </footer>
+
+    </div>
+  </div>
+
+
+  <!-- ============================================================
+       Unsaved-changes prompt (AC-9.5)
+       ============================================================
+       Not a separate dialog state per se — this prompt renders
+       INSIDE the open dialog when the user attempts to close with
+       unsaved changes. We render it here as a reference snippet
+       so engineers can see the exact copy + the .inline-confirm
+       primitive in place.
+  -->
+  <div class="state-demo mb-8" aria-labelledby="promptTitle">
+    <div class="state-demo__heading" id="promptTitle">Sub-estado · confirmar descarte de cambios (AC-9.5)</div>
+    <p class="state-demo__intro">
+      Aparece dentro del dialog (encima del panel derivado) cuando el usuario intenta cerrar — Esc, ×, Cancelar, click en el fondo — con campos modificados. Las acciones de <em>Revertir…</em> no disparan este prompt (tienen su propia confirmación, AC-7.5.4 / AC-7.5.5). Si la acción viene de Guardar con éxito, tampoco aparece.
+    </p>
+
+    <div class="inline-confirm" role="alertdialog" aria-labelledby="unsaved-title" aria-describedby="unsaved-body">
+      <strong id="unsaved-title">Tienes cambios sin guardar</strong>
+      <p id="unsaved-body">
+        Si cierras ahora perderás las modificaciones que has hecho en este vesting. ¿Quieres descartarlas?
+        <br />
+        <span class="text-xs subtle">EN · <em>You have unsaved changes. Discard them?</em></span>
+      </p>
+      <div class="inline-confirm__actions">
+        <button class="btn btn--secondary btn--sm" type="button">Seguir editando</button>
+        <button class="btn btn--danger btn--sm" type="button">Descartar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Field-gating matrix (AC-7.5.3) — engineer reference.
+       ============================================================
+       Explicit table so engineers can see which buttons render
+       per override-flag combination.
+  -->
+  <section class="card mb-8" aria-labelledby="matrix-title">
+    <h2 id="matrix-title">Matriz de visibilidad de los botones de revertir (AC-7.5.3)</h2>
+    <p class="muted text-sm mt-2 mb-4">Reglas de cuándo aparecen los dos botones de revertir en el footer del dialog.</p>
+    <table class="tbl" aria-label="Visibilidad de botones de revertir según flags de override">
+      <thead>
+        <tr>
+          <th scope="col"><span class="mono">is_user_override</span></th>
+          <th scope="col"><span class="mono">is_sell_to_cover_override</span></th>
+          <th scope="col">Revertir todos</th>
+          <th scope="col">Revertir solo sell-to-cover</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row"><span class="mono">false</span></th>
+          <td><span class="mono">false</span></td>
+          <td><span class="muted">oculto</span></td>
+          <td><span class="muted">oculto</span></td>
+        </tr>
+        <tr>
+          <th scope="row"><span class="mono">true</span></th>
+          <td><span class="mono">false</span></td>
+          <td><span class="pill pill--manual">visible</span></td>
+          <td><span class="muted">oculto</span></td>
+        </tr>
+        <tr>
+          <th scope="row"><span class="mono">false</span></th>
+          <td><span class="mono">true</span></td>
+          <td><span class="pill pill--manual">visible</span></td>
+          <td><span class="pill pill--manual">visible</span></td>
+        </tr>
+        <tr>
+          <th scope="row"><span class="mono">true</span></th>
+          <td><span class="mono">true</span></td>
+          <td><span class="pill pill--manual">visible</span></td>
+          <td><span class="pill pill--manual">visible</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</main>
+
+<footer class="disclaimer" role="contentinfo">
+  <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+  <span class="disclaimer__meta">
+    <!-- G-5-b: el dialog NO renderiza el chip (los valores se muestran en moneda nativa, no EUR). El chip vive en grant-detail debajo. -->
+    <span class="muted text-xs">El dialog renderiza en moneda nativa — sin conversión a EUR, sin chip de reglas (G-5-b).</span>
+  </span>
+</footer>
+</body>
+</html>

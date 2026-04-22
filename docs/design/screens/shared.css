@@ -1880,3 +1880,380 @@ ul.list-indent li { margin-bottom: var(--space-2); }
   font-size: var(--text-sm);
 }
 
+/* ============================================================
+   Slice-3b additions
+   ============================================================
+   Every class below is used by at least one Slice-3b mockup
+   (profile-tax-preferences.html, vesting-event-dialog.html).
+   Additive only: no new tokens, no existing primitive edits.
+   ------------------------------------------------------------ */
+
+/* Toggle switch — bool input styled as a switch.
+   Justification: .choice (radio/checkbox inline group) is meant
+   for multi-option pickers with a visible control and adjacent
+   label. AC-4.3.1 names a SWITCH-style presentation for the
+   single-boolean "Aplicar sell-to-cover por defecto" toggle,
+   which .choice does not cover. Uses existing border / accent /
+   motion tokens only. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-fg);
+}
+.switch input[type="checkbox"] {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); border: 0;
+}
+.switch__track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 99px;
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+  flex: 0 0 auto;
+}
+.switch__track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  transition: transform var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+.switch input:checked + .switch__track {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.switch input:checked + .switch__track::after {
+  transform: translateX(16px);
+  background: var(--color-surface-raised);
+  border-color: var(--color-accent);
+}
+.switch input:focus-visible + .switch__track {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.switch input:disabled + .switch__track { opacity: .45; cursor: not-allowed; }
+.switch__label { display: inline-flex; flex-direction: column; gap: 2px; }
+.switch__label-main { font-size: var(--text-sm); font-weight: 500; color: var(--color-fg); }
+.switch__label-hint { font-size: var(--text-xs); color: var(--color-fg-subtle); }
+
+/* Country-conditional reveal: .conditional-row hides when a
+   sibling selector reports a non-Spain country. We control the
+   visibility via the `hidden` attribute (server-rendered), not
+   via :has() which has inconsistent support. This class is a
+   thin wrapper for the per-country helper layout — no new
+   behavior vs a plain .field, just the small "(Aparece al
+   elegir España)" hint styling on the label row. */
+.field--conditional .field__conditional-note {
+  font-size: var(--text-xs);
+  color: var(--color-fg-subtle);
+  font-style: italic;
+}
+
+/* ---------- Tax-preferences history table (AC-4.5.1) ----------
+   Justification: the Slice-2 .tbl primitive already covers most
+   of this, but the "actual" pill cell + the "País" cell with
+   tooltip need a narrow tweak for the column widths that matches
+   the dialog's 5-col spec (Desde / Hasta / País / Rendimiento /
+   sell-to-cover). This class sets a predictable col layout so
+   the mobile narrow-view (AC-10.2) sticky-first-col still works. */
+.prefs-history {
+  /* Uses .tbl as the base. Extra: enforce column widths so the
+     pill column does not wrap. */
+}
+.prefs-history th.prefs-history__actual-col,
+.prefs-history td.prefs-history__actual-col { width: 96px; }
+.prefs-history__empty {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-fg-subtle);
+  font-size: var(--text-sm);
+  background: var(--color-surface-sunken);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- Dialog shell (G-35 + §7.1) ----------
+   Justification: the Slice-3 .modal primitive covers a centered
+   confirmation modal (bulk-fill, delete). §7.1 + AC-10.1 require
+   a richer dialog with: (a) header carrying source pills and a
+   close (×) control, (b) body with a derived-values panel, (c)
+   a secondary revert row above the primary footer. Building
+   these inside .modal's single body block produces cramped
+   markup; .dialog-shell / .dialog-shell__* extends the existing
+   .modal-backdrop with a wider footprint (640 px vs 560 px) and
+   a structured three-region body. It also adds the narrow-
+   viewport full-screen-sheet transform (AC-10.1). */
+.dialog-shell {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.dialog-shell__header {
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface-raised);
+}
+.dialog-shell__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.dialog-shell__title { font-size: var(--text-md); font-weight: 600; color: var(--color-fg); }
+.dialog-shell__pills { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.dialog-shell__close {
+  width: 32px; height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-fg-muted);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-md);
+  font-family: var(--font-mono);
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.dialog-shell__close:hover { background: var(--color-surface-sunken); color: var(--color-fg); }
+.dialog-shell__body {
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  overflow-y: auto;
+  flex: 1;
+}
+.dialog-shell__footer {
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.dialog-shell__footer-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.dialog-shell__footer-row--primary { justify-content: flex-end; }
+.dialog-shell__footer-row--revert {
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border);
+  justify-content: flex-start;
+}
+
+@media (max-width: 640px) {
+  /* AC-10.1 — full-screen sheet on narrow viewports. */
+  .dialog-shell {
+    max-width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+  }
+  .modal-backdrop {
+    padding: 0;
+    align-items: stretch;
+  }
+  .dialog-shell__header { position: sticky; top: 0; z-index: 2; }
+  .dialog-shell__footer { position: sticky; bottom: 0; z-index: 2; }
+  .dialog-shell__footer-row { flex-direction: column; align-items: stretch; }
+  .dialog-shell__footer-row .btn { width: 100%; }
+}
+
+/* ---------- Derived-values panel (§7.2) ----------
+   Justification: AC-3.4 G-35 requires the derived values to be
+   marked up as a <dl> / <dt> / <dd>, not a table. The generic
+   dl has no structural styling and the 4-cell grid (bruto /
+   acciones vendidas / neto / retenido) is specific to the
+   dialog's panel. Purely layout + read-only presentation; reuses
+   existing sunken-surface + mono tokens. */
+.derived-panel {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.derived-panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.derived-panel__title {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+.derived-panel__hint { font-size: var(--text-xs); color: var(--color-fg-subtle); }
+.derived-panel__grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3) var(--space-5);
+}
+@media (max-width: 640px) {
+  /* AC-10.3 — derived values stack as <dt> above <dd>. */
+  .derived-panel__grid { grid-template-columns: 1fr; }
+  .derived-panel__item { flex-direction: column; align-items: flex-start; }
+  .derived-panel__value { text-align: left; }
+}
+.derived-panel__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  border-bottom: 1px dotted var(--color-border);
+  padding-bottom: var(--space-2);
+}
+.derived-panel__item:nth-last-child(-n+2) { border-bottom: none; padding-bottom: 0; }
+.derived-panel__label {
+  font-size: var(--text-xs);
+  color: var(--color-fg-muted);
+  font-weight: 500;
+  margin: 0;
+}
+.derived-panel__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-md);
+  color: var(--color-fg);
+  font-weight: 500;
+  margin: 0;
+  text-align: right;
+}
+.derived-panel__value--empty { color: var(--color-fg-subtle); font-family: var(--font-sans); font-size: var(--text-sm); }
+
+/* ---------- Source pills (AC-7.2 / §7.5 matrix) ----------
+   Justification: .pill--manual / .pill--auto already exist for
+   the row-level source signal on the Slice-3 vesting-tbl. The
+   dialog header needs TWO pills stacked (one for manual/auto
+   provenance on vest-date/shares/FMV, one for sell-to-cover
+   provenance). The existing pills work as-is; we add a single
+   modifier to indicate the sell-to-cover-applied state so G-23
+   (label + icon never color alone) continues to hold. */
+.pill--stc-on {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.pill--stc-off {
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-subtle);
+  border-color: var(--color-border);
+}
+
+/* ---------- Inline price-with-currency group ----------
+   Justification: several Slice-3b dialog fields pair a numeric
+   input with a currency picker (FMV + ccy, sell price + ccy).
+   .form-grid + two .field entries layout works but wastes the
+   dialog's narrow width. This class is a compact two-child
+   grid reused across the two dialog fields. */
+.price-pair {
+  display: grid;
+  grid-template-columns: 1fr 88px;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+@media (max-width: 640px) {
+  .price-pair { grid-template-columns: 1fr 72px; }
+}
+
+/* ---------- Unsaved-changes inline confirm (AC-9.5) ----------
+   Justification: Slice-2 .danger-confirm is full-border-callout
+   sized for the DSR page. AC-9.5's prompt lives INSIDE the
+   open dialog, sits above the derived panel briefly, and must
+   be less visually heavy than .danger-confirm. Reuses warning
+   tokens; no new colors. */
+.inline-confirm {
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-warning);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.inline-confirm strong { font-size: var(--text-sm); color: var(--color-warning); font-weight: 600; }
+.inline-confirm p { font-size: var(--text-sm); color: var(--color-fg-muted); }
+.inline-confirm__actions {
+  display: flex;
+  gap: var(--space-2);
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+
+/* ---------- Multi-state demo separator (Slice-3b parity with
+   Slice-3 rule-set-chip.html). Engineers see all three dialog
+   states stacked; a clear visual divider between them keeps
+   each state readable. No new tokens. */
+.state-demo {
+  padding: var(--space-6);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.state-demo__heading {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--color-accent);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px dashed var(--color-border);
+}
+.state-demo__intro { font-size: var(--text-sm); color: var(--color-fg-muted); }
+/* When .dialog-shell is rendered inline inside the reference
+   demo (not floated over a backdrop), it keeps its visual form
+   but drops the 90 vh cap so engineers see the whole thing. */
+.state-demo .dialog-shell {
+  max-height: none;
+  box-shadow: var(--shadow-1);
+}
+
+/* Danger button modifier — the "Revertir todos los ajustes"
+   action is destructive enough to warrant a slightly heavier
+   cue than .btn--ghost but the existing .btn--danger
+   (outlined-red) already covers this. We only add a modifier
+   for the NARROW revert (.btn--destructive-soft) which sits
+   between ghost and danger in visual weight. Reuses warning
+   token, no new color. */
+.btn--destructive-soft {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+  background: transparent;
+}
+.btn--destructive-soft:hover { background: var(--color-warning-subtle); }

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orbit — Perfil · Preferencias fiscales</title>
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+<!--
+  profile-tax-preferences.html — Slice 3b §4 (AC-4.1.1..4.6.2).
+
+  Surface: a SECTION inside the Profile page (Account → Perfil y residencia),
+  NOT a standalone page. Renders as a <section class="account-panel"> below
+  the Slice-2 Modelo 720 inputs panel and above the Slice-2 Session/device
+  list UI (AC-4.1.1). This file renders the Profile shell with:
+
+    - the Slice-1 residency summary panel (reference shape; unchanged),
+    - the Slice-2 Modelo 720 inputs panel (summarized; see modelo-720-inputs.html),
+    - the NEW Slice-3b "Preferencias fiscales" panel (the focus of this file),
+    - a pointer to the Slice-2 Sessions list UI.
+
+  Time-series semantics (AC-4.4.*): on save, the open user_tax_preferences
+  row gets to_date = today and a new row is inserted with from_date = today,
+  to_date = NULL, atomically. Same-day re-save updates in place (AC-4.4.3)
+  — no orphan zero-length rows in the history table. One open row per user
+  at a time (partial UNIQUE — AC-4.4.4). Dual residency out of scope.
+
+  Two states are rendered in the same file, gated by comment markers so
+  engineers can see both:
+
+    <!-- state: initial -->      first-ever visit; empty form, empty history.
+    <!-- state: populated -->    returning user with ES 45 % active + PT — off
+                                 closed row in history (mirrors demo step 15).
+
+  Accessibility:
+   - The Profile <h1> is owned by the page header; each section here
+     carries an <h2> (one per section, as per the Slice-1 / Slice-2 pattern).
+   - The country-conditional percent field is hidden via the `hidden`
+     attribute rather than via CSS display:none — server-rendered, no JS
+     toggle needed for the CSP-strict pass.
+   - sell_to_cover_enabled toggle: switch-styled checkbox (.switch).
+   - Save button carries `disabled` until a field differs from the open row
+     (AC-style inert submit). In this reference the disabled state is shown
+     on <!-- state: initial --> where no change has happened.
+   - History table: .tbl primitive with a small overrides column set.
+
+  CSP strictness (SEC-180): no inline style="" attributes. All dynamic values
+  (country abbrev tooltip, etc.) ride HTML attributes, not inline CSS.
+
+  Tax vocabulary (G-12 extended): "rendimiento del trabajo" stays in Spanish
+  even in EN locale; "sell-to-cover" stays in English in both locales; see
+  EN glosses on first render.
+-->
+<a class="skip" href="#main">Saltar al contenido</a>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar__brand">ORB<span>IT</span></div>
+
+    <nav class="sidebar__group" aria-label="Cartera">
+      <div class="sidebar__heading">Cartera</div>
+      <a class="sidebar__link" href="dashboard-slice-3.html">Dashboard</a>
+      <a class="sidebar__link" href="grant-detail-vesting-editor.html">Grants</a>
+      <a class="sidebar__link" href="grant-detail-vesting-editor.html#vesting">Vesting</a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Decisiones">
+      <div class="sidebar__heading">Decisiones</div>
+      <a class="sidebar__link" href="#">Sell-now <span class="sidebar__pill">próx.</span></a>
+      <a class="sidebar__link" href="#">Escenarios <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group" aria-label="Cumplimiento">
+      <div class="sidebar__heading">Cumplimiento</div>
+      <a class="sidebar__link" href="art-7p-trip-form.html">Viajes Art. 7.p</a>
+      <a class="sidebar__link" href="modelo-720-inputs.html">Modelo 720</a>
+      <a class="sidebar__link" href="#">Exports <span class="sidebar__pill">próx.</span></a>
+    </nav>
+
+    <nav class="sidebar__group mt-auto" aria-label="Cuenta">
+      <div class="sidebar__heading">Cuenta</div>
+      <a class="sidebar__link sidebar__link--active" href="residency-setup.html" aria-current="page">Perfil y residencia</a>
+      <a class="sidebar__link" href="session-management.html">Sesiones activas</a>
+      <a class="sidebar__link" href="dsr-self-service.html">Datos y privacidad</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs">Cuenta / <strong>Perfil y residencia</strong></div>
+      <div class="topbar__actions">
+        <button class="btn btn--ghost btn--sm" aria-label="Cambiar idioma (ES / EN)">ES · EN</button>
+        <button class="btn btn--secondary btn--sm" type="button">María O.</button>
+      </div>
+    </header>
+
+    <main id="main" class="content">
+
+      <div class="page-title">
+        <div>
+          <h1>Perfil y residencia</h1>
+          <div class="page-title__meta">Ajustes que Orbit necesita para interpretar tu cartera. Cada bloque está versionado como serie temporal.</div>
+        </div>
+      </div>
+
+      <div class="account-split">
+
+        <!-- Profile sub-menu -->
+        <nav class="account-menu" aria-label="Ajustes de la cuenta">
+          <a class="account-menu__link account-menu__link--active" href="residency-setup.html">Perfil y residencia</a>
+          <a class="account-menu__link" href="#">Contraseña</a>
+          <a class="account-menu__link" href="#">Segundo factor (MFA) <span class="muted text-xs">próx.</span></a>
+          <a class="account-menu__link" href="session-management.html">Sesiones activas</a>
+          <a class="account-menu__link" href="dsr-self-service.html">Datos y privacidad</a>
+          <a class="account-menu__link" href="#">Facturación</a>
+        </nav>
+
+        <div class="stack gap-6">
+
+          <!-- Residency summary (Slice-1 reference; unchanged) -->
+          <section class="account-panel" aria-labelledby="residency-title">
+            <header class="stack gap-2">
+              <h2 id="residency-title">Residencia fiscal</h2>
+              <p class="muted text-sm">Vigente desde el <span class="mono">2024-09-01</span>. Si te mudas, crearemos un período nuevo y cerraremos éste automáticamente.</p>
+            </header>
+            <dl class="grid grid--3 gap-3">
+              <div class="stack gap-1">
+                <dt class="card__label">Jurisdicción</dt>
+                <dd class="mono text-sm">España · territorio común</dd>
+              </div>
+              <div class="stack gap-1">
+                <dt class="card__label">Autonomía</dt>
+                <dd class="mono text-sm">ES-MD — Comunidad de Madrid</dd>
+              </div>
+              <div class="stack gap-1">
+                <dt class="card__label">Regímenes especiales</dt>
+                <dd class="mono text-sm">—</dd>
+              </div>
+            </dl>
+            <div>
+              <a class="btn btn--secondary btn--sm" href="residency-setup.html">Editar residencia</a>
+            </div>
+          </section>
+
+          <!-- Modelo 720 (Slice-2) — summarized reference. Full surface at modelo-720-inputs.html -->
+          <section class="account-panel" aria-labelledby="m720-summary-title">
+            <header class="stack gap-2">
+              <h2 id="m720-summary-title">Modelo 720 — valores declarados</h2>
+              <p class="muted text-sm">Totales por categoría, versionados año a año. Edita el detalle en la pantalla dedicada.</p>
+            </header>
+            <dl class="grid grid--3 gap-3">
+              <div class="stack gap-1">
+                <dt class="card__label">Cuentas bancarias</dt>
+                <dd class="mono text-sm">€25.000,00 <span class="muted text-xs">desde 2026-04-19</span></dd>
+              </div>
+              <div class="stack gap-1">
+                <dt class="card__label">Bienes inmuebles</dt>
+                <dd class="mono text-sm">€0,00 <span class="muted text-xs">desde 2026-04-19</span></dd>
+              </div>
+              <div class="stack gap-1">
+                <dt class="card__label">Valores / títulos</dt>
+                <dd class="mono text-sm muted">Automático (próx.)</dd>
+              </div>
+            </dl>
+            <div>
+              <a class="btn btn--secondary btn--sm" href="modelo-720-inputs.html">Editar Modelo 720</a>
+            </div>
+          </section>
+
+
+          <!-- ============================================================
+               state: initial
+               ============================================================
+               First-ever visit. No user_tax_preferences rows exist.
+               - Country picker: no selection (AC-4.1.3).
+               - Percent field: hidden via `hidden` attribute (AC-4.2.2).
+               - Toggle: neutral, unchecked.
+               - Save: disabled (no change yet).
+               - History: empty-state copy (AC-4.5.4).
+          -->
+          <section class="account-panel" id="preferencias-fiscales" aria-labelledby="prefs-title-initial">
+            <header class="stack gap-2">
+              <div class="row gap-3">
+                <h2 id="prefs-title-initial">Preferencias fiscales</h2>
+                <span class="pill pill--empty" aria-label="Estado: sin preferencias guardadas">sin configurar</span>
+              </div>
+              <p class="muted text-sm">
+                Indica dónde pagas tus impuestos y la configuración que usamos en los cálculos de vesting. Cada cambio abre un nuevo período y cierra el anterior.
+                <br />
+                <span class="text-xs">EN · <em>Tell us where you pay tax and the settings we use on vesting calculations. Every save opens a new period and closes the prior one.</em></span>
+              </p>
+              <p class="text-xs muted">
+                <strong>Estado de demostración:</strong> esta variante renderiza el formulario en su estado <em>inicial</em> (nunca se ha guardado). Desplázate para ver el estado <em>poblado</em>.
+              </p>
+            </header>
+
+            <form class="stack gap-4" action="/api/v1/user-tax-preferences" method="post" novalidate aria-describedby="prefs-initial-save-hint">
+
+              <!-- Country picker (AC-4.2.1) -->
+              <div class="field">
+                <label class="field__label" for="prefs-country-initial">País de residencia fiscal <span class="muted text-xs">· Country of tax residence</span></label>
+                <select class="select" id="prefs-country-initial" name="country_iso2" required aria-describedby="prefs-country-initial-hint">
+                  <option value="" selected>— selecciona —</option>
+                  <optgroup label="Europa">
+                    <option value="ES">España</option>
+                    <option value="PT">Portugal</option>
+                    <option value="FR">Francia</option>
+                    <option value="DE">Alemania</option>
+                    <option value="IT">Italia</option>
+                    <option value="NL">Países Bajos</option>
+                    <option value="IE">Irlanda</option>
+                    <option value="BE">Bélgica</option>
+                    <option value="LU">Luxemburgo</option>
+                    <option value="AT">Austria</option>
+                    <option value="DK">Dinamarca</option>
+                    <option value="SE">Suecia</option>
+                    <option value="FI">Finlandia</option>
+                    <option value="PL">Polonia</option>
+                    <option value="CZ">República Checa</option>
+                    <option value="GB">Reino Unido</option>
+                  </optgroup>
+                </select>
+                <p class="field__hint" id="prefs-country-initial-hint">
+                  GeoIP está explícitamente <strong>desactivado</strong> — tienes que elegir el país manualmente. En v1 solo <span class="mono">ES</span> tiene cálculo fiscal; el resto se guardan con fines de historial.
+                </p>
+              </div>
+
+              <!-- Percent field — hidden initially (AC-4.2.2) -->
+              <div class="field field--conditional" hidden>
+                <label class="field__label" for="prefs-percent-initial">Rendimiento del trabajo (%) <span class="muted text-xs">· Spanish withholding on employment income</span></label>
+                <div class="row gap-2">
+                  <input class="input num" id="prefs-percent-initial" name="rendimiento_del_trabajo_percent" type="number" inputmode="decimal" min="0" max="100" step="0.0001" placeholder="p.ej. 45,0000" aria-describedby="prefs-percent-initial-hint" />
+                  <span class="mono text-sm muted">%</span>
+                </div>
+                <p class="field__hint" id="prefs-percent-initial-hint">
+                  Porcentaje que tu empleador usa para calcular las retenciones por sell-to-cover. Puedes sobreescribirlo en cada vesting. Déjalo en blanco si no lo sabes — el dialog no hará default-sourcing.
+                </p>
+                <p class="field__conditional-note">Aparece al elegir España.</p>
+              </div>
+
+              <!-- sell-to-cover toggle (AC-4.3.1) -->
+              <div class="field">
+                <label class="switch" for="prefs-stc-initial">
+                  <input type="checkbox" id="prefs-stc-initial" name="sell_to_cover_enabled" />
+                  <span class="switch__track" aria-hidden="true"></span>
+                  <span class="switch__label">
+                    <span class="switch__label-main">Aplicar sell-to-cover por defecto <span class="muted text-xs">· Apply sell-to-cover by default</span></span>
+                    <span class="switch__label-hint">Actívalo si tu empleador vende parte de las acciones vestidas para cubrir impuestos. Sell-to-cover se mantiene en inglés en ambos idiomas — es el término que usa tu broker.</span>
+                  </span>
+                </label>
+              </div>
+
+              <!-- Close-and-create explainer -->
+              <aside class="alert alert--info">
+                <strong>Al guardar abriremos un nuevo período</strong>
+                <p>
+                  Guardaremos un registro nuevo con fecha de inicio <span class="mono">hoy</span> y cerraremos el período actual con fecha de fin <span class="mono">hoy</span>. Los vestings existentes mantienen sus valores — este cambio no reescribe datos históricos.
+                  <br />
+                  <span class="text-xs">EN · <em>Saving opens a new period and closes the previous one. Existing vesting events keep their values — this save never back-fills history.</em></span>
+                </p>
+              </aside>
+
+              <div class="row row--between">
+                <span class="muted text-xs" id="prefs-initial-save-hint">Guardar sólo activa cuando rellenas el país (y el resto de campos si aplica).</span>
+                <div class="row gap-2">
+                  <button class="btn btn--secondary" type="button" disabled>Cancelar</button>
+                  <button class="btn btn--primary" type="submit" disabled>Guardar</button>
+                </div>
+              </div>
+            </form>
+
+            <hr class="divider" />
+
+            <!-- History table — empty state (AC-4.5.4) -->
+            <section aria-labelledby="prefs-history-initial-title" class="stack gap-3">
+              <header>
+                <h3 id="prefs-history-initial-title">Histórico</h3>
+                <p class="muted text-sm">Períodos anteriores cerrados, más recientes primero. La fila activa vive en el formulario.</p>
+              </header>
+              <div class="prefs-history__empty" role="status">
+                Sin historial aún. <span class="muted">Cuando guardes por primera vez, este período será tu <em>actual</em>; las siguientes ediciones crearán el histórico.</span>
+              </div>
+            </section>
+          </section>
+
+
+          <!-- ============================================================
+               state: populated
+               ============================================================
+               Returning user. The current open row is ES 46 % / toggle on
+               (mirrors demo step 16). History table carries two prior
+               closed rows: ES 45 % on (the first save, closed when user
+               switched to PT), and PT — off (closed when user switched
+               back to ES).
+          -->
+          <section class="account-panel" aria-labelledby="prefs-title-pop">
+            <header class="stack gap-2">
+              <div class="row gap-3">
+                <h2 id="prefs-title-pop">Preferencias fiscales</h2>
+                <span class="pill pill--full" aria-label="Estado: período abierto activo">actual</span>
+              </div>
+              <p class="muted text-sm">
+                Indica dónde pagas tus impuestos y la configuración que usamos en los cálculos de vesting. Cada cambio abre un nuevo período y cierra el anterior.
+                <br />
+                <span class="text-xs">EN · <em>Tell us where you pay tax and the settings we use on vesting calculations. Every save opens a new period and closes the prior one.</em></span>
+              </p>
+              <p class="text-xs muted">
+                <strong>Estado de demostración:</strong> esta variante renderiza el formulario con un valor guardado previamente (<span class="mono">ES · 46,0000 % · sell-to-cover ON</span>) y dos filas en el histórico.
+              </p>
+            </header>
+
+            <form class="stack gap-4" action="/api/v1/user-tax-preferences" method="post" novalidate aria-describedby="prefs-pop-save-hint">
+
+              <!-- Country picker with ES pre-selected -->
+              <div class="field">
+                <label class="field__label" for="prefs-country-pop">País de residencia fiscal</label>
+                <select class="select" id="prefs-country-pop" name="country_iso2" required aria-describedby="prefs-country-pop-hint">
+                  <optgroup label="Europa">
+                    <option value="ES" selected>España</option>
+                    <option value="PT">Portugal</option>
+                    <option value="FR">Francia</option>
+                    <option value="DE">Alemania</option>
+                    <option value="IT">Italia</option>
+                    <option value="NL">Países Bajos</option>
+                    <option value="IE">Irlanda</option>
+                    <option value="BE">Bélgica</option>
+                    <option value="LU">Luxemburgo</option>
+                    <option value="AT">Austria</option>
+                    <option value="DK">Dinamarca</option>
+                    <option value="SE">Suecia</option>
+                    <option value="FI">Finlandia</option>
+                    <option value="PL">Polonia</option>
+                    <option value="CZ">República Checa</option>
+                    <option value="GB">Reino Unido</option>
+                  </optgroup>
+                </select>
+                <p class="field__hint" id="prefs-country-pop-hint">
+                  Vigente desde el <span class="mono">19 abr 2026</span>. Si cambias de país, cerramos este período y abrimos uno nuevo con la fecha de hoy.
+                </p>
+              </div>
+
+              <!-- Percent field — visible because country == ES (AC-4.2.2) -->
+              <div class="field field--conditional">
+                <label class="field__label" for="prefs-percent-pop">Rendimiento del trabajo (%) <span class="muted text-xs">· Spanish withholding on employment income</span></label>
+                <div class="row gap-2">
+                  <input class="input num" id="prefs-percent-pop" name="rendimiento_del_trabajo_percent" type="number" inputmode="decimal" min="0" max="100" step="0.0001" value="46,0000" aria-describedby="prefs-percent-pop-hint" />
+                  <span class="mono text-sm muted">%</span>
+                </div>
+                <p class="field__hint" id="prefs-percent-pop-hint">
+                  Porcentaje que tu empleador usa para calcular las retenciones por sell-to-cover. Puedes sobreescribirlo en cada vesting. Hasta 4 decimales; rango <span class="mono">0–100</span>.
+                </p>
+              </div>
+
+              <!-- sell-to-cover toggle, checked -->
+              <div class="field">
+                <label class="switch" for="prefs-stc-pop">
+                  <input type="checkbox" id="prefs-stc-pop" name="sell_to_cover_enabled" checked />
+                  <span class="switch__track" aria-hidden="true"></span>
+                  <span class="switch__label">
+                    <span class="switch__label-main">Aplicar sell-to-cover por defecto</span>
+                    <span class="switch__label-hint">Actívalo si tu empleador vende parte de las acciones vestidas para cubrir impuestos. Cuando esté activo y rellenes el % arriba, el dialog usará ese valor por defecto en el primer sell-to-cover que introduzcas.</span>
+                  </span>
+                </label>
+              </div>
+
+              <!-- Close-and-create explainer -->
+              <aside class="alert alert--info">
+                <strong>Al guardar abriremos un nuevo período</strong>
+                <p>
+                  Guardaremos un registro nuevo con fecha de inicio <span class="mono">hoy</span> y cerraremos el período actual con fecha de fin <span class="mono">hoy</span>. Los vestings existentes mantienen sus valores. Si guardas dos veces el mismo día, actualizamos en el sitio (no creamos un período duplicado).
+                </p>
+              </aside>
+
+              <div class="row row--between">
+                <span class="muted text-xs" id="prefs-pop-save-hint">Guardar sólo activa cuando modificas al menos un campo.</span>
+                <div class="row gap-2">
+                  <button class="btn btn--secondary" type="button">Cancelar</button>
+                  <button class="btn btn--primary" type="submit" disabled>Guardar</button>
+                </div>
+              </div>
+            </form>
+
+            <hr class="divider" />
+
+            <!-- History table — two closed rows (AC-4.5.1..4.5.3) -->
+            <section aria-labelledby="prefs-history-pop-title" class="stack gap-3">
+              <header>
+                <h3 id="prefs-history-pop-title">Histórico</h3>
+                <p class="muted text-sm">Períodos anteriores cerrados, más recientes primero. La fila activa vive en el formulario (no aparece aquí). Las filas del histórico son de sólo lectura (AC-4.5.3).</p>
+              </header>
+
+              <table class="tbl prefs-history" aria-label="Histórico de preferencias fiscales">
+                <thead>
+                  <tr>
+                    <th scope="col">Desde</th>
+                    <th scope="col">Hasta</th>
+                    <th scope="col">País</th>
+                    <th scope="col" class="num">Rendimiento del trabajo</th>
+                    <th scope="col" class="prefs-history__actual-col">Sell-to-cover</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Most recent closed row: PT — off, closed when user switched back to ES today -->
+                  <tr>
+                    <th scope="row"><span class="mono">1 abr 2026</span></th>
+                    <td><span class="mono">19 abr 2026</span></td>
+                    <td><span class="mono" title="Portugal">PT</span></td>
+                    <td class="num muted">—</td>
+                    <td class="prefs-history__actual-col"><span class="muted">—</span></td>
+                  </tr>
+                  <!-- First ever save: ES 45 % on, closed when user switched to PT -->
+                  <tr>
+                    <th scope="row"><span class="mono">15 feb 2026</span></th>
+                    <td><span class="mono">1 abr 2026</span></td>
+                    <td><span class="mono" title="España">ES</span></td>
+                    <td class="num">45,0000 %</td>
+                    <td class="prefs-history__actual-col">
+                      <span class="pill pill--full" aria-label="sell-to-cover: sí"><span aria-hidden="true">✓</span> sí</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p class="muted text-xs">
+                Dato de sólo lectura. Si necesitas corregir retroactivamente un período pasado, escríbenos — Orbit v1 no soporta editarlo desde aquí (AC-4.5.3). Sell-to-cover se muestra como <span class="mono">✓ sí</span> / <span class="mono">— no</span> nunca sólo por color (G-23).
+              </p>
+            </section>
+          </section>
+
+
+          <!-- Sessions pointer (Slice-2 — for context only) -->
+          <section class="account-panel" aria-labelledby="sessions-pointer-title">
+            <header class="stack gap-2">
+              <h2 id="sessions-pointer-title">Sesiones activas</h2>
+              <p class="muted text-sm">3 sesiones activas en este momento. La gestión completa vive en su propia pantalla.</p>
+            </header>
+            <div>
+              <a class="btn btn--secondary btn--sm" href="session-management.html">Ir a sesiones activas</a>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+    </main>
+
+    <footer class="disclaimer" role="contentinfo">
+      <span class="disclaimer__text">Esto no es asesoramiento fiscal ni financiero — Orbit calcula, no aconseja.</span>
+      <span class="disclaimer__meta">
+        <!-- G-5-c: Preferencias fiscales no renderiza chip (no hay cifra FX-dependiente en esta sección). -->
+        <span class="muted text-xs">Preferencias fiscales no depende del tipo de cambio — por eso esta sección no lleva el chip de reglas.</span>
+      </span>
+    </footer>
+  </div>
+</div>
+</body>
+</html>
