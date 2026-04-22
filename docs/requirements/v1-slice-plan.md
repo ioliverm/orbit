@@ -2,8 +2,8 @@
 
 | Field       | Value                                                      |
 |-------------|------------------------------------------------------------|
-| Version     | 1.4                                                        |
-| Date        | 2026-04-21                                                 |
+| Version     | 1.5                                                        |
+| Date        | 2026-04-22                                                 |
 | Owner       | requirements-analyst (Ivan Oliver)                         |
 | Sources     | `docs/specs/orbit-v1-persona-b-spain.md`, ADR-001..ADR-008, ADR-015 (local-first split), `docs/design/orbit-v1-ui-proposal.md`, `docs/requirements/open-questions-resolved.md` |
 | Purpose     | Break v1 into ordered, independently shippable vertical slices. Each ends in a demo-able state. No layers; every slice crosses frontend + backend + data + ops. |
@@ -11,6 +11,7 @@
 | v1.2 change | Product owner decision 2026-04-19 (same day, follow-up): **this is a PoC; no Stripe, no paid tier.** The free/paid distinction is removed everywhere. Every account is the same account; every feature is available to every user. Slice 3 collapses from "Paid shell + Modelo 720 passive UX" to just "FX pipeline + Modelo 720 passive UX + dashboard EUR conversion". Billing, subscription state, VAT handling, feature-matrix screen, preview-only blurred state, and `subscriptions` table all drop out. TOTP 2FA becomes optional for every user in Slice 7 (no "mandatory for paid"). Stripe live-mode cutover and professional indemnity insurance drop out of Slice 8. |
 | v1.3 change | Product owner decision 2026-04-20: **defer bulk-import tooling (CSV Carta + Shareworks, ETrade PDF) to the end of v1**, immediately before cloud deployment. Slice 2 trims to the non-import surfaces (ESPP purchases, Art. 7.p trips, multi-grant dashboard, Modelo 720 category inputs, session-device UI). A new **Slice 8 — Portfolio bulk import** is inserted between the old Slice 7 and the old Slice 8; the deploy slice renumbers to **Slice 9 — Production deployment & launch gate**. Rationale: hand-entry through Slice 7 is the minimum viable path for Ivan's own dogfooding; import tooling has a long-tail QA story (column-mapping edge cases, vendor CSV drift) that is safer to build in one concentrated batch just before production users arrive. Neither the "Tengo varios grants" link (AC-4.2.11) nor the bulk-import affordance in Slice 2 is moved — both defer to Slice 8. Internal-readiness gate shifts: **end of Slice 8** is now the feature-complete mark (was end of Slice 7); end of Slice 7 is the "hand-entry-only MVP" mark. |
 | v1.4 change | Product owner decision 2026-04-21: fold **per-vest FMV capture + editable past vesting events** into Slice 3. Rationale: the spec (`orbit-v1-persona-b-spain.md` L319/L334) treats FMV-at-vest as the RSU cost basis but no slice defined where that data lives. `vesting_events` gets `fmv_at_vest` + `fmv_currency` + `is_user_override` + `overridden_at` columns; past-event rows become editable for FMV, date, and shares-vested with user-edits authoritative over the derivation (cumulative invariant relaxes on any override). Slice 3 T-shirt bumps **M → L**. Ships alongside the ECB pipeline so the grant-detail "Precios de vesting" section can render pre-filled EUR values on introduction. NSO exercise-FMV is the symmetric gap on NSO grants and stays in Slice 5 where sell-now consumes it (`nso_exercises` table lands there). |
+| v1.5 change | Product owner decision 2026-04-22: insert a new **Slice 3b — Sell-to-cover withholding + tax preferences** between Slice 3 and Slice 4. Rationale: Spanish RSU cap-gains basis depends on the net shares delivered after broker sell-to-cover for IRPF withholding; without this data, Slice 4's tax engine over-counts the share position by the sold fraction on every RSU grant. Adds a time-series sidecar `user_tax_preferences` (`user_id`, `from_date`, `to_date`, `country_iso2`, `rendimiento_del_trabajo_percent` nullable, `sell_to_cover_enabled` boolean; close-and-create on change, mirroring `residency_periods`; one open row per user). ALTERs `vesting_events` with `tax_withholding_percent` + `share_sell_price` + `share_sell_currency` + `is_sell_to_cover_override` + `sell_to_cover_overridden_at` (same override-preservation discipline as v1.4). New pure `orbit_core::sell_to_cover::compute` function returns `{ gross, shares_sold, net_delivered, cash_withheld }` from `(fmv, shares, tax_pct, sell_price)`; TS parity mirror with shared fixture. Profile gains a "Preferencias fiscales" section (country-aware rendering — `rendimiento_del_trabajo_percent` field visible when the active country is Spain; default `sell_to_cover_enabled = true` for Spain, false otherwise). Vesting-events editor on grant-detail evolves from inline rows to a per-row **dialog** that shows all derived values (gross, shares sold for taxes, cash withheld, net delivered) and allows editing FMV, share sell price, tax percentage, and shares vested. Capital-gains basis semantics update for Slice 4: `basis = fmv_at_vest × net_shares_delivered` when sell-to-cover applied (vs × `shares_vested_this_event` when not). Naming follows the ADR-015 §0a/§0b precedent — Slice 3 stays Slice 3, new slice is 3b, Slice 4+ numbering unchanged. T-shirt **M**. |
 
 ## Principles
 
@@ -29,7 +30,8 @@
 | 1 | **First portfolio** | Sign up → residency → first grant → see vesting schedule. | L | Persona B enters one grant, sees vesting timeline. Nothing else. |
 | 2 | Portfolio completeness (hand-entry) | Multiple grants, dashboard tiles, ESPP purchases, Art. 7.p trip entry, Modelo 720 category inputs, session-device UI. **No bulk import** (Slice 8). | M | Persona B adds several grants by hand, records an ESPP purchase, logs a trip. |
 | 3 | FX + Modelo 720 passive UX + FMV capture | ECB FX pipeline, dashboard EUR conversion (paper-gains tile), Modelo 720 threshold alert, rule-set chip in footer, per-vest FMV capture + editable past vesting events. | L | Paper-gains tile shows EUR with bands; M720 threshold alert fires; footer chip shows ECB FX date + engine version; grant-detail "Precios de vesting" lets the user adjust past vests. |
-| 4 | Tax engine + autonomía + scenario modeler | First tax numbers. Rule-set versioning goes live. Ranges-and-sensitivity NFR activates. | XL | Persona B runs the IPO/lockup/hold scenario and sees net proceeds with sensitivity. |
+| 3b | Sell-to-cover withholding + tax preferences | `user_tax_preferences` sidecar; sell-to-cover fields on `vesting_events`; per-row dialog on the vesting-events editor showing gross/sold/net/withheld derived values. | M | Spain user sets 45% rendimiento-del-trabajo default; on a past RSU vest, opens the dialog and sees `net shares = vested − (tax% × gross / sell_price)` computed from the FMV + sell price they enter. |
+| 4 | Tax engine + autonomía + scenario modeler | First tax numbers. Rule-set versioning goes live. Ranges-and-sensitivity NFR activates. RSU cap-gains basis = `fmv_at_vest × net_shares_delivered` (consuming Slice-3b data). | XL | Persona B runs the IPO/lockup/hold scenario and sees net proceeds with sensitivity. |
 | 5 | Sell-now calculator (post-IPO leg) | Finnhub (dev tier) + ECB pipeline + US-013. | L | Persona B opens sell-now, enters lots, sees net-EUR-landing range. |
 | 6 | Exports + Modelo 720 worksheet + recompute | Gestor PDF, CSV, traceability IDs, recompute-under-current-rules. | L | Persona B exports a scenario PDF; tests recompute after a rule-set bump. |
 | 7 | GDPR DSR self-service + optional 2FA | Data export, erasure, TOTP optional for all users. | M | User enables TOTP; exports their data archive; deletes account; 30-day grace works. |
@@ -225,13 +227,36 @@ End of Slice 2.
 
 ---
 
-## Slice 4 — Tax engine goes live (scenario modeler first)
+## Slice 3b — Sell-to-cover withholding + tax preferences
 
 ### Scope one-liner
-The hybrid tax engine (ADR-003) ships its first calculator: the scenario modeler (US-004). Rule-set versioning (ADR-004) goes live. The ranges-and-sensitivity NFR (§7.4) activates on real tax numbers.
+Capture sell-to-cover tax-withholding at the vesting-event level so Slice 4's tax engine can compute capital-gains basis on the net shares actually delivered (not gross vested). Adds a Profile-side tax-preferences sidecar with per-country scoping. Required by Slice 4 for Spanish RSU cap-gains correctness.
 
 ### Entry state
 End of Slice 3.
+
+### Exit state
+- **New sidecar `user_tax_preferences`** (time-series, close-and-create, mirroring `residency_periods`): `user_id`, `from_date`, `to_date` (NULL = open), `country_iso2`, `rendimiento_del_trabajo_percent` (nullable), `sell_to_cover_enabled` (boolean; default `true` for Spain on country-switch). Partial unique index enforces one open row per user. RLS `tenant_isolation`.
+- **ALTER `vesting_events`** with `tax_withholding_percent NUMERIC(5,4)`, `share_sell_price NUMERIC(20,6)`, `share_sell_currency TEXT`, `is_sell_to_cover_override BOOLEAN DEFAULT false`, `sell_to_cover_overridden_at TIMESTAMPTZ`. All nullable — null values mean "no sell-to-cover applied to this vest". Cross-field CHECK enforces coherence (all-or-none on the sell-to-cover triplet; override flag ⇔ overridden_at).
+- **New pure function `orbit_core::sell_to_cover::compute`** — takes `(fmv_at_vest, shares_vested, tax_percent, share_sell_price)` and returns `{ gross_amount, shares_sold_for_taxes, net_shares_delivered, cash_withheld }`. Derived at read time; not stored. TS parity mirror `frontend/src/lib/sellToCover.ts` + shared fixture `sell_to_cover_cases.json`.
+- **Profile "Preferencias fiscales" section** — country picker (ISO-3166 alpha-2); for Spain-like countries a `rendimiento_del_trabajo_percent` numeric input renders; `sell_to_cover_enabled` toggle (default true for Spain, false otherwise — server respects whatever the client submits). Save closes the prior `user_tax_preferences` row (`to_date = today`) and inserts a new one; idempotent within a same-day save per the M720 pattern. Audit `user_tax_preferences.upsert` with payload `{ outcome }`, no values.
+- **Vesting-events editor redesign** — grant-detail's "Precios de vesting" section moves from inline row-edit to a **per-row dialog**. Dialog renders derived values (gross amount, shares sold for taxes, cash withheld, net shares delivered) plus editable fields: `fmv_at_vest`, `share_sell_price` (+ currency), `tax_withholding_percent`, `shares_vested_this_event`, `vest_date` (past-only). Save path uses the extended `PUT /api/v1/grants/:gid/vesting-events/:eid` with OCC via `updated_at` (same discipline as Slice 3). Revert affordance clears the sell-to-cover override fields in addition to the FMV override — `clearOverride: true` reverts both tracks; a new `clearSellToCoverOverride: true` body flag clears just the sell-to-cover track.
+- **Default sourcing** — on first POST of a vesting-event override where the user has `sell_to_cover_enabled = true` and the body omits `tax_withholding_percent`, the handler reads the user's active `user_tax_preferences.rendimiento_del_trabajo_percent` and seeds that value. Explicit body value wins; null stays null if the user explicitly unsets.
+- **Audit-log additions**: `user_tax_preferences.upsert`, `vesting_event.sell_to_cover_override`, `vesting_event.clear_sell_to_cover_override`. SEC-101-strict payloads — no raw percentages, no prices, no amounts; only `{ grant_id?, fields_changed }` for vesting-event actions.
+
+### Explicit non-goals
+- **No tax math** — Slice 3b captures the data; Slice 4 consumes it.
+- **No worker changes** — orbit-worker already scheduled the daily ECB fetch in Slice 3; Slice 3b is a data-shape + UI slice only.
+- **No NSO sell-to-cover** — NSO exercise mechanics are Slice 5 (`nso_exercises` table); sell-to-cover on exercise is part of that surface and is not back-ported here.
+- **No multi-country concurrent tax residency** — one open `user_tax_preferences` row per user at any time. Dual-residency edge cases (overlapping periods) are out of scope for v1.
+- **No per-grant tax-percentage default** — the percentage lives on the user, not on the grant (Q-D decision). Per-grant defaults can return post-v1 if a real plan needs them.
+
+### T-shirt
+**M.** Two additive schema changes (one sidecar + one ALTER), one new pure function + TS mirror + fixture, one Profile section, one editor refactor (inline → dialog). No worker changes; no new external integrations.
+
+### Dependencies
+- Slice 3 complete (the editor being refactored ships in Slice 3).
+- No new ADRs needed beyond ADR-018 (Slice-3b technical design); the capture shapes + override-preservation rules follow ADR-017's templates.
 
 ### Exit state
 - **`orbit-tax-core` primitives** (ADR-003) implemented: `Money`, `TaxResult`, `FormulaTrace`, `SensitivityBand`.
@@ -254,7 +279,7 @@ End of Slice 3.
 **XL.** This is the heaviest slice. It includes rule-set authoring, the calculator core, the autonomía tables, Art. 7.p logic, scenario persistence, sensitivity rendering, and the full flag-state UX for foral/Beckham.
 
 ### Dependencies
-- Slice 3 complete.
+- Slice 3b complete (sell-to-cover data is the cap-gains basis input per v1.5).
 - ADR-003, ADR-004 fully implemented.
 - Rule-set content authored by someone who understands 2026 AEAT guidance (owner: Ivan or contracted gestor).
 - All D-* range-pattern decisions from the UX proposal locked.
@@ -462,6 +487,8 @@ End of Slice 8. Orbit runs end-to-end on a developer machine against Docker Comp
 [Slice 0a: local shell] → [Slice 1: first grant] → [Slice 2: portfolio fullness]
                                                          ↓
                                               [Slice 3: FX + M720 passive]
+                                                         ↓
+                                              [Slice 3b: sell-to-cover + tax prefs]
                                                          ↓
                                               [Slice 4: tax engine + scenarios]
                                                          ↓
