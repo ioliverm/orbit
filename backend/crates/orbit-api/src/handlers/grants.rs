@@ -176,6 +176,33 @@ pub struct VestingEventDto {
     /// OCC token per AC-10.5. Only present for persisted rows.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    // --- Slice 3b captured columns + derived values (ADR-018 §3). ---
+    /// Stringified fraction in `[0, 1]` (e.g. `"0.4500"`). `None` for
+    /// rows without a sell-to-cover override.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tax_withholding_percent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub share_sell_price: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub share_sell_currency: Option<String>,
+    #[serde(default)]
+    pub is_sell_to_cover_override: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sell_to_cover_overridden_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Derived `fmv × shares`. `None` when the sell-to-cover triplet
+    /// is incomplete OR when `compute` would error (the dialog also
+    /// renders dashes in those cases).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gross_amount: Option<String>,
+    /// Derived `ceil_4dp(tax × gross / sell_price)`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shares_sold_for_taxes: Option<String>,
+    /// Derived `shares_vested - shares_sold`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_shares_delivered: Option<String>,
+    /// Derived `shares_sold × sell_price`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cash_withheld: Option<String>,
 }
 
 impl From<&VestingEvent> for VestingEventDto {
@@ -196,12 +223,22 @@ impl From<&VestingEvent> for VestingEventDto {
             fmv_currency: e.fmv_currency.clone(),
             is_user_override: false,
             updated_at: None,
+            tax_withholding_percent: None,
+            share_sell_price: None,
+            share_sell_currency: None,
+            is_sell_to_cover_override: false,
+            sell_to_cover_overridden_at: None,
+            gross_amount: None,
+            shares_sold_for_taxes: None,
+            net_shares_delivered: None,
+            cash_withheld: None,
         }
     }
 }
 
 impl From<&orbit_db::vesting_events::VestingEventRow> for VestingEventDto {
     fn from(r: &orbit_db::vesting_events::VestingEventRow) -> Self {
+        let derived = compute_row_derived(r);
         VestingEventDto {
             id: Some(r.id),
             vest_date: r.vest_date,
@@ -218,8 +255,98 @@ impl From<&orbit_db::vesting_events::VestingEventRow> for VestingEventDto {
             fmv_currency: r.fmv_currency.clone(),
             is_user_override: r.is_user_override,
             updated_at: Some(r.updated_at),
+            tax_withholding_percent: r.tax_withholding_percent.clone(),
+            share_sell_price: r.share_sell_price.clone(),
+            share_sell_currency: r.share_sell_currency.clone(),
+            is_sell_to_cover_override: r.is_sell_to_cover_override,
+            sell_to_cover_overridden_at: r.sell_to_cover_overridden_at,
+            gross_amount: derived.as_ref().and_then(|d| d.gross.clone()),
+            shares_sold_for_taxes: derived.as_ref().and_then(|d| d.sold.clone()),
+            net_shares_delivered: derived.as_ref().and_then(|d| d.net.clone()),
+            cash_withheld: derived.as_ref().and_then(|d| d.cash.clone()),
         }
     }
+}
+
+/// Derived sell-to-cover values for a persisted vesting-event row.
+/// `None` when the triplet is incomplete or when the pure-function
+/// compute would error — in either case the dialog renders dashes.
+/// Mirrors the `row_to_json` derivation in `handlers::vesting_events`
+/// but returns the scaled-to-string conversion directly so the DTO
+/// can project it through `#[serde(skip_serializing_if)]`.
+struct RowDerived {
+    gross: Option<String>,
+    sold: Option<String>,
+    net: Option<String>,
+    cash: Option<String>,
+}
+
+fn compute_row_derived(r: &orbit_db::vesting_events::VestingEventRow) -> Option<RowDerived> {
+    use orbit_core::{compute_sell_to_cover, SellToCoverInput};
+    let fmv = r.fmv_at_vest.as_deref()?;
+    let tax = r.tax_withholding_percent.as_deref()?;
+    let price = r.share_sell_price.as_deref()?;
+    let input = SellToCoverInput {
+        fmv_at_vest_scaled: parse_scaled_numeric(fmv)?,
+        shares_vested_scaled: r.shares_vested_this_event,
+        tax_withholding_percent_scaled: parse_scaled_numeric(tax)?,
+        share_sell_price_scaled: parse_scaled_numeric(price)?,
+    };
+    let result = compute_sell_to_cover(input).ok()?;
+    Some(RowDerived {
+        gross: Some(scaled_decimal_string(result.gross_amount_scaled)),
+        sold: Some(scaled_decimal_string(result.shares_sold_for_taxes_scaled)),
+        net: Some(scaled_decimal_string(result.net_shares_delivered_scaled)),
+        cash: Some(scaled_decimal_string(result.cash_withheld_scaled)),
+    })
+}
+
+/// NUMERIC `"0.4500"` / `"42.000000"` → scaled-i64 (× 10_000). Truncates
+/// beyond 4 dp. Returns `None` on any parse failure or scaled overflow.
+fn parse_scaled_numeric(s: &str) -> Option<i64> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let (sign, rest) = match trimmed.as_bytes().first() {
+        Some(b'+') => (1i64, &trimmed[1..]),
+        Some(b'-') => (-1i64, &trimmed[1..]),
+        _ => (1i64, trimmed),
+    };
+    if rest.is_empty() {
+        return None;
+    }
+    let (int_part, frac_part) = match rest.find('.') {
+        Some(idx) => (&rest[..idx], &rest[idx + 1..]),
+        None => (rest, ""),
+    };
+    if !int_part.chars().all(|c| c.is_ascii_digit())
+        || !frac_part.chars().all(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    let mut frac = frac_part.to_string();
+    if frac.len() > 4 {
+        frac.truncate(4);
+    }
+    while frac.len() < 4 {
+        frac.push('0');
+    }
+    let int_val: i64 = int_part.parse().ok()?;
+    let frac_val: i64 = frac.parse().ok()?;
+    int_val
+        .checked_mul(orbit_core::SHARES_SCALE)?
+        .checked_add(frac_val)?
+        .checked_mul(sign)
+}
+
+fn scaled_decimal_string(v: i64) -> String {
+    let sign = if v < 0 { "-" } else { "" };
+    let abs = (v as i128).unsigned_abs();
+    let scale = orbit_core::SHARES_SCALE as u128;
+    let int_part = abs / scale;
+    let frac_part = abs % scale;
+    format!("{sign}{int_part}.{frac_part:04}")
 }
 
 // ---------------------------------------------------------------------------

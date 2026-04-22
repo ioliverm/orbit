@@ -8,6 +8,7 @@
 
 pub mod money;
 pub mod paper_gains;
+pub mod sell_to_cover;
 pub mod stacked_grants;
 pub mod vesting;
 
@@ -16,6 +17,10 @@ pub use paper_gains::{
     compute as compute_paper_gains, EsppPurchaseForPaperGains, EurBand, GrantForPaperGains,
     GrantPriceOverrideForPaperGains, MissingReason, PaperGainsInput, PaperGainsResult,
     PerGrantGains, TickerPriceForPaperGains, VestingEventForPaperGains,
+};
+pub use sell_to_cover::{
+    compute as compute_sell_to_cover, ComputeError as SellToCoverComputeError, SellToCoverInput,
+    SellToCoverResult,
 };
 pub use stacked_grants::{
     normalize_employer, stack_cumulative_for_employer, stack_dashboard, vested_to_date_at,

@@ -76,6 +76,18 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/residency",
             get(handlers::residency::get).post(handlers::residency::create),
+        )
+        // Slice 3b T38 — Profile tax-preferences. Same posture as residency:
+        // authenticated but onboarding-gate-exempt, so a user who returns
+        // to the Profile section before completing onboarding can save.
+        .route(
+            "/user-tax-preferences",
+            get(handlers::user_tax_preferences::list_history)
+                .post(handlers::user_tax_preferences::upsert),
+        )
+        .route(
+            "/user-tax-preferences/current",
+            get(handlers::user_tax_preferences::get_current),
         );
 
     // Endpoints past the wizard: the onboarding gate applies here. Returns

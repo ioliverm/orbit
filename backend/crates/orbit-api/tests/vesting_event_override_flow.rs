@@ -599,6 +599,377 @@ async fn grant_update_happy_path_with_overrides_preserves_sum() {
     assert_eq!(status, StatusCode::OK, "update failed: {body}");
 }
 
+// ---------------------------------------------------------------------------
+// Slice 3b T38 — sell-to-cover track integration probes (ADR-018).
+// ---------------------------------------------------------------------------
+
+/// Save a `user_tax_preferences` row for the session via the HTTP API.
+/// The default-sourcing tests depend on the profile being populated
+/// before the dialog PUT fires.
+async fn save_tax_preferences(
+    app: &axum::Router,
+    s: &Session,
+    percent: Option<&str>,
+    sell_to_cover_enabled: bool,
+) {
+    let body = json!({
+        "countryIso2": "ES",
+        "rendimientoDelTrabajoPercent": percent,
+        "sellToCoverEnabled": sell_to_cover_enabled,
+    });
+    let r = post(
+        app,
+        "/api/v1/user-tax-preferences",
+        body,
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, resp) = body_json(r).await;
+    assert!(
+        status == StatusCode::CREATED || status == StatusCode::OK,
+        "tax-preferences save: {status} {resp}",
+    );
+}
+
+#[tokio::test]
+async fn sell_to_cover_override_happy_path() {
+    let (state, app) = app().await;
+    let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "s2c-happy").await;
+    save_tax_preferences(&app, &s, Some("0.4500"), true).await;
+
+    let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
+
+    // PUT with the full Slice-3 FMV body + the Slice-3b triplet.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "fmvAtVest": "42.0000",
+            "fmvCurrency": "USD",
+            "taxWithholdingPercent": "0.4500",
+            "shareSellPrice": "42.2500",
+            "shareSellCurrency": "USD",
+            "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["isSellToCoverOverride"], true);
+    assert_eq!(body["taxWithholdingPercent"], "0.4500");
+    assert_eq!(body["shareSellCurrency"], "USD");
+    // Derived values present + non-null.
+    assert!(body["grossAmount"].is_string(), "grossAmount: {body}");
+    assert!(body["sharesSoldForTaxes"].is_string());
+    assert!(body["netSharesDelivered"].is_string());
+    assert!(body["cashWithheld"].is_string());
+
+    // Audit: one `vesting_event.override` + one `vesting_event.sell_to_cover_override`.
+    let audit_pool = audit_pool().await;
+    let n_fmv = audit_count(&audit_pool, s.user_id, "vesting_event.override").await;
+    let n_s2c = audit_count(
+        &audit_pool,
+        s.user_id,
+        "vesting_event.sell_to_cover_override",
+    )
+    .await;
+    assert!(
+        n_fmv >= 1,
+        "expected at least one vesting_event.override row"
+    );
+    assert!(
+        n_s2c >= 1,
+        "expected at least one vesting_event.sell_to_cover_override row"
+    );
+    let payload = audit_last_payload(
+        &audit_pool,
+        s.user_id,
+        "vesting_event.sell_to_cover_override",
+    )
+    .await;
+    let fields = payload["fields_changed"].as_array().unwrap();
+    // The triplet keys appear.
+    for want in ["tax_percent", "sell_price", "sell_currency"] {
+        assert!(
+            fields.iter().any(|v| v == want),
+            "missing {want} in fields_changed: {payload}",
+        );
+    }
+    assert_no_forbidden_keys(&payload, "vesting_event.sell_to_cover_override");
+}
+
+#[tokio::test]
+async fn sell_to_cover_default_sourcing_seeds_from_profile() {
+    let (state, app) = app().await;
+    let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "s2c-seed").await;
+    save_tax_preferences(&app, &s, Some("0.4500"), true).await;
+    let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
+
+    // Body OMITS `taxWithholdingPercent` key entirely. Default-
+    // sourcing should fire and seed `0.4500` from the profile.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "fmvAtVest": "42.0000",
+            "fmvCurrency": "USD",
+            "shareSellPrice": "42.2500",
+            "shareSellCurrency": "USD",
+            "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        body["taxWithholdingPercent"], "0.4500",
+        "expected default-sourced 0.4500: {body}",
+    );
+}
+
+#[tokio::test]
+async fn sell_to_cover_explicit_null_does_not_seed() {
+    let (state, app) = app().await;
+    let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "s2c-null").await;
+    save_tax_preferences(&app, &s, Some("0.4500"), true).await;
+    let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
+
+    // Body passes `taxWithholdingPercent: null` — explicit clear. With
+    // `shareSellPrice: "42.25"` the triplet ends up partial (price
+    // non-null, tax null, currency will default from fmv) which must
+    // 422 `triplet_incomplete`.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "fmvAtVest": "42.0000",
+            "fmvCurrency": "USD",
+            "taxWithholdingPercent": null,
+            "shareSellPrice": "42.2500",
+            "shareSellCurrency": "USD",
+            "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    let fields = body["error"]["details"]["fields"].as_array().unwrap();
+    assert!(
+        fields
+            .iter()
+            .any(|f| f["code"] == "vesting_event.sell_to_cover.triplet_incomplete"),
+        "missing triplet_incomplete code: {body}",
+    );
+}
+
+#[tokio::test]
+async fn clear_sell_to_cover_override_narrow_preserves_fmv() {
+    let (state, app) = app().await;
+    let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "s2c-narrow").await;
+    save_tax_preferences(&app, &s, Some("0.4500"), true).await;
+    let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
+
+    // Apply full triplet + FMV.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "fmvAtVest": "42.0000",
+            "fmvCurrency": "USD",
+            "taxWithholdingPercent": "0.4500",
+            "shareSellPrice": "42.2500",
+            "shareSellCurrency": "USD",
+            "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, row) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK, "{row}");
+    let ua2: String = row["updatedAt"].as_str().unwrap().into();
+
+    // Narrow clear — FMV preserved, triplet nulled.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "clearSellToCoverOverride": true,
+            "expectedUpdatedAt": ua2,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, row) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK, "{row}");
+    assert_eq!(row["isSellToCoverOverride"], false);
+    assert!(row["taxWithholdingPercent"].is_null());
+    assert!(row["shareSellPrice"].is_null());
+    assert!(row["shareSellCurrency"].is_null());
+    // FMV-track preserved.
+    assert!(
+        !row["fmvAtVest"].is_null(),
+        "narrow clear must preserve fmv: {row}"
+    );
+    assert_eq!(row["isUserOverride"], true);
+}
+
+#[tokio::test]
+async fn clear_override_full_resets_both_tracks() {
+    let (state, app) = app().await;
+    let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "s2c-full").await;
+    save_tax_preferences(&app, &s, Some("0.4500"), true).await;
+    let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
+
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "fmvAtVest": "42.0000",
+            "fmvCurrency": "USD",
+            "taxWithholdingPercent": "0.4500",
+            "shareSellPrice": "42.2500",
+            "shareSellCurrency": "USD",
+            "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (_status, _c, row) = body_json(r).await;
+    let ua2: String = row["updatedAt"].as_str().unwrap().into();
+
+    // Full clear — both tracks reset.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "clearOverride": true,
+            "expectedUpdatedAt": ua2,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, row) = body_json(r).await;
+    assert_eq!(status, StatusCode::OK, "{row}");
+    assert_eq!(row["isUserOverride"], false);
+    assert_eq!(row["isSellToCoverOverride"], false);
+    assert!(row["fmvAtVest"].is_null());
+    assert!(row["taxWithholdingPercent"].is_null());
+    assert!(row["shareSellPrice"].is_null());
+    assert!(row["shareSellCurrency"].is_null());
+
+    // Full-clear writes TWO audit rows per ADR-018 §5.
+    let audit_pool = audit_pool().await;
+    assert!(audit_count(&audit_pool, s.user_id, "vesting_event.clear_override").await >= 1);
+    assert!(
+        audit_count(
+            &audit_pool,
+            s.user_id,
+            "vesting_event.clear_sell_to_cover_override",
+        )
+        .await
+            >= 1
+    );
+}
+
+#[tokio::test]
+async fn sell_to_cover_negative_net_returns_422() {
+    let (state, app) = app().await;
+    let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "s2c-neg").await;
+    save_tax_preferences(&app, &s, Some("0.4500"), true).await;
+    let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
+
+    // tax = 1.0000, sell < fmv → compute returns NegativeNetShares,
+    // handler maps to 422.
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "fmvAtVest": "100.0000",
+            "fmvCurrency": "USD",
+            "taxWithholdingPercent": "1.0000",
+            "shareSellPrice": "40.0000",
+            "shareSellCurrency": "USD",
+            "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    let fields = body["error"]["details"]["fields"].as_array().unwrap();
+    assert!(
+        fields
+            .iter()
+            .any(|f| f["code"] == "vesting_event.sell_to_cover.negative_net_shares"),
+        "missing negative_net_shares code: {body}",
+    );
+}
+
+#[tokio::test]
+async fn sell_to_cover_currency_mismatch_returns_422() {
+    let (state, app) = app().await;
+    let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "s2c-ccy").await;
+    save_tax_preferences(&app, &s, Some("0.4500"), true).await;
+    let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
+
+    let r = put(
+        &app,
+        &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
+        json!({
+            "fmvAtVest": "42.0000",
+            "fmvCurrency": "USD",
+            "taxWithholdingPercent": "0.4500",
+            "shareSellPrice": "42.2500",
+            "shareSellCurrency": "EUR",
+            "expectedUpdatedAt": updated_at,
+        }),
+        vec![
+            (header::COOKIE.as_str(), s.cookie.clone()),
+            ("x-csrf-token", s.csrf.clone()),
+        ],
+    )
+    .await;
+    let (status, _c, body) = body_json(r).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    let fields = body["error"]["details"]["fields"].as_array().unwrap();
+    assert!(
+        fields
+            .iter()
+            .any(|f| f["code"] == "vesting_event.sell_to_cover.currency_mismatch"),
+        "missing currency_mismatch code: {body}",
+    );
+}
+
 #[tokio::test]
 async fn grant_shrink_below_overrides_returns_422() {
     let (state, app) = app().await;

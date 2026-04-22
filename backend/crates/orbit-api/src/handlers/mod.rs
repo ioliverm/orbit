@@ -14,4 +14,5 @@ pub mod modelo_720_inputs;
 pub mod residency;
 pub mod rule_set_chip;
 pub mod trips;
+pub mod user_tax_preferences;
 pub mod vesting_events;

@@ -1,4 +1,4 @@
-//! Vesting-event override endpoints (Slice 3 T29, ADR-017 §3).
+//! Vesting-event override endpoints (Slice 3 T29, extended in Slice 3b T38).
 //!
 //! Covers:
 //!
@@ -11,20 +11,46 @@
 //! and returns `OverrideOutcome::Conflict` on mismatch — the handler
 //! then returns a 409 with `code = "resource.stale_client_state"`.
 //!
-//! Audit allowlists (SEC-101 + AC-8.10):
+//! Audit allowlists (SEC-101 + AC-8.10; Slice 3b ADR-018 §5):
 //!
 //!   * `vesting_event.override` — `{ grant_id, fields_changed }`
 //!   * `vesting_event.clear_override` — `{ grant_id, cleared_fields, preserved }`
 //!   * `vesting_event.bulk_fmv` — `{ grant_id, applied_count, skipped_count }`
+//!   * `vesting_event.sell_to_cover_override` — `{ grant_id, fields_changed }`
+//!   * `vesting_event.clear_sell_to_cover_override` — `{ grant_id }`
+//!
+//! # Slice 3b extension (ADR-018 §3)
+//!
+//! The PUT body grows five optional keys:
+//!
+//!   * `taxWithholdingPercent: string | null` — fraction in `[0, 1]`.
+//!   * `shareSellPrice: string | null` — per-share sell price.
+//!   * `shareSellCurrency: "USD" | "EUR" | "GBP" | null` — defaults to
+//!     `fmvCurrency` per AC-7.3.4.
+//!   * `clearSellToCoverOverride: bool` — narrow clear (preserves FMV).
+//!
+//! `clearOverride: true` now clears BOTH tracks (ADR-018 §2 supersede);
+//! the DB layer [`orbit_db::vesting_events::clear_override`] is the
+//! nuclear revert.
+//!
+//! **Default-sourcing of `tax_withholding_percent`** per ADR-018 §4 and
+//! the AC-7.6.3 resolution: when the key is ABSENT from the body AND
+//! `shareSellPrice` is present non-null AND the row is not yet
+//! sell-to-cover-overridden AND the user's active
+//! `user_tax_preferences` row has `sell_to_cover_enabled = true` with
+//! a non-null `rendimiento_del_trabajo_percent`, the handler seeds
+//! from the profile. Explicit `null` suppresses seeding (explicit
+//! clear); present-non-null takes verbatim.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use chrono::{DateTime, NaiveDate, Utc};
-use orbit_core::SHARES_SCALE;
+use orbit_core::{compute_sell_to_cover, SellToCoverComputeError, SellToCoverInput, SHARES_SCALE};
 use orbit_db::vesting_events::{
-    self, ClearOutcome, OverrideOutcome, VestingEventOverridePatch, VestingEventRow,
+    self, ClearOutcome, OverrideOutcome, SellToCoverClearOutcome, SellToCoverOutcome,
+    SellToCoverOverridePatch, VestingEventOverridePatch, VestingEventRow,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -39,6 +65,7 @@ use crate::state::AppState;
 const CURRENCIES: &[&str] = &["USD", "EUR", "GBP"];
 const MAX_FUTURE_DAYS: i64 = 365;
 const MAX_PRICE_LEN: usize = 32;
+const MAX_PERCENT_LEN: usize = 16;
 
 // ---------------------------------------------------------------------------
 // PUT /grants/:grantId/vesting-events/:eventId
@@ -64,6 +91,21 @@ pub struct OverrideBody {
     #[serde(default)]
     pub clear_override: bool,
     pub expected_updated_at: DateTime<Utc>,
+
+    // --- Slice 3b additions (ADR-018 §3) ---
+    /// Fraction in `[0, 1]` stringified (e.g., `"0.4500"`). `Some(None)`
+    /// = explicit clear (suppresses default-sourcing per AC-7.6.3);
+    /// `None` = key absent in body (default-sourcing may fire).
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub tax_withholding_percent: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub share_sell_price: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_nullable_string")]
+    pub share_sell_currency: Option<Option<String>>,
+    /// Narrow revert: clears only the sell-to-cover triplet; preserves
+    /// FMV, vest_date, shares, and the Slice-3 override flag.
+    #[serde(default)]
+    pub clear_sell_to_cover_override: bool,
 }
 
 /// Internal representation of the `sharesVested` JSON value before
@@ -85,6 +127,34 @@ pub async fn upsert_override(
 ) -> Result<Response, AppError> {
     let today = Utc::now().date_naive();
 
+    // Mixed-body rejections — fire before we even open a tx so we don't
+    // waste a connection on a bad body (ADR-018 §3).
+    if body.clear_override
+        && (body.vest_date.is_some()
+            || body.shares_vested.is_some()
+            || body.fmv_at_vest.is_some()
+            || body.fmv_currency.is_some()
+            || body.tax_withholding_percent.is_some()
+            || body.share_sell_price.is_some()
+            || body.share_sell_currency.is_some()
+            || body.clear_sell_to_cover_override)
+    {
+        return Err(AppError::Validation(vec![FieldError {
+            field: "clearOverride".into(),
+            code: "vesting_event.clear_conflict.full".into(),
+        }]));
+    }
+    if body.clear_sell_to_cover_override
+        && (body.tax_withholding_percent.is_some()
+            || body.share_sell_price.is_some()
+            || body.share_sell_currency.is_some())
+    {
+        return Err(AppError::Validation(vec![FieldError {
+            field: "clearSellToCoverOverride".into(),
+            code: "vesting_event.clear_conflict.narrow".into(),
+        }]));
+    }
+
     let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id).await?;
 
     // Ensure the event belongs to this grant + this user; RLS filters
@@ -96,13 +166,8 @@ pub async fn upsert_override(
         return Err(AppError::NotFound);
     }
 
-    // The clear-override branch reverts date/shares to the algorithmic
-    // output and preserves FMV per AC-8.7.1. OCC (AC-10.5) is enforced
-    // inside the repo's UPDATE predicate — a stale `expected_updated_at`
-    // resolves as `ClearOutcome::Conflict` and surfaces as 409
-    // `resource.stale_client_state`, same as `apply_override`.
+    // --- Branch 1: full clear (ADR-018 §2 supersede — clears both tracks).
     if body.clear_override {
-        let had_fmv = existing.fmv_at_vest.is_some();
         let outcome = vesting_events::clear_override(
             &mut tx,
             auth.user_id,
@@ -124,6 +189,10 @@ pub async fn upsert_override(
         };
 
         let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
+        // Two audit rows in deterministic order per ADR-018 §5 +
+        // AC-7.7.3. The Slice-3 `cleared_fields` array now always
+        // includes "fmv" (it's always cleared on full-clear);
+        // `preserved` is always `[]`.
         audit::record_wizard_in_tx(
             tx.as_executor(),
             WizardAction::VestingEventClearOverride,
@@ -132,16 +201,59 @@ pub async fn upsert_override(
             ip_hash.as_ref().map(|s| &s[..]),
             json!({
                 "grant_id": grant_id,
-                "cleared_fields": ["vest_date", "shares"],
-                "preserved": if had_fmv { vec!["fmv"] } else { vec![] },
+                "cleared_fields": ["vest_date", "shares", "fmv"],
+                "preserved": Vec::<&str>::new(),
             }),
+        )
+        .await?;
+        audit::record_wizard_in_tx(
+            tx.as_executor(),
+            WizardAction::VestingEventClearSellToCoverOverride,
+            auth.user_id,
+            Some(event_id),
+            ip_hash.as_ref().map(|s| &s[..]),
+            json!({ "grant_id": grant_id }),
         )
         .await?;
         tx.commit().await?;
         return Ok((StatusCode::OK, Json(row_to_json(&row))).into_response());
     }
 
-    // Future-row immutability: only FMV edits allowed (AC-8.3.1).
+    // --- Branch 2: narrow clear (sell-to-cover only).
+    if body.clear_sell_to_cover_override {
+        let outcome = vesting_events::clear_sell_to_cover_override(
+            &mut tx,
+            auth.user_id,
+            event_id,
+            body.expected_updated_at,
+        )
+        .await?;
+        let row = match outcome {
+            SellToCoverClearOutcome::Cleared(row) => row,
+            SellToCoverClearOutcome::NotFound => return Err(AppError::NotFound),
+            SellToCoverClearOutcome::Conflict => return Err(AppError::Conflict),
+        };
+        let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
+        audit::record_wizard_in_tx(
+            tx.as_executor(),
+            WizardAction::VestingEventClearSellToCoverOverride,
+            auth.user_id,
+            Some(event_id),
+            ip_hash.as_ref().map(|s| &s[..]),
+            json!({ "grant_id": grant_id }),
+        )
+        .await?;
+        tx.commit().await?;
+        return Ok((StatusCode::OK, Json(row_to_json(&row))).into_response());
+    }
+
+    // --- Branch 3: forward write (Slice-3 FMV track + Slice-3b sell-to-cover
+    // track, composed).
+
+    // Future-row immutability: only FMV-or-sell-to-cover edits allowed
+    // (AC-8.3.1; Slice-3b extension: sell-to-cover is an FMV-adjacent
+    // surface that is legal on future rows only when vest_date/shares
+    // are not in the body).
     let is_future = existing.vest_date > today;
     if is_future && (body.vest_date.is_some() || body.shares_vested.is_some()) {
         return Err(AppError::Validation(vec![FieldError {
@@ -150,10 +262,9 @@ pub async fn upsert_override(
         }]));
     }
 
-    // Per-field validation.
+    // Per-field validation (Slice-3 + Slice-3b).
     let mut errors: Vec<FieldError> = Vec::new();
     if let Some(d) = body.vest_date {
-        // `<= today + 365 days` hard reject (AC-8.2.2).
         if (d - today).num_days() > MAX_FUTURE_DAYS {
             errors.push(FieldError {
                 field: "vestDate".into(),
@@ -209,9 +320,7 @@ pub async fn upsert_override(
             });
         }
     }
-    // AC-8.2.4: fmv_at_vest and fmv_currency must be set together (or both
-    // cleared together). The repo's CHECK enforces this at the DB layer;
-    // surfacing here as a 422 keeps the error envelope consistent.
+    // AC-8.2.4 FMV pair coherence (Slice-3).
     if let (Some(f), Some(c)) = (&body.fmv_at_vest, &body.fmv_currency) {
         let f_none = f.is_none();
         let c_none = c.is_none();
@@ -222,67 +331,277 @@ pub async fn upsert_override(
             });
         }
     }
+
+    // Slice-3b per-field validation.
+    if let Some(Some(ref pct)) = body.tax_withholding_percent {
+        if pct.len() > MAX_PERCENT_LEN {
+            errors.push(FieldError {
+                field: "taxWithholdingPercent".into(),
+                code: "length".into(),
+            });
+        } else {
+            match pct.parse::<f64>() {
+                Ok(v) if v.is_finite() && (0.0..=1.0).contains(&v) => {}
+                _ => errors.push(FieldError {
+                    field: "taxWithholdingPercent".into(),
+                    code: "vesting_event.sell_to_cover.percent_out_of_range".into(),
+                }),
+            }
+        }
+    }
+    if let Some(Some(ref price)) = body.share_sell_price {
+        if price.len() > MAX_PRICE_LEN {
+            errors.push(FieldError {
+                field: "shareSellPrice".into(),
+                code: "length".into(),
+            });
+        } else {
+            match price.parse::<f64>() {
+                Ok(v) if v > 0.0 => {}
+                _ => errors.push(FieldError {
+                    field: "shareSellPrice".into(),
+                    code: "must_be_positive".into(),
+                }),
+            }
+        }
+    }
+    if let Some(Some(ref cur)) = body.share_sell_currency {
+        if !CURRENCIES.contains(&cur.as_str()) {
+            errors.push(FieldError {
+                field: "shareSellCurrency".into(),
+                code: "unsupported".into(),
+            });
+        }
+    }
+
     if !errors.is_empty() {
         return Err(AppError::Validation(errors));
     }
 
-    // Compose the patch. `shares_scaled` is the handler-normalized
-    // scaled-i64 form; per-field validation above already rejected
-    // non-positive or malformed inputs.
-    let patch = VestingEventOverridePatch {
+    // --- Slice 3b default-sourcing of tax_withholding_percent (ADR-018 §4).
+    //
+    // The one-shot rule: seed from user_tax_preferences.rendimiento when
+    //   (a) the row is not yet sell-to-cover-overridden (one-shot),
+    //   (b) body.shareSellPrice is present non-null,
+    //   (c) body.taxWithholdingPercent KEY is ABSENT (not explicit null),
+    //   (d) active tax-preferences row has sell_to_cover_enabled = true
+    //       and a non-null rendimiento.
+    //
+    // `body.tax_withholding_percent` is:
+    //   None            → key absent (eligible for seeding)
+    //   Some(None)      → explicit null (NOT eligible; explicit clear)
+    //   Some(Some(v))   → explicit value (no seed needed)
+    let mut tax_patch = body.tax_withholding_percent.clone();
+    let wants_sell_to_cover_write = matches!(body.share_sell_price, Some(Some(_)));
+    if tax_patch.is_none() && wants_sell_to_cover_write && !existing.is_sell_to_cover_override {
+        let prefs = orbit_db::user_tax_preferences::current(&mut tx, auth.user_id).await?;
+        if let Some(p) = prefs {
+            if p.sell_to_cover_enabled && p.rendimiento_del_trabajo_percent.is_some() {
+                tax_patch = Some(Some(p.rendimiento_del_trabajo_percent.unwrap()));
+            }
+        }
+    }
+
+    // --- Slice 3b currency defaulting: shareSellCurrency defaults to
+    // fmvCurrency when the sell-to-cover write is happening but the
+    // client omitted (or explicitly nulled) the currency. AC-7.3.4.
+    let mut sell_currency_patch = body.share_sell_currency.clone();
+    if wants_sell_to_cover_write && !matches!(sell_currency_patch, Some(Some(_))) {
+        // Prefer the body's fmvCurrency (if the user is updating it in
+        // the same save), else fall back to the row's existing
+        // fmv_currency.
+        let src_from_body = match &body.fmv_currency {
+            Some(Some(s)) => Some(s.clone()),
+            _ => None,
+        };
+        let src = src_from_body.or_else(|| existing.fmv_currency.clone());
+        sell_currency_patch = src.map(Some);
+    }
+
+    // --- Slice 3b triplet-coherence + currency-match checks. These
+    // run AFTER default-sourcing so the eventual row's state is what
+    // gets validated, not just the body.
+    //
+    // Effective triplet after applying the patch to the existing row:
+    //   - if body carries a Some(_) (non-null), use it;
+    //   - if body carries Some(None), the column will be null;
+    //   - if body carries None (absent), the column keeps its
+    //     existing value.
+    let effective_tax_present =
+        patch_effective_has_value(&tax_patch, &existing.tax_withholding_percent);
+    let effective_price_present =
+        patch_effective_has_value(&body.share_sell_price, &existing.share_sell_price);
+    let effective_currency_present =
+        patch_effective_has_value(&sell_currency_patch, &existing.share_sell_currency);
+
+    let effective_count = [
+        effective_tax_present,
+        effective_price_present,
+        effective_currency_present,
+    ]
+    .iter()
+    .filter(|&&x| x)
+    .count();
+
+    if effective_count != 0 && effective_count != 3 {
+        return Err(AppError::Validation(vec![FieldError {
+            field: "shareSellPrice".into(),
+            code: "vesting_event.sell_to_cover.triplet_incomplete".into(),
+        }]));
+    }
+
+    // Currency equality when the triplet is populated: the final
+    // fmv_currency must equal the final share_sell_currency (ADR-018
+    // §2 currency policy). Pull the effective values.
+    if effective_count == 3 {
+        let final_fmv_currency = match &body.fmv_currency {
+            Some(v) => v.clone(),
+            None => existing.fmv_currency.clone(),
+        };
+        let final_sell_currency = match &sell_currency_patch {
+            Some(v) => v.clone(),
+            None => existing.share_sell_currency.clone(),
+        };
+        match (final_fmv_currency, final_sell_currency) {
+            (Some(f), Some(s)) if f == s => {}
+            (Some(_), None) | (None, Some(_)) | (None, None) => {
+                // Triplet says present but fmv isn't — this means the
+                // user is submitting sell-to-cover without an fmv on
+                // the row or in the body. Surface a dedicated 422 per
+                // ADR-018 §3.
+                return Err(AppError::Validation(vec![FieldError {
+                    field: "shareSellPrice".into(),
+                    code: "vesting_event.sell_to_cover.requires_fmv".into(),
+                }]));
+            }
+            (Some(_), Some(_)) => {
+                return Err(AppError::Validation(vec![FieldError {
+                    field: "shareSellCurrency".into(),
+                    code: "vesting_event.sell_to_cover.currency_mismatch".into(),
+                }]));
+            }
+        }
+    }
+
+    // --- Compose patches and apply. Both tracks ride inside this one
+    // tx so audit + DB state land atomically (T25 / S1).
+    let fmv_patch = VestingEventOverridePatch {
         vest_date: body.vest_date,
         shares_vested_this_event: shares_scaled,
         fmv_at_vest: body.fmv_at_vest.clone(),
         fmv_currency: body.fmv_currency.clone(),
     };
 
-    // Fields-changed allowlist; computed from the patch so audit is
-    // per-field precise (AC-8.10.1).
-    let mut fields_changed: Vec<&'static str> = Vec::new();
-    if patch.vest_date.is_some() {
-        fields_changed.push("vest_date");
-    }
-    if patch.shares_vested_this_event.is_some() {
-        fields_changed.push("shares");
-    }
-    if patch.fmv_at_vest.is_some() || patch.fmv_currency.is_some() {
-        fields_changed.push("fmv");
-    }
-    if fields_changed.is_empty() {
-        // AC-8.10.1: empty `fields_changed` → no audit, no DB write.
+    let sell_patch = SellToCoverOverridePatch {
+        tax_withholding_percent: tax_patch.clone(),
+        share_sell_price: body.share_sell_price.clone(),
+        share_sell_currency: sell_currency_patch.clone(),
+    };
+
+    // Decide whether each track has anything to write.
+    let fmv_track_fields: Vec<&'static str> = {
+        let mut v = Vec::new();
+        if fmv_patch.vest_date.is_some() {
+            v.push("vest_date");
+        }
+        if fmv_patch.shares_vested_this_event.is_some() {
+            v.push("shares");
+        }
+        if fmv_patch.fmv_at_vest.is_some() || fmv_patch.fmv_currency.is_some() {
+            v.push("fmv");
+        }
+        v
+    };
+    let sell_track_fields: Vec<&'static str> = {
+        let mut v = Vec::new();
+        if sell_patch.tax_withholding_percent.is_some() {
+            v.push("tax_percent");
+        }
+        if sell_patch.share_sell_price.is_some() {
+            v.push("sell_price");
+        }
+        if sell_patch.share_sell_currency.is_some() {
+            v.push("sell_currency");
+        }
+        v
+    };
+
+    if fmv_track_fields.is_empty() && sell_track_fields.is_empty() {
+        // Nothing to write. Echo the existing row; no audit.
         tx.commit().await?;
         return Ok((StatusCode::OK, Json(row_to_json(&existing))).into_response());
     }
 
-    let outcome = vesting_events::apply_override(
-        &mut tx,
-        auth.user_id,
-        event_id,
-        &patch,
-        body.expected_updated_at,
-    )
-    .await?;
-    let row = match outcome {
-        OverrideOutcome::Applied(r) => r,
-        OverrideOutcome::Conflict => return Err(AppError::Conflict),
-    };
-
+    // Track the token we pass to the second UPDATE if both tracks
+    // need to write. The first write advances `updated_at` via the
+    // trigger; the second write must predicate on the new token.
+    let mut token = body.expected_updated_at;
     let ip_hash = audit::hash_ip(&state.ip_hash_key, ip.0.as_deref());
-    audit::record_wizard_in_tx(
-        tx.as_executor(),
-        WizardAction::VestingEventOverride,
-        auth.user_id,
-        Some(event_id),
-        ip_hash.as_ref().map(|s| &s[..]),
-        json!({
-            "grant_id": grant_id,
-            "fields_changed": fields_changed,
-        }),
-    )
-    .await?;
-    tx.commit().await?;
+    let mut latest_row: Option<VestingEventRow> = None;
 
-    Ok((StatusCode::OK, Json(row_to_json(&row))).into_response())
+    if !fmv_track_fields.is_empty() {
+        let outcome =
+            vesting_events::apply_override(&mut tx, auth.user_id, event_id, &fmv_patch, token)
+                .await?;
+        let row = match outcome {
+            OverrideOutcome::Applied(r) => r,
+            OverrideOutcome::Conflict => return Err(AppError::Conflict),
+        };
+        audit::record_wizard_in_tx(
+            tx.as_executor(),
+            WizardAction::VestingEventOverride,
+            auth.user_id,
+            Some(event_id),
+            ip_hash.as_ref().map(|s| &s[..]),
+            json!({
+                "grant_id": grant_id,
+                "fields_changed": fmv_track_fields,
+            }),
+        )
+        .await?;
+        token = row.updated_at;
+        latest_row = Some(row);
+    }
+
+    if !sell_track_fields.is_empty() {
+        let outcome = vesting_events::apply_sell_to_cover_override(
+            &mut tx,
+            auth.user_id,
+            event_id,
+            &sell_patch,
+            token,
+        )
+        .await?;
+        let row = match outcome {
+            SellToCoverOutcome::Applied(r) => r,
+            SellToCoverOutcome::NotFound => return Err(AppError::NotFound),
+            SellToCoverOutcome::Conflict => return Err(AppError::Conflict),
+        };
+        audit::record_wizard_in_tx(
+            tx.as_executor(),
+            WizardAction::VestingEventSellToCoverOverride,
+            auth.user_id,
+            Some(event_id),
+            ip_hash.as_ref().map(|s| &s[..]),
+            json!({
+                "grant_id": grant_id,
+                "fields_changed": sell_track_fields,
+            }),
+        )
+        .await?;
+        latest_row = Some(row);
+    }
+
+    // Validate computed derived values if the sell-to-cover triplet is
+    // complete — surfacing compute errors as envelope 422s before we
+    // commit so a typo'd tax+sell pair doesn't persist.
+    let committed_row = latest_row.expect("at least one track wrote a row");
+    if let Some(Err(err)) = try_compute_derived(&committed_row) {
+        return Err(map_compute_error(err));
+    }
+
+    tx.commit().await?;
+    Ok((StatusCode::OK, Json(row_to_json(&committed_row))).into_response())
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +643,6 @@ pub async fn bulk_fmv(
     }
 
     let mut tx = orbit_db::Tx::for_user(&state.pool, auth.user_id).await?;
-    // Confirm grant exists + is owned (AC-10.3: cross-tenant → 404).
     let _grant = orbit_db::grants::get_grant(&mut tx, auth.user_id, grant_id)
         .await?
         .ok_or(AppError::NotFound)?;
@@ -363,7 +681,11 @@ pub async fn bulk_fmv(
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn row_to_json(r: &VestingEventRow) -> serde_json::Value {
+/// Render a full `VestingEventRow` into the Slice-3 + Slice-3b JSON
+/// envelope, including derived sell-to-cover values when the triplet
+/// is populated (Slice-3b AC-7.8 §"dialog response shape").
+pub(crate) fn row_to_json(r: &VestingEventRow) -> serde_json::Value {
+    let derived = derived_values_for_row(r);
     json!({
         "id": r.id,
         "grantId": r.grant_id,
@@ -375,7 +697,146 @@ fn row_to_json(r: &VestingEventRow) -> serde_json::Value {
         "fmvCurrency": r.fmv_currency,
         "isUserOverride": r.is_user_override,
         "updatedAt": r.updated_at,
+        // Slice 3b columns
+        "taxWithholdingPercent": r.tax_withholding_percent,
+        "shareSellPrice": r.share_sell_price,
+        "shareSellCurrency": r.share_sell_currency,
+        "isSellToCoverOverride": r.is_sell_to_cover_override,
+        "sellToCoverOverriddenAt": r.sell_to_cover_overridden_at,
+        // Slice 3b derived values (null when triplet incomplete)
+        "grossAmount": derived.as_ref().and_then(|d| d.gross.clone()),
+        "sharesSoldForTaxes": derived.as_ref().and_then(|d| d.sold.clone()),
+        "netSharesDelivered": derived.as_ref().and_then(|d| d.net.clone()),
+        "cashWithheld": derived.as_ref().and_then(|d| d.cash.clone()),
     })
+}
+
+/// String-rendered derived values for a row, or `None` when the
+/// sell-to-cover triplet is incomplete / the compute errored.
+struct DerivedValues {
+    gross: Option<String>,
+    sold: Option<String>,
+    net: Option<String>,
+    cash: Option<String>,
+}
+
+fn derived_values_for_row(r: &VestingEventRow) -> Option<DerivedValues> {
+    let input = build_compute_input(r)?;
+    let result = compute_sell_to_cover(input).ok()?;
+    Some(DerivedValues {
+        gross: Some(scaled_decimal_string(result.gross_amount_scaled)),
+        sold: Some(scaled_decimal_string(result.shares_sold_for_taxes_scaled)),
+        net: Some(scaled_decimal_string(result.net_shares_delivered_scaled)),
+        cash: Some(scaled_decimal_string(result.cash_withheld_scaled)),
+    })
+}
+
+/// Build a [`SellToCoverInput`] from a `VestingEventRow` when the
+/// triplet + FMV are all populated. Returns `None` on any missing
+/// piece (caller reports `null` derived values).
+fn build_compute_input(r: &VestingEventRow) -> Option<SellToCoverInput> {
+    let fmv = r.fmv_at_vest.as_deref()?;
+    let tax = r.tax_withholding_percent.as_deref()?;
+    let price = r.share_sell_price.as_deref()?;
+    Some(SellToCoverInput {
+        fmv_at_vest_scaled: parse_scaled_numeric(fmv)?,
+        shares_vested_scaled: r.shares_vested_this_event,
+        tax_withholding_percent_scaled: parse_scaled_numeric(tax)?,
+        share_sell_price_scaled: parse_scaled_numeric(price)?,
+    })
+}
+
+/// Try to compute derived values and surface the error variant when
+/// the sell-to-cover triplet is populated and the compute is
+/// meaningful. Returns `None` when the triplet is incomplete (derived
+/// values stay null without an error).
+fn try_compute_derived(r: &VestingEventRow) -> Option<Result<(), SellToCoverComputeError>> {
+    let input = build_compute_input(r)?;
+    Some(compute_sell_to_cover(input).map(|_| ()))
+}
+
+/// Convert a `NUMERIC(x,y)` string like `"0.45"` or `"42.000000"`
+/// to scaled-i64 (× `SHARES_SCALE`, truncating beyond 4 dp). Mirrors
+/// [`parse_shares_decimal`] for the cross-column numeric story — the
+/// scaling is `SHARES_SCALE = 10_000`, so `0.4500` → `4500`. Returns
+/// `None` on parse failure or overflow.
+fn parse_scaled_numeric(s: &str) -> Option<i64> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let (sign, rest) = match trimmed.as_bytes().first() {
+        Some(b'+') => (1i64, &trimmed[1..]),
+        Some(b'-') => (-1i64, &trimmed[1..]),
+        _ => (1i64, trimmed),
+    };
+    if rest.is_empty() {
+        return None;
+    }
+    let (int_part, frac_part) = match rest.find('.') {
+        Some(idx) => (&rest[..idx], &rest[idx + 1..]),
+        None => (rest, ""),
+    };
+    if !int_part.chars().all(|c| c.is_ascii_digit())
+        || !frac_part.chars().all(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    let mut frac = frac_part.to_string();
+    if frac.len() > 4 {
+        frac.truncate(4);
+    }
+    while frac.len() < 4 {
+        frac.push('0');
+    }
+    let int_val: i64 = int_part.parse().ok()?;
+    let frac_val: i64 = frac.parse().ok()?;
+    let scaled = int_val
+        .checked_mul(SHARES_SCALE)?
+        .checked_add(frac_val)?
+        .checked_mul(sign)?;
+    Some(scaled)
+}
+
+/// Render a scaled-i64 value as a decimal string with four digits of
+/// precision (matches the NUMERIC(20,4) / (5,4) wire convention used
+/// elsewhere in the API). Preserves sign for the uncommon negative
+/// case.
+fn scaled_decimal_string(v: i64) -> String {
+    let sign = if v < 0 { "-" } else { "" };
+    let abs = (v as i128).unsigned_abs();
+    let scale = SHARES_SCALE as u128;
+    let int_part = abs / scale;
+    let frac_part = abs % scale;
+    format!("{sign}{int_part}.{frac_part:04}")
+}
+
+/// Is the effective column value non-null after applying `patch` to
+/// `existing`? `None` patch leaves `existing` untouched; `Some(None)`
+/// nulls it; `Some(Some(_))` makes it non-null.
+fn patch_effective_has_value(patch: &Option<Option<String>>, existing: &Option<String>) -> bool {
+    match patch {
+        None => existing.is_some(),
+        Some(None) => false,
+        Some(Some(_)) => true,
+    }
+}
+
+fn map_compute_error(err: SellToCoverComputeError) -> AppError {
+    let (field, code) = match err {
+        SellToCoverComputeError::NegativeNetShares => (
+            "shareSellPrice",
+            "vesting_event.sell_to_cover.negative_net_shares",
+        ),
+        SellToCoverComputeError::ZeroSellPriceWithPositiveTax => (
+            "shareSellPrice",
+            "vesting_event.sell_to_cover.zero_sell_price",
+        ),
+    };
+    AppError::Validation(vec![FieldError {
+        field: field.into(),
+        code: code.into(),
+    }])
 }
 
 /// Custom deserializer: distinguishes "field absent" (None) from
@@ -418,42 +879,5 @@ where
 /// fraction is truncated (not rounded) at 4 dp. Returns `None` on any
 /// parse failure or on a value that would overflow `i64` after scaling.
 fn parse_shares_decimal(s: &str) -> Option<i64> {
-    let trimmed = s.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    // Allow a single leading sign for robustness; the caller rejects
-    // non-positive values separately.
-    let (sign, rest) = match trimmed.as_bytes().first() {
-        Some(b'+') => (1i64, &trimmed[1..]),
-        Some(b'-') => (-1i64, &trimmed[1..]),
-        _ => (1i64, trimmed),
-    };
-    if rest.is_empty() {
-        return None;
-    }
-    let (int_part, frac_part) = match rest.find('.') {
-        Some(idx) => (&rest[..idx], &rest[idx + 1..]),
-        None => (rest, ""),
-    };
-    if !int_part.chars().all(|c| c.is_ascii_digit())
-        || !frac_part.chars().all(|c| c.is_ascii_digit())
-    {
-        return None;
-    }
-    // Take up to 4 frac digits, right-pad with zeros so "12.34" → "3400".
-    let mut frac = frac_part.to_string();
-    if frac.len() > 4 {
-        frac.truncate(4);
-    }
-    while frac.len() < 4 {
-        frac.push('0');
-    }
-    let int_val: i64 = int_part.parse().ok()?;
-    let frac_val: i64 = frac.parse().ok()?;
-    let scaled = int_val
-        .checked_mul(SHARES_SCALE)?
-        .checked_add(frac_val)?
-        .checked_mul(sign)?;
-    Some(scaled)
+    parse_scaled_numeric(s)
 }

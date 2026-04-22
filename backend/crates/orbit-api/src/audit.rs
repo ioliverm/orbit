@@ -113,6 +113,24 @@ pub enum WizardAction {
     /// written per modified event via [`WizardAction::VestingEventOverride`]
     /// to carry per-row provenance (AC-8.6.4).
     VestingEventBulkFmv,
+
+    // --- Slice 3b T38 (ADR-018 §5) ---
+    /// `user_tax_preferences.upsert` — payload allowlist:
+    /// `{ outcome }` where `outcome` is one of
+    /// `"inserted" | "closed_and_created" | "updated_same_day"`. The
+    /// `NoOp` branch writes NO audit row. **Never** country, percent,
+    /// or the sell-to-cover boolean (SEC-101-strict per ADR-018 §5).
+    UserTaxPreferencesUpsert,
+    /// `vesting_event.sell_to_cover_override` — payload allowlist:
+    /// `{ grant_id, fields_changed: ["tax_percent"|"sell_price"|
+    ///   "sell_currency"|"shares"|"fmv"|"vest_date", ...] }`.
+    /// Never percents, prices, currency codes, or amounts.
+    VestingEventSellToCoverOverride,
+    /// `vesting_event.clear_sell_to_cover_override` — payload
+    /// allowlist: `{ grant_id }`. Written on the narrow-clear path
+    /// (`clearSellToCoverOverride: true`) AND as the second audit row
+    /// of the full-clear (`clearOverride: true`) per ADR-018 §5.
+    VestingEventClearSellToCoverOverride,
 }
 
 impl WizardAction {
@@ -136,6 +154,11 @@ impl WizardAction {
             WizardAction::VestingEventOverride => "vesting_event.override",
             WizardAction::VestingEventClearOverride => "vesting_event.clear_override",
             WizardAction::VestingEventBulkFmv => "vesting_event.bulk_fmv",
+            WizardAction::UserTaxPreferencesUpsert => "user_tax_preferences.upsert",
+            WizardAction::VestingEventSellToCoverOverride => "vesting_event.sell_to_cover_override",
+            WizardAction::VestingEventClearSellToCoverOverride => {
+                "vesting_event.clear_sell_to_cover_override"
+            }
         }
     }
 
@@ -158,7 +181,10 @@ impl WizardAction {
             | WizardAction::GrantCurrentPriceOverrideDelete => "grant_current_price_override",
             WizardAction::VestingEventOverride
             | WizardAction::VestingEventClearOverride
-            | WizardAction::VestingEventBulkFmv => "vesting_event",
+            | WizardAction::VestingEventBulkFmv
+            | WizardAction::VestingEventSellToCoverOverride
+            | WizardAction::VestingEventClearSellToCoverOverride => "vesting_event",
+            WizardAction::UserTaxPreferencesUpsert => "user_tax_preferences",
         }
     }
 }

@@ -1,0 +1,175 @@
+{
+  "_notes": "Slice 3b T38. Canonical sell-to-cover cases per ADR-018 §2 + §4. Every scaled value uses SHARES_SCALE = 10_000 (4 decimal places). Rust fixture test at tests/sell_to_cover_fixtures.rs; frontend parity mirror at frontend/src/lib/__tests__/sellToCover.spec.ts (T39 scope). expected_error is one of: NegativeNetShares, ZeroSellPriceWithPositiveTax.",
+  "cases": [
+    {
+      "name": "zero_tax",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 1000000,
+        "taxWithholdingPercentScaled": 0,
+        "shareSellPriceScaled": 420000
+      },
+      "expected": {
+        "grossAmountScaled": 42000000,
+        "sharesSoldForTaxesScaled": 0,
+        "netSharesDeliveredScaled": 1000000,
+        "cashWithheldScaled": 0
+      }
+    },
+    {
+      "name": "full_tax_equal_prices",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 1000000,
+        "taxWithholdingPercentScaled": 10000,
+        "shareSellPriceScaled": 420000
+      },
+      "expected": {
+        "grossAmountScaled": 42000000,
+        "sharesSoldForTaxesScaled": 1000000,
+        "netSharesDeliveredScaled": 0,
+        "cashWithheldScaled": 42000000
+      }
+    },
+    {
+      "name": "full_tax_sell_above_fmv",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 1000000,
+        "taxWithholdingPercentScaled": 10000,
+        "shareSellPriceScaled": 450000
+      },
+      "expected": {
+        "grossAmountScaled": 42000000,
+        "sharesSoldForTaxesScaled": 933334,
+        "netSharesDeliveredScaled": 66666,
+        "cashWithheldScaled": 42000030
+      }
+    },
+    {
+      "name": "full_tax_sell_below_fmv_rejects",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 1000000,
+        "taxWithholdingPercentScaled": 10000,
+        "shareSellPriceScaled": 400000
+      },
+      "expectedError": "NegativeNetShares"
+    },
+    {
+      "name": "typical_spain_45pct",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 10000000,
+        "taxWithholdingPercentScaled": 4500,
+        "shareSellPriceScaled": 422500
+      },
+      "expected": {
+        "grossAmountScaled": 420000000,
+        "sharesSoldForTaxesScaled": 4473373,
+        "netSharesDeliveredScaled": 5526627,
+        "cashWithheldScaled": 189000009
+      }
+    },
+    {
+      "name": "sell_above_fmv_broker_lucky",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 10000000,
+        "taxWithholdingPercentScaled": 4500,
+        "shareSellPriceScaled": 462000
+      },
+      "expected": {
+        "grossAmountScaled": 420000000,
+        "sharesSoldForTaxesScaled": 4090910,
+        "netSharesDeliveredScaled": 5909090,
+        "cashWithheldScaled": 189000042
+      }
+    },
+    {
+      "name": "sell_below_fmv_broker_unlucky",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 10000000,
+        "taxWithholdingPercentScaled": 3000,
+        "shareSellPriceScaled": 378000
+      },
+      "expected": {
+        "grossAmountScaled": 420000000,
+        "sharesSoldForTaxesScaled": 3333334,
+        "netSharesDeliveredScaled": 6666666,
+        "cashWithheldScaled": 126000025
+      }
+    },
+    {
+      "name": "fractional_shares",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 12345,
+        "taxWithholdingPercentScaled": 4500,
+        "shareSellPriceScaled": 420000
+      },
+      "expected": {
+        "grossAmountScaled": 518490,
+        "sharesSoldForTaxesScaled": 5556,
+        "netSharesDeliveredScaled": 6789,
+        "cashWithheldScaled": 233352
+      }
+    },
+    {
+      "name": "zero_vest",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 0,
+        "taxWithholdingPercentScaled": 4500,
+        "shareSellPriceScaled": 420000
+      },
+      "expected": {
+        "grossAmountScaled": 0,
+        "sharesSoldForTaxesScaled": 0,
+        "netSharesDeliveredScaled": 0,
+        "cashWithheldScaled": 0
+      }
+    },
+    {
+      "name": "million_share_stress",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 10000000000,
+        "taxWithholdingPercentScaled": 4500,
+        "shareSellPriceScaled": 420000
+      },
+      "expected": {
+        "grossAmountScaled": 420000000000,
+        "sharesSoldForTaxesScaled": 4500000000,
+        "netSharesDeliveredScaled": 5500000000,
+        "cashWithheldScaled": 189000000000
+      }
+    },
+    {
+      "name": "rounding_boundary",
+      "input": {
+        "fmvAtVestScaled": 20000,
+        "sharesVestedScaled": 10000,
+        "taxWithholdingPercentScaled": 5000,
+        "shareSellPriceScaled": 19999
+      },
+      "expected": {
+        "grossAmountScaled": 20000,
+        "sharesSoldForTaxesScaled": 5001,
+        "netSharesDeliveredScaled": 4999,
+        "cashWithheldScaled": 10001
+      }
+    },
+    {
+      "name": "zero_sell_price_rejects",
+      "input": {
+        "fmvAtVestScaled": 420000,
+        "sharesVestedScaled": 10000000,
+        "taxWithholdingPercentScaled": 4500,
+        "shareSellPriceScaled": 0
+      },
+      "expectedError": "ZeroSellPriceWithPositiveTax"
+    }
+  ]
+}

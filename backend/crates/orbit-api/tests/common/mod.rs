@@ -531,6 +531,22 @@ pub const FORBIDDEN_IN_ANY_AUDIT_PAYLOAD: &[&str] = &[
     "rawXml",
     "response_body",
     "responseBody",
+    // Slice 3b T38 additions (ADR-018 §5 SEC-101-strict). Sell-to-cover
+    // triplet values + the user_tax_preferences fields — none of these
+    // are allowlisted by any Slice-3b action's payload (only symbolic
+    // `outcome` / `fields_changed` / `grant_id` are).
+    "tax_withholding_percent",
+    "taxWithholdingPercent",
+    "share_sell_price",
+    "shareSellPrice",
+    "share_sell_currency",
+    "shareSellCurrency",
+    "rendimiento_del_trabajo_percent",
+    "rendimientoDelTrabajoPercent",
+    "country_iso2",
+    "countryIso2",
+    "sell_to_cover_enabled",
+    "sellToCoverEnabled",
 ];
 
 /// Recursively walk a JSON value and assert none of the
