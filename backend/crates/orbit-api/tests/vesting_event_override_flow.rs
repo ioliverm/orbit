@@ -316,12 +316,18 @@ async fn clear_override_two_concurrent_puts_first_wins_second_409s() {
     assert_eq!(body["error"]["code"], "resource.stale_client_state");
 }
 
-/// T31 — `clearOverride: true` on a row that has ONLY an FMV (no
-/// prior shares/date edit) keeps `is_user_override = true` AND
-/// preserves the FMV per AC-8.7.1 (c). We set up the row by first
-/// applying an FMV-only override, then clearing.
+/// `clearOverride: true` on a row that has ONLY an FMV resets every
+/// override column per ADR-018 §2 supersede (AC-7.5.1, Slice-3b):
+/// the full-clear is the "nuclear" revert and clears both tracks
+/// including FMV. Callers that want to preserve FMV now route through
+/// the narrow `clearSellToCoverOverride` path instead.
+///
+/// Pre-Slice-3b this test asserted the inverse (FMV preserved); the
+/// assertions were updated when ADR-018 landed. The row's `fmvAtVest`
+/// is set up via an FMV-only override to exercise the case where
+/// FMV was the only state the user had captured.
 #[tokio::test]
-async fn clear_override_fmv_only_row_keeps_override_flag_and_fmv() {
+async fn clear_override_fmv_only_row_resets_flag_and_clears_fmv() {
     let (state, app) = app().await;
     let (s, grant_id) = onboarded_with_past_rsu(&state, &app, "vev-clear-fmv").await;
     let (event_id, updated_at) = fetch_event_row(&state.pool, grant_id, 0).await;
@@ -344,7 +350,8 @@ async fn clear_override_fmv_only_row_keeps_override_flag_and_fmv() {
     let (_s, _c, row) = body_json(r).await;
     let ua2: String = row["updatedAt"].as_str().unwrap().into();
 
-    // Clear override — shares/vest_date revert, FMV stays, flag stays true.
+    // Clear override — ADR-018 §2 supersede: shares/vest_date revert
+    // to algorithm output, FMV is cleared, override flag drops.
     let r = put(
         &app,
         &format!("/api/v1/grants/{grant_id}/vesting-events/{event_id}"),
@@ -360,9 +367,12 @@ async fn clear_override_fmv_only_row_keeps_override_flag_and_fmv() {
     .await;
     let (status, _c, row) = body_json(r).await;
     assert_eq!(status, StatusCode::OK, "{row}");
-    // AC-8.7.1 (c): FMV preserved + override flag still true.
-    assert_eq!(row["fmvAtVest"], "42.500000");
-    assert_eq!(row["isUserOverride"], true);
+    // AC-7.5.1 (ADR-018 §2 supersede): FMV cleared + override flag false.
+    assert!(
+        row["fmvAtVest"].is_null(),
+        "fmvAtVest must be null after Slice-3b full-clear; got {row}"
+    );
+    assert_eq!(row["isUserOverride"], false);
 }
 
 /// T31 — `clearOverride: true` on a row that has shares+date edits and

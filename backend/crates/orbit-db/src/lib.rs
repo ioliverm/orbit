@@ -29,6 +29,7 @@ pub mod residency;
 pub mod sessions_mgmt;
 pub mod ticker_current_prices;
 mod tx;
+pub mod user_tax_preferences;
 pub mod vesting_events;
 
 pub use tx::Tx;

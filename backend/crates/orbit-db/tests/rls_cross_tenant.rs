@@ -1748,3 +1748,839 @@ async fn tx_system_select_on_rls_table_returns_zero_rows() {
     tx.rollback().await.expect("rollback");
     cleanup_user(&migrate_pool, user_a).await;
 }
+
+// ---------------------------------------------------------------------------
+// Slice 3b T37 — cross-tenant probes for user_tax_preferences + the
+// sell-to-cover override surface on vesting_events. Unit tests covering
+// the four UpsertOutcome branches, resolve_at_date, the sell-to-cover
+// round-trip, and the extended clear_override behavior also live here
+// (they need a live Postgres so the integration-tests gate is correct).
+// ---------------------------------------------------------------------------
+
+/// Seed a `user_tax_preferences` row for `user_id` via the migrate pool
+/// (owner bypasses the permissive RLS).
+async fn seed_user_tax_pref(
+    migrate_pool: &PgPool,
+    user_id: Uuid,
+    country: &str,
+    percent: Option<&str>,
+    enabled: bool,
+    from_date: chrono::NaiveDate,
+) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO user_tax_preferences (
+            user_id, country_iso2, rendimiento_del_trabajo_percent,
+            sell_to_cover_enabled, from_date, to_date
+        )
+        VALUES ($1, $2, $3::numeric, $4, $5, NULL)
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(country)
+    .bind(percent)
+    .bind(enabled)
+    .bind(from_date)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed user_tax_preferences for {user_id} failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("user_tax_preferences.id missing from RETURNING")
+}
+
+/// Probe — `user_tax_preferences` isolation. User A saves a row; user
+/// B's tx cannot SELECT, UPDATE, or DELETE it.
+#[tokio::test]
+async fn user_tax_preferences_cross_tenant_select_is_isolated() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_utp").await;
+    ensure_user(&migrate_pool, user_b, "b_utp").await;
+    let today = chrono::NaiveDate::from_ymd_opt(2026, 4, 19).unwrap();
+    let rid_a = seed_user_tax_pref(&migrate_pool, user_a, "ES", Some("0.4500"), true, today).await;
+    let rid_b = seed_user_tax_pref(&migrate_pool, user_b, "PT", None, false, today).await;
+
+    // --- SELECT probe under user A: sees only A's row.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) select");
+    let rows = sqlx::query("SELECT id, user_id FROM user_tax_preferences WHERE id IN ($1, $2)")
+        .bind(rid_a)
+        .bind(rid_b)
+        .fetch_all(tx.as_executor())
+        .await
+        .expect("select user_tax_preferences under RLS");
+    assert_eq!(
+        rows.len(),
+        1,
+        "RLS leak: SELECT on user_tax_preferences under Tx::for_user({user_a}) returned {} rows \
+         for (a, b) pair, expected exactly 1.",
+        rows.len()
+    );
+    let seen_id: Uuid = rows[0].try_get("id").expect("row id");
+    let seen_user: Uuid = rows[0].try_get("user_id").expect("row user_id");
+    assert_eq!(
+        seen_id, rid_a,
+        "RLS leak: Tx::for_user({user_a}) returned user B's user_tax_preferences id {seen_id}"
+    );
+    assert_eq!(
+        seen_user, user_a,
+        "RLS leak: Tx::for_user({user_a}) returned a user_tax_preferences row for user {seen_user}"
+    );
+    tx.rollback().await.expect("rollback select probe");
+
+    // --- repo current() under user B: does NOT see user A's row.
+    let mut tx = Tx::for_user(&app_pool, user_b)
+        .await
+        .expect("Tx::for_user(user_b) repo");
+    let seen_by_b = orbit_db::user_tax_preferences::current(&mut tx, user_a)
+        .await
+        .expect("current()");
+    assert!(
+        seen_by_b.is_none(),
+        "RLS leak: user B's Tx saw user A's user_tax_preferences via current(): {seen_by_b:?}"
+    );
+    tx.rollback().await.expect("rollback repo probe");
+
+    // --- UPDATE probe (cross-tenant UPDATE of the open-row's to_date).
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) update");
+    let updated =
+        sqlx::query("UPDATE user_tax_preferences SET to_date = CURRENT_DATE WHERE id = $1")
+            .bind(rid_b)
+            .execute(tx.as_executor())
+            .await
+            .expect("cross-tenant UPDATE should return 0 rows, not error");
+    assert_eq!(
+        updated.rows_affected(),
+        0,
+        "RLS leak: UPDATE from Tx::for_user({user_a}) affected {} rows on user B's \
+         user_tax_preferences row {rid_b}.",
+        updated.rows_affected()
+    );
+    tx.commit().await.expect("commit empty update");
+
+    // --- DELETE probe.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) delete");
+    let deleted = sqlx::query("DELETE FROM user_tax_preferences WHERE id = $1")
+        .bind(rid_b)
+        .execute(tx.as_executor())
+        .await
+        .expect("cross-tenant DELETE should return 0 rows, not error");
+    assert_eq!(
+        deleted.rows_affected(),
+        0,
+        "RLS leak: DELETE from Tx::for_user({user_a}) removed {} rows on user B's \
+         user_tax_preferences row {rid_b}.",
+        deleted.rows_affected()
+    );
+    tx.commit().await.expect("commit empty delete");
+
+    // Sanity: user B's row still exists with its original payload.
+    let surviving = sqlx::query(
+        "SELECT country_iso2, sell_to_cover_enabled, to_date \
+           FROM user_tax_preferences WHERE id = $1",
+    )
+    .bind(rid_b)
+    .fetch_optional(&migrate_pool)
+    .await
+    .expect("post-check lookup");
+    let surviving = surviving
+        .expect("user B's user_tax_preferences row must still exist after cross-tenant DELETE");
+    let country: String = surviving.try_get("country_iso2").expect("country_iso2");
+    let to_date: Option<chrono::NaiveDate> = surviving.try_get("to_date").expect("to_date");
+    assert_eq!(country, "PT");
+    assert!(
+        to_date.is_none(),
+        "RLS leak: user B's user_tax_preferences row to_date was mutated by cross-tenant UPDATE"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+/// Seed a vesting_events row with a sell-to-cover override already
+/// applied for `user_id`/`grant_id`. Used by the cross-tenant probe
+/// against [`apply_sell_to_cover_override`].
+async fn seed_sell_to_cover_vesting_event(
+    migrate_pool: &PgPool,
+    user_id: Uuid,
+    grant_id: Uuid,
+) -> Uuid {
+    let row = sqlx::query(
+        r#"
+        INSERT INTO vesting_events (
+            user_id, grant_id, vest_date,
+            shares_vested_this_event, cumulative_shares_vested, state,
+            fmv_at_vest, fmv_currency,
+            is_user_override, overridden_at,
+            tax_withholding_percent, share_sell_price, share_sell_currency,
+            is_sell_to_cover_override, sell_to_cover_overridden_at
+        )
+        VALUES ($1, $2, DATE '2025-09-15',
+                250, 250, 'vested',
+                42.00::numeric, 'USD',
+                true, now(),
+                0.4500::numeric, 42.25::numeric, 'USD',
+                true, now())
+        RETURNING id
+        "#,
+    )
+    .bind(user_id)
+    .bind(grant_id)
+    .fetch_one(migrate_pool)
+    .await
+    .unwrap_or_else(|e| panic!("seed sell-to-cover vesting_event for {user_id} failed: {e}"));
+
+    row.try_get::<Uuid, _>("id")
+        .expect("vesting_events.id missing from RETURNING")
+}
+
+/// Probe — `apply_sell_to_cover_override` from Tx::for_user(B) on
+/// user A's event is RLS-filtered. The UPDATE matches zero rows, and
+/// the helper returns `SellToCoverOutcome::NotFound` (user B's tx
+/// cannot even SEE the row, so the post-update existence check also
+/// returns None — NotFound is the correct branch). User A's row is
+/// unmutated.
+#[tokio::test]
+async fn vesting_events_sell_to_cover_override_cross_tenant_cannot_apply() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    let user_b = Uuid::new_v4();
+
+    ensure_user(&migrate_pool, user_a, "a_s2c").await;
+    ensure_user(&migrate_pool, user_b, "b_s2c").await;
+    let ga = seed_grant(&migrate_pool, user_a, "a_s2c").await;
+    let eid_a = seed_sell_to_cover_vesting_event(&migrate_pool, user_a, ga).await;
+
+    // Read the owner's updated_at token (so the probe is not masked by
+    // an OCC mismatch — the point is that RLS alone gates the UPDATE's
+    // row-set to zero).
+    let row = sqlx::query("SELECT updated_at FROM vesting_events WHERE id = $1")
+        .bind(eid_a)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("read updated_at");
+    let updated_at: chrono::DateTime<chrono::Utc> = row.try_get("updated_at").expect("updated_at");
+
+    // --- apply_sell_to_cover_override from user B's tx, targeting A's event.
+    let mut tx = Tx::for_user(&app_pool, user_b)
+        .await
+        .expect("Tx::for_user(user_b)");
+    let patch = orbit_db::vesting_events::SellToCoverOverridePatch {
+        tax_withholding_percent: Some(Some("0.9999".to_string())),
+        share_sell_price: Some(Some("1.00".to_string())),
+        share_sell_currency: Some(Some("USD".to_string())),
+    };
+    let outcome = orbit_db::vesting_events::apply_sell_to_cover_override(
+        &mut tx, user_b, eid_a, &patch, updated_at,
+    )
+    .await
+    .expect("apply_sell_to_cover_override call");
+    assert_eq!(
+        outcome,
+        orbit_db::vesting_events::SellToCoverOutcome::NotFound,
+        "RLS leak: apply_sell_to_cover_override from Tx::for_user({user_b}) on user A's \
+         event {eid_a} returned {outcome:?}; expected NotFound (0 rows matched under RLS \
+         + post-update existence check also RLS-filtered)."
+    );
+    tx.commit().await.expect("commit empty override");
+
+    // --- clear_sell_to_cover_override from user B's tx, targeting A's event.
+    let mut tx = Tx::for_user(&app_pool, user_b)
+        .await
+        .expect("Tx::for_user(user_b) clear");
+    let clear_outcome =
+        orbit_db::vesting_events::clear_sell_to_cover_override(&mut tx, user_b, eid_a, updated_at)
+            .await
+            .expect("clear_sell_to_cover_override call");
+    assert_eq!(
+        clear_outcome,
+        orbit_db::vesting_events::SellToCoverClearOutcome::NotFound,
+        "RLS leak: clear_sell_to_cover_override from Tx::for_user({user_b}) on user A's \
+         event {eid_a} returned {clear_outcome:?}; expected NotFound."
+    );
+    tx.commit().await.expect("commit empty clear");
+
+    // Sanity: user A's row still carries the original sell-to-cover
+    // triplet and flags (read via the migrate pool — owner bypasses RLS).
+    let surviving = sqlx::query(
+        "SELECT tax_withholding_percent::text AS pct, share_sell_price::text AS price, \
+                share_sell_currency, is_sell_to_cover_override \
+           FROM vesting_events WHERE id = $1",
+    )
+    .bind(eid_a)
+    .fetch_one(&migrate_pool)
+    .await
+    .expect("post-check lookup");
+    let pct: String = surviving.try_get("pct").expect("pct");
+    let price: String = surviving.try_get("price").expect("price");
+    let cur: String = surviving.try_get("share_sell_currency").expect("cur");
+    let flag: bool = surviving
+        .try_get("is_sell_to_cover_override")
+        .expect("is_sell_to_cover_override");
+    assert!(
+        pct.starts_with("0.45"),
+        "RLS leak: user A's tax_withholding_percent mutated to {pct:?} by cross-tenant call"
+    );
+    assert!(
+        price.starts_with("42.25"),
+        "RLS leak: user A's share_sell_price mutated to {price:?} by cross-tenant call"
+    );
+    assert_eq!(cur, "USD");
+    assert!(
+        flag,
+        "user A's is_sell_to_cover_override flag must still be true after the cross-tenant no-op"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+    cleanup_user(&migrate_pool, user_b).await;
+}
+
+// ---------------------------------------------------------------------------
+// Slice 3b T37 — user_tax_preferences::create_or_upsert_same_day +
+// resolve_at_date round-trip unit tests.
+// ---------------------------------------------------------------------------
+
+/// Probe — `create_or_upsert_same_day` covers every UpsertOutcome
+/// branch in one round-trip. Assert the partial UNIQUE holds (one
+/// open row at a time).
+#[tokio::test]
+async fn user_tax_preferences_upsert_covers_every_outcome() {
+    use orbit_db::user_tax_preferences as utp;
+
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    ensure_user(&migrate_pool, user_a, "a_utp_outcomes").await;
+
+    // ---------- 1. Inserted (no prior row).
+    let day1 = chrono::NaiveDate::from_ymd_opt(2026, 1, 10).unwrap();
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) insert");
+    let form = utp::UserTaxPreferenceUpsertForm {
+        country_iso2: "ES".into(),
+        rendimiento_del_trabajo_percent: Some("0.4500".into()),
+        sell_to_cover_enabled: true,
+        today: day1,
+    };
+    let outcome = utp::create_or_upsert_same_day(&mut tx, user_a, &form)
+        .await
+        .expect("upsert inserted");
+    let inserted_row = match outcome {
+        utp::UpsertOutcome::Inserted(r) => r,
+        other => panic!("expected Inserted, got {other:?}"),
+    };
+    assert_eq!(inserted_row.country_iso2, "ES");
+    assert_eq!(
+        inserted_row.rendimiento_del_trabajo_percent.as_deref(),
+        Some("0.4500")
+    );
+    assert!(inserted_row.sell_to_cover_enabled);
+    assert_eq!(inserted_row.from_date, day1);
+    assert!(inserted_row.to_date.is_none());
+    tx.commit().await.expect("commit insert");
+
+    // ---------- 2. NoOp (identical same-day save).
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) noop");
+    let outcome = utp::create_or_upsert_same_day(&mut tx, user_a, &form)
+        .await
+        .expect("upsert noop");
+    let noop_row = match outcome {
+        utp::UpsertOutcome::NoOp(r) => r,
+        other => panic!("expected NoOp, got {other:?}"),
+    };
+    assert_eq!(
+        noop_row.id, inserted_row.id,
+        "NoOp must return the existing row id unchanged"
+    );
+    tx.commit().await.expect("commit noop");
+
+    // ---------- 3. UpdatedSameDay (same-day, different percent).
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) same-day");
+    let form_changed = utp::UserTaxPreferenceUpsertForm {
+        country_iso2: "ES".into(),
+        rendimiento_del_trabajo_percent: Some("0.4700".into()),
+        sell_to_cover_enabled: true,
+        today: day1,
+    };
+    let outcome = utp::create_or_upsert_same_day(&mut tx, user_a, &form_changed)
+        .await
+        .expect("upsert same-day");
+    let same_day_row = match outcome {
+        utp::UpsertOutcome::UpdatedSameDay(r) => r,
+        other => panic!("expected UpdatedSameDay, got {other:?}"),
+    };
+    assert_eq!(
+        same_day_row.id, inserted_row.id,
+        "UpdatedSameDay must update the existing row in place (same id)"
+    );
+    assert_eq!(
+        same_day_row.rendimiento_del_trabajo_percent.as_deref(),
+        Some("0.4700")
+    );
+    assert_eq!(same_day_row.from_date, day1);
+    tx.commit().await.expect("commit same-day");
+
+    // ---------- 4. ClosedAndCreated (different day, different value).
+    let day2 = chrono::NaiveDate::from_ymd_opt(2026, 2, 5).unwrap();
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) close-and-create");
+    let form_day2 = utp::UserTaxPreferenceUpsertForm {
+        country_iso2: "PT".into(),
+        rendimiento_del_trabajo_percent: None,
+        sell_to_cover_enabled: false,
+        today: day2,
+    };
+    let outcome = utp::create_or_upsert_same_day(&mut tx, user_a, &form_day2)
+        .await
+        .expect("upsert close-and-create");
+    let day2_row = match outcome {
+        utp::UpsertOutcome::ClosedAndCreated(r) => r,
+        other => panic!("expected ClosedAndCreated, got {other:?}"),
+    };
+    assert_ne!(
+        day2_row.id, inserted_row.id,
+        "ClosedAndCreated must INSERT a new row with a fresh id"
+    );
+    assert_eq!(day2_row.country_iso2, "PT");
+    assert!(day2_row.rendimiento_del_trabajo_percent.is_none());
+    assert!(!day2_row.sell_to_cover_enabled);
+    assert_eq!(day2_row.from_date, day2);
+    assert!(day2_row.to_date.is_none());
+    tx.commit().await.expect("commit close-and-create");
+
+    // ---------- Invariant: partial UNIQUE on (user_id) WHERE to_date IS NULL
+    // holds. Only one open row may exist at a time.
+    let open_count_row = sqlx::query(
+        "SELECT COUNT(*) AS n FROM user_tax_preferences \
+         WHERE user_id = $1 AND to_date IS NULL",
+    )
+    .bind(user_a)
+    .fetch_one(&migrate_pool)
+    .await
+    .expect("count open rows");
+    let open_count: i64 = open_count_row.try_get("n").expect("n");
+    assert_eq!(
+        open_count, 1,
+        "partial UNIQUE invariant violated: user {user_a} has {open_count} open rows"
+    );
+
+    // The prior row now has `to_date = day2` (closed on close-and-create).
+    let prior_row = sqlx::query("SELECT to_date FROM user_tax_preferences WHERE id = $1")
+        .bind(inserted_row.id)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("read prior row");
+    let prior_to_date: Option<chrono::NaiveDate> = prior_row.try_get("to_date").expect("to_date");
+    assert_eq!(
+        prior_to_date,
+        Some(day2),
+        "prior open row should have been closed with to_date = day2"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+}
+
+/// Probe — `resolve_at_date` returns the correct row for points
+/// inside open periods, closed periods, and before the earliest
+/// `from_date`.
+#[tokio::test]
+async fn user_tax_preferences_resolve_at_date_covers_every_branch() {
+    use orbit_db::user_tax_preferences as utp;
+
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    ensure_user(&migrate_pool, user_a, "a_utp_resolve").await;
+
+    let day1 = chrono::NaiveDate::from_ymd_opt(2026, 1, 10).unwrap();
+    let day2 = chrono::NaiveDate::from_ymd_opt(2026, 2, 5).unwrap();
+
+    // Seed a closed row [day1, day2) and an open row [day2, ∞).
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) seed 1");
+    let form1 = utp::UserTaxPreferenceUpsertForm {
+        country_iso2: "ES".into(),
+        rendimiento_del_trabajo_percent: Some("0.4500".into()),
+        sell_to_cover_enabled: true,
+        today: day1,
+    };
+    let _ = utp::create_or_upsert_same_day(&mut tx, user_a, &form1)
+        .await
+        .expect("seed day1");
+    tx.commit().await.expect("commit seed 1");
+
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) seed 2");
+    let form2 = utp::UserTaxPreferenceUpsertForm {
+        country_iso2: "PT".into(),
+        rendimiento_del_trabajo_percent: None,
+        sell_to_cover_enabled: false,
+        today: day2,
+    };
+    let _ = utp::create_or_upsert_same_day(&mut tx, user_a, &form2)
+        .await
+        .expect("seed day2");
+    tx.commit().await.expect("commit seed 2");
+
+    // Case A — date inside the open period: resolves to the day-2 row.
+    let inside_open = chrono::NaiveDate::from_ymd_opt(2026, 3, 1).unwrap();
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) resolve A");
+    let row = utp::resolve_at_date(&mut tx, user_a, inside_open)
+        .await
+        .expect("resolve inside open period")
+        .expect("open-period row must exist");
+    assert_eq!(row.country_iso2, "PT", "inside open period must be PT");
+    assert_eq!(row.from_date, day2);
+    assert!(row.to_date.is_none());
+    tx.commit().await.expect("commit A");
+
+    // Case B — date inside the closed period: resolves to the day-1 row.
+    let inside_closed = chrono::NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) resolve B");
+    let row = utp::resolve_at_date(&mut tx, user_a, inside_closed)
+        .await
+        .expect("resolve inside closed period")
+        .expect("closed-period row must exist");
+    assert_eq!(row.country_iso2, "ES", "inside closed period must be ES");
+    assert_eq!(row.from_date, day1);
+    assert_eq!(row.to_date, Some(day2));
+    tx.commit().await.expect("commit B");
+
+    // Case C — date before the earliest from_date: resolves to None.
+    let before_anything = chrono::NaiveDate::from_ymd_opt(2025, 12, 1).unwrap();
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) resolve C");
+    let row = utp::resolve_at_date(&mut tx, user_a, before_anything)
+        .await
+        .expect("resolve before-anything");
+    assert!(
+        row.is_none(),
+        "resolve_at_date before earliest from_date must return None; got {row:?}"
+    );
+    tx.commit().await.expect("commit C");
+
+    cleanup_user(&migrate_pool, user_a).await;
+}
+
+// ---------------------------------------------------------------------------
+// Slice 3b T37 — apply/clear_sell_to_cover_override + extended
+// clear_override round-trip unit tests.
+// ---------------------------------------------------------------------------
+
+/// Probe — `apply_sell_to_cover_override` round-trip. Apply the
+/// triplet + verify the flags; then `clear_sell_to_cover_override`
+/// and verify the triplet is nulled and the flags are false, BUT the
+/// Slice-3 FMV-track columns are preserved verbatim (AC-7.5.2).
+#[tokio::test]
+async fn vesting_events_sell_to_cover_round_trip_preserves_fmv() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    ensure_user(&migrate_pool, user_a, "a_s2c_rt").await;
+    let grant_id = seed_grant(&migrate_pool, user_a, "a_s2c_rt").await;
+    let event_id = seed_vesting_event(&migrate_pool, user_a, grant_id, "a_s2c_rt").await;
+
+    // Pre-stage: apply a Slice-3 FMV override so the row has FMV +
+    // is_user_override=true going into the sell-to-cover path. The
+    // narrow clear later must preserve all of these.
+    let row0 = sqlx::query("SELECT updated_at FROM vesting_events WHERE id = $1")
+        .bind(event_id)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("read updated_at (initial)");
+    let ua0: chrono::DateTime<chrono::Utc> = row0.try_get("updated_at").expect("updated_at");
+
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) fmv");
+    let fmv_patch = orbit_db::vesting_events::VestingEventOverridePatch {
+        fmv_at_vest: Some(Some("42.0000".to_string())),
+        fmv_currency: Some(Some("USD".to_string())),
+        ..Default::default()
+    };
+    let fmv_outcome =
+        orbit_db::vesting_events::apply_override(&mut tx, user_a, event_id, &fmv_patch, ua0)
+            .await
+            .expect("apply_override fmv");
+    tx.commit().await.expect("commit fmv");
+    let after_fmv = match fmv_outcome {
+        orbit_db::vesting_events::OverrideOutcome::Applied(r) => r,
+        other => panic!("expected Applied, got {other:?}"),
+    };
+
+    // --- apply_sell_to_cover_override on the FMV-bearing row.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) s2c apply");
+    let s2c_patch = orbit_db::vesting_events::SellToCoverOverridePatch {
+        tax_withholding_percent: Some(Some("0.4500".to_string())),
+        share_sell_price: Some(Some("42.2500".to_string())),
+        share_sell_currency: Some(Some("USD".to_string())),
+    };
+    let s2c_outcome = orbit_db::vesting_events::apply_sell_to_cover_override(
+        &mut tx,
+        user_a,
+        event_id,
+        &s2c_patch,
+        after_fmv.updated_at,
+    )
+    .await
+    .expect("apply_sell_to_cover_override");
+    tx.commit().await.expect("commit s2c apply");
+    let after_s2c = match s2c_outcome {
+        orbit_db::vesting_events::SellToCoverOutcome::Applied(r) => r,
+        other => panic!("expected Applied, got {other:?}"),
+    };
+
+    assert!(
+        after_s2c.is_sell_to_cover_override,
+        "is_sell_to_cover_override must be true after apply"
+    );
+    assert!(
+        after_s2c.sell_to_cover_overridden_at.is_some(),
+        "sell_to_cover_overridden_at must be non-null after apply"
+    );
+    assert!(
+        after_s2c
+            .tax_withholding_percent
+            .as_deref()
+            .map(|s| s.starts_with("0.45"))
+            .unwrap_or(false),
+        "tax_withholding_percent must be 0.4500 (got {:?})",
+        after_s2c.tax_withholding_percent
+    );
+    assert!(
+        after_s2c
+            .share_sell_price
+            .as_deref()
+            .map(|s| s.starts_with("42.25"))
+            .unwrap_or(false),
+        "share_sell_price must be 42.2500 (got {:?})",
+        after_s2c.share_sell_price
+    );
+    assert_eq!(after_s2c.share_sell_currency.as_deref(), Some("USD"));
+    assert!(
+        after_s2c.updated_at > after_fmv.updated_at,
+        "updated_at must advance through the apply path"
+    );
+    // Slice-3 track preserved.
+    assert!(after_s2c.is_user_override);
+    assert_eq!(after_s2c.fmv_currency.as_deref(), Some("USD"));
+
+    // --- clear_sell_to_cover_override (narrow revert).
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) s2c clear");
+    let clear_outcome = orbit_db::vesting_events::clear_sell_to_cover_override(
+        &mut tx,
+        user_a,
+        event_id,
+        after_s2c.updated_at,
+    )
+    .await
+    .expect("clear_sell_to_cover_override");
+    tx.commit().await.expect("commit s2c clear");
+    let cleared = match clear_outcome {
+        orbit_db::vesting_events::SellToCoverClearOutcome::Cleared(r) => r,
+        other => panic!("expected Cleared, got {other:?}"),
+    };
+
+    // Triplet cleared + flag false + timestamp null.
+    assert!(cleared.tax_withholding_percent.is_none());
+    assert!(cleared.share_sell_price.is_none());
+    assert!(cleared.share_sell_currency.is_none());
+    assert!(!cleared.is_sell_to_cover_override);
+    assert!(cleared.sell_to_cover_overridden_at.is_none());
+    // Slice-3 FMV-track columns preserved (AC-7.5.2).
+    assert!(
+        cleared
+            .fmv_at_vest
+            .as_deref()
+            .map(|s| s.starts_with("42."))
+            .unwrap_or(false),
+        "fmv_at_vest must be preserved by narrow clear (got {:?})",
+        cleared.fmv_at_vest
+    );
+    assert_eq!(cleared.fmv_currency.as_deref(), Some("USD"));
+    assert!(
+        cleared.is_user_override,
+        "is_user_override must be preserved by narrow clear"
+    );
+    assert!(
+        cleared.overridden_at.is_some(),
+        "overridden_at must be preserved by narrow clear"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+}
+
+/// Probe — extended `clear_override` behaviour per ADR-018 §2:
+/// apply both a Slice-3 FMV override and a Slice-3b sell-to-cover
+/// override, then `clear_override` once. Verify BOTH tracks reset:
+/// FMV columns NULL, triplet NULL, both flag pairs false/NULL, AND
+/// vest_date + shares reverted to the algorithmic output.
+#[tokio::test]
+async fn vesting_events_clear_override_resets_both_tracks() {
+    let app_pool = pool_from_env("DATABASE_URL").await;
+    let migrate_pool = pool_from_env("DATABASE_URL_MIGRATE").await;
+
+    let user_a = Uuid::new_v4();
+    ensure_user(&migrate_pool, user_a, "a_clear_both").await;
+    // seed_grant: RSU, 1000 shares / 48 mo / 12 mo cliff / monthly.
+    // Algorithmic output for the 2025-09-15 cliff row: 250 shares.
+    let grant_id = seed_grant(&migrate_pool, user_a, "a_clear_both").await;
+    let event_id = seed_vesting_event(&migrate_pool, user_a, grant_id, "a_clear_both").await;
+
+    // Read initial updated_at.
+    let row0 = sqlx::query("SELECT updated_at FROM vesting_events WHERE id = $1")
+        .bind(event_id)
+        .fetch_one(&migrate_pool)
+        .await
+        .expect("read initial updated_at");
+    let ua0: chrono::DateTime<chrono::Utc> = row0.try_get("updated_at").expect("updated_at");
+
+    // --- Apply FMV override (vest_date + shares + fmv) via apply_override.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) fmv");
+    let fmv_patch = orbit_db::vesting_events::VestingEventOverridePatch {
+        vest_date: Some(chrono::NaiveDate::from_ymd_opt(2025, 10, 1).unwrap()),
+        shares_vested_this_event: Some(300 * orbit_core::SHARES_SCALE),
+        fmv_at_vest: Some(Some("42.0000".to_string())),
+        fmv_currency: Some(Some("USD".to_string())),
+    };
+    let fmv_outcome =
+        orbit_db::vesting_events::apply_override(&mut tx, user_a, event_id, &fmv_patch, ua0)
+            .await
+            .expect("apply_override fmv");
+    tx.commit().await.expect("commit fmv");
+    let after_fmv = match fmv_outcome {
+        orbit_db::vesting_events::OverrideOutcome::Applied(r) => r,
+        other => panic!("expected Applied, got {other:?}"),
+    };
+
+    // --- Apply sell-to-cover override on top.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) s2c");
+    let s2c_patch = orbit_db::vesting_events::SellToCoverOverridePatch {
+        tax_withholding_percent: Some(Some("0.4500".to_string())),
+        share_sell_price: Some(Some("42.2500".to_string())),
+        share_sell_currency: Some(Some("USD".to_string())),
+    };
+    let s2c_outcome = orbit_db::vesting_events::apply_sell_to_cover_override(
+        &mut tx,
+        user_a,
+        event_id,
+        &s2c_patch,
+        after_fmv.updated_at,
+    )
+    .await
+    .expect("apply_sell_to_cover_override");
+    tx.commit().await.expect("commit s2c");
+    let after_s2c = match s2c_outcome {
+        orbit_db::vesting_events::SellToCoverOutcome::Applied(r) => r,
+        other => panic!("expected Applied, got {other:?}"),
+    };
+    // Pre-condition: both flags true; both tracks populated.
+    assert!(after_s2c.is_user_override);
+    assert!(after_s2c.is_sell_to_cover_override);
+    assert!(after_s2c.fmv_at_vest.is_some());
+    assert!(after_s2c.tax_withholding_percent.is_some());
+
+    // --- clear_override: the extended Slice-3b behaviour must reset
+    // both tracks AND revert vest_date + shares to the algorithm.
+    let mut tx = Tx::for_user(&app_pool, user_a)
+        .await
+        .expect("Tx::for_user(user_a) clear");
+    // `today` far in the future so every derived row is non-Upcoming.
+    let today = chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap();
+    let clear_outcome = orbit_db::vesting_events::clear_override(
+        &mut tx,
+        user_a,
+        event_id,
+        today,
+        after_s2c.updated_at,
+    )
+    .await
+    .expect("clear_override");
+    tx.commit().await.expect("commit clear");
+    let cleared = match clear_outcome {
+        orbit_db::vesting_events::ClearOutcome::Cleared(r) => r,
+        other => panic!("expected Cleared, got {other:?}"),
+    };
+
+    // vest_date + shares reverted to the algorithm output (2025-09-15
+    // cliff, 250 shares — same as the Slice-3 round-trip probe).
+    assert_eq!(
+        cleared.vest_date,
+        chrono::NaiveDate::from_ymd_opt(2025, 9, 15).unwrap(),
+        "clear_override must revert vest_date to the algorithm output"
+    );
+    assert_eq!(
+        cleared.shares_vested_this_event,
+        250 * orbit_core::SHARES_SCALE,
+        "clear_override must revert shares to the algorithm output"
+    );
+    // Slice-3 FMV track reset (ADR-018 §2 supersede).
+    assert!(
+        cleared.fmv_at_vest.is_none(),
+        "fmv_at_vest must be NULL after Slice-3b full clear (got {:?})",
+        cleared.fmv_at_vest
+    );
+    assert!(
+        cleared.fmv_currency.is_none(),
+        "fmv_currency must be NULL after Slice-3b full clear"
+    );
+    assert!(
+        !cleared.is_user_override,
+        "is_user_override must be false after Slice-3b full clear"
+    );
+    assert!(
+        cleared.overridden_at.is_none(),
+        "overridden_at must be NULL after Slice-3b full clear"
+    );
+    // Slice-3b sell-to-cover track reset.
+    assert!(cleared.tax_withholding_percent.is_none());
+    assert!(cleared.share_sell_price.is_none());
+    assert!(cleared.share_sell_currency.is_none());
+    assert!(
+        !cleared.is_sell_to_cover_override,
+        "is_sell_to_cover_override must be false after clear_override"
+    );
+    assert!(
+        cleared.sell_to_cover_overridden_at.is_none(),
+        "sell_to_cover_overridden_at must be NULL after clear_override"
+    );
+
+    cleanup_user(&migrate_pool, user_a).await;
+}

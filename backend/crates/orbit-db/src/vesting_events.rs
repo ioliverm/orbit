@@ -34,11 +34,40 @@
 //! paths for AC-8.2..AC-8.9. The derivation-algorithm extension that
 //! preserves overrides across grant-param changes is T29's scope.
 //!
+//! # Slice 3b extensions (ADR-018 §1 + §2)
+//!
+//! Five additive columns added by `migrations/20260530120000_slice_3b.sql`
+//! for the sell-to-cover track:
+//!
+//!   * `tax_withholding_percent` (`NUMERIC(5,4)`, nullable fraction in
+//!     `[0, 1]`).
+//!   * `share_sell_price` (`NUMERIC(20,6)`, nullable).
+//!   * `share_sell_currency` (`TEXT`, nullable — `USD | EUR | GBP`).
+//!   * `is_sell_to_cover_override` (`BOOLEAN NOT NULL DEFAULT false`).
+//!   * `sell_to_cover_overridden_at` (`TIMESTAMPTZ`, nullable).
+//!
+//! Two new cross-field CHECKs enforce `sell_to_cover_triplet_coherent`
+//! (all-or-none on the first three) and
+//! `sell_to_cover_override_flag_coherent`
+//! (`is_sell_to_cover_override = (sell_to_cover_overridden_at IS NOT NULL)`).
+//!
+//! The Slice-3b repo surface ([`apply_sell_to_cover_override`],
+//! [`clear_sell_to_cover_override`]) implements the write paths for
+//! AC-5.* and AC-7.5.*. [`clear_override`] is extended (ADR-018 §2
+//! supersede) to additionally clear the sell-to-cover triplet — the
+//! Slice-3 "preserve FMV on full clear" semantic is replaced by the
+//! Slice-3b "nuclear revert clears both tracks" semantic. Callers who
+//! want to preserve FMV while clearing only the sell-to-cover triplet
+//! use [`clear_sell_to_cover_override`] instead.
+//!
 //! Traces to:
 //!   - ADR-014 §1 (vesting_events DDL, UNIQUE on (grant_id, vest_date)).
 //!   - ADR-017 §1 (Slice-3 additive columns + cross-field CHECKs).
+//!   - ADR-018 §1 (Slice-3b additive columns + cross-field CHECKs).
+//!   - ADR-018 §2 (full-clear supersedes FMV preservation).
 //!   - docs/requirements/slice-1-acceptance-criteria.md §4.3.
 //!   - docs/requirements/slice-3-acceptance-criteria.md §8 (AC-8.2..AC-8.9).
+//!   - docs/requirements/slice-3b-acceptance-criteria.md §5 + §7.5.
 
 use chrono::NaiveDate;
 use orbit_core::{derive_vesting_events, Cadence, GrantInput, Shares, VestingEvent, VestingState};
@@ -75,6 +104,31 @@ pub struct VestingEventRow {
     /// `vesting_events_touch_updated_at` trigger; used as the
     /// optimistic-concurrency token in [`apply_override`] (AC-10.5).
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    /// Slice 3b addition. Fraction in `[0, 1]` carried as
+    /// `NUMERIC(5,4)::text` (e.g., `"0.4500"`). `None` until the user
+    /// captures a sell-to-cover override (or the handler seeds from
+    /// `user_tax_preferences` per AC-7.6). Paired with
+    /// [`Self::share_sell_price`] and [`Self::share_sell_currency`] via
+    /// the `sell_to_cover_triplet_coherent` CHECK.
+    pub tax_withholding_percent: Option<String>,
+    /// Slice 3b addition. Per-share sell price at vest for the
+    /// sell-to-cover calculation. Decimal passthrough
+    /// (`NUMERIC(20,6)::text`).
+    pub share_sell_price: Option<String>,
+    /// Slice 3b addition. `USD | EUR | GBP`. Paired with
+    /// [`Self::share_sell_price`] and [`Self::tax_withholding_percent`].
+    pub share_sell_currency: Option<String>,
+    /// Slice 3b addition. `true` iff the row has been manually
+    /// edited in the sell-to-cover dialog (triplet captured).
+    /// Independent of [`Self::is_user_override`] so the two revert
+    /// paths ([`clear_override`] vs [`clear_sell_to_cover_override`])
+    /// compose cleanly. The DB enforces coherence with
+    /// [`Self::sell_to_cover_overridden_at`] via the
+    /// `sell_to_cover_override_flag_coherent` CHECK.
+    pub is_sell_to_cover_override: bool,
+    /// Slice 3b addition. `Some(t)` iff
+    /// [`Self::is_sell_to_cover_override`] is `true`.
+    pub sell_to_cover_overridden_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// The patch supplied on a PUT `/grants/:grantId/vesting-events/:eventId`
@@ -96,7 +150,15 @@ pub struct VestingEventOverridePatch {
 /// Outcome of [`apply_override`] — the handler uses this to pick
 /// between a 200-with-row response and the 409 stale-state response
 /// per AC-10.5.
+///
+/// The `Applied` variant carries a full [`VestingEventRow`]; every
+/// outcome originates from a DB round-trip that already produced a
+/// heap-resident row. The large-variant clippy lint is suppressed
+/// because boxing here would only trade a stack-move for a heap
+/// indirection with no runtime benefit and would churn every
+/// call-site's match expression (handler, tests, probes).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum OverrideOutcome {
     /// The patch landed. `updated_at` on the returned row advances.
     Applied(VestingEventRow),
@@ -509,24 +571,40 @@ pub async fn apply_override(
 }
 
 /// Revert `vest_date` and `shares_vested_this_event` to the algorithm's
-/// current output for this row; **preserve `fmv_at_vest` and
-/// `fmv_currency`** per AC-8.7.1.
+/// current output for this row, and **clear every override column on
+/// both the Slice-3 FMV track and the Slice-3b sell-to-cover track**
+/// per ADR-018 §2.
 ///
-/// Per AC-8.7.1 (d): if the user had entered an FMV, `is_user_override`
-/// stays `true` because the FMV itself is a manual edit (and the
-/// `override_flag_coherent` CHECK then requires `overridden_at` to stay
-/// non-NULL). Only when the row carried no FMV does the clear drop
-/// both flags.
+/// # Behaviour change from Slice 3 (ADR-018 §2 supersede)
+///
+/// In Slice 3 this helper preserved `fmv_at_vest` / `fmv_currency` on
+/// the assumption that the narrow revert path did not exist (AC-8.7.1
+/// original). Slice 3b introduces [`clear_sell_to_cover_override`] as
+/// the narrow revert; `clear_override` now becomes the "nuclear"
+/// revert and clears both tracks in full:
+///
+///   * `vest_date` + `shares_vested_this_event` ← algorithm output;
+///   * `fmv_at_vest` + `fmv_currency` ← `NULL`;
+///   * `tax_withholding_percent` + `share_sell_price` +
+///     `share_sell_currency` ← `NULL`;
+///   * `is_user_override` ← `false`, `overridden_at` ← `NULL`;
+///   * `is_sell_to_cover_override` ← `false`,
+///     `sell_to_cover_overridden_at` ← `NULL`.
+///
+/// Rationale (ADR-018 §3, AC-7.5.1): in Slice-3b the UI exposes two
+/// distinct revert buttons — a narrow one that preserves FMV and a
+/// "revert everything" one that does not. The DB-layer full-clear is
+/// the latter; callers who want FMV preservation now route through
+/// [`clear_sell_to_cover_override`] explicitly.
 ///
 /// The algorithm output is derived from the parent grant via
 /// [`orbit_core::derive_vesting_events`]. For T28 this uses the
-/// Slice-1 signature (no override-aware branch); T29 will extend
-/// `derive_vesting_events` to accept existing overrides and align the
-/// "algorithmic output for slot" logic. In the meantime, the helper
-/// matches the algorithm-row for this event by `vest_date` equality
-/// *or*, if the current overridden `vest_date` has no match in the
-/// re-derivation, by index position after sort — which covers the
-/// common case (user overrode the vest within-window).
+/// Slice-1 signature (no override-aware branch); T29 extends
+/// `derive_vesting_events` to accept existing overrides. The helper
+/// matches the algorithm-row for this event by
+/// `cumulative_shares_vested` (the stable anchor written once by
+/// [`replace_for_grant`]), falling back to `vest_date` equality for
+/// the degenerate case.
 ///
 /// Returns [`ClearOutcome::NotFound`] if the row is not present or not
 /// owned by `user_id` (RLS-filtered); [`ClearOutcome::Conflict`] if the
@@ -630,59 +708,45 @@ pub async fn clear_override(
         None => return Ok(ClearOutcome::NoAlgorithmicMatch),
     };
 
-    // 5. Determine the new override flag per AC-8.7.1 (c)+(d):
-    //    - if the row has no FMV after the revert, is_user_override=false
-    //      and overridden_at=NULL (clean reset).
-    //    - if the row still carries an FMV, is_user_override remains
-    //      true and overridden_at is preserved (the CHECK requires it).
-    let has_fmv = existing.fmv_at_vest.is_some();
-
-    // 6. UPDATE in place, predicated on `updated_at = $expected` to
+    // 5. UPDATE in place, predicated on `updated_at = $expected` to
     // close the read-vs-update race (AC-10.5 — same OCC discipline as
-    // `apply_override`). A zero-rows result is indistinguishable from a
-    // cross-tenant RLS filter, but the prior `get_event` lookup narrows
-    // that case to the stale-state branch.
+    // `apply_override`). A zero-rows result is indistinguishable from
+    // a cross-tenant RLS filter, but the prior `get_event` lookup
+    // narrows that case to the stale-state branch.
     //
-    // We do NOT change fmv_at_vest / fmv_currency (preservation per
-    // AC-8.7.1 (b)). We DO update vest_date + shares, and conditionally
-    // clear the override flag.
-    let row = if has_fmv {
-        sqlx::query(&format!(
-            r#"
-            UPDATE vesting_events
-               SET vest_date = $3,
-                   shares_vested_this_event = $4::numeric / 10000
-             WHERE id = $1 AND user_id = $2 AND updated_at = $5
-         RETURNING {RETURNING_COLUMNS}
-            "#,
-        ))
-        .bind(event_id)
-        .bind(user_id)
-        .bind(algo_row.vest_date)
-        .bind(algo_row.shares_vested_this_event)
-        .bind(expected_updated_at)
-        .fetch_optional(tx.as_executor())
-        .await?
-    } else {
-        sqlx::query(&format!(
-            r#"
-            UPDATE vesting_events
-               SET vest_date = $3,
-                   shares_vested_this_event = $4::numeric / 10000,
-                   is_user_override = false,
-                   overridden_at = NULL
-             WHERE id = $1 AND user_id = $2 AND updated_at = $5
-         RETURNING {RETURNING_COLUMNS}
-            "#,
-        ))
-        .bind(event_id)
-        .bind(user_id)
-        .bind(algo_row.vest_date)
-        .bind(algo_row.shares_vested_this_event)
-        .bind(expected_updated_at)
-        .fetch_optional(tx.as_executor())
-        .await?
-    };
+    // Per ADR-018 §2 supersede: the full-clear is the "nuclear"
+    // revert. It clears every Slice-3 FMV-track column (fmv_at_vest,
+    // fmv_currency, is_user_override, overridden_at) AND every
+    // Slice-3b sell-to-cover-track column (tax_withholding_percent,
+    // share_sell_price, share_sell_currency,
+    // is_sell_to_cover_override, sell_to_cover_overridden_at).
+    // Callers that want to preserve FMV while clearing only the
+    // sell-to-cover triplet use `clear_sell_to_cover_override`.
+    let row = sqlx::query(&format!(
+        r#"
+        UPDATE vesting_events
+           SET vest_date                   = $3,
+               shares_vested_this_event    = $4::numeric / 10000,
+               fmv_at_vest                 = NULL,
+               fmv_currency                = NULL,
+               is_user_override            = false,
+               overridden_at               = NULL,
+               tax_withholding_percent     = NULL,
+               share_sell_price            = NULL,
+               share_sell_currency         = NULL,
+               is_sell_to_cover_override   = false,
+               sell_to_cover_overridden_at = NULL
+         WHERE id = $1 AND user_id = $2 AND updated_at = $5
+     RETURNING {RETURNING_COLUMNS}
+        "#,
+    ))
+    .bind(event_id)
+    .bind(user_id)
+    .bind(algo_row.vest_date)
+    .bind(algo_row.shares_vested_this_event)
+    .bind(expected_updated_at)
+    .fetch_optional(tx.as_executor())
+    .await?;
 
     match row {
         Some(r) => Ok(ClearOutcome::Cleared(row_to_event(&r)?)),
@@ -690,11 +754,16 @@ pub async fn clear_override(
     }
 }
 
-/// Outcome of [`clear_override`].
+/// Outcome of [`clear_override`]. See [`OverrideOutcome`] for the
+/// rationale behind the `#[allow(clippy::large_enum_variant)]`
+/// suppression.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum ClearOutcome {
     /// The revert landed; the returned row carries the algorithmic
-    /// `vest_date` and `shares_vested_this_event`; FMV is preserved.
+    /// `vest_date` and `shares_vested_this_event`; every Slice-3
+    /// FMV-track and Slice-3b sell-to-cover-track column is reset
+    /// per ADR-018 §2 supersede.
     Cleared(VestingEventRow),
     /// The event id was not found or is not owned by `user_id`.
     NotFound,
@@ -779,6 +848,265 @@ pub async fn bulk_fill_fmv(
     })
 }
 
+// ---------------------------------------------------------------------------
+// Slice 3b — sell-to-cover override surface (ADR-018 §1 + §2).
+// ---------------------------------------------------------------------------
+
+/// Patch supplied on a PUT `/grants/:grantId/vesting-events/:eventId`
+/// that writes to the Slice-3b sell-to-cover track (AC-7.3 + AC-8.3b).
+/// Every field is optional — the handler layer validates per-field
+/// rules and composes the patch before calling
+/// [`apply_sell_to_cover_override`]. The handler is also responsible
+/// for enforcing the `sell_to_cover_triplet_coherent` invariant at
+/// validation time; the DB CHECK is defense-in-depth.
+///
+/// `None` leaves the column untouched; `Some(Some(v))` writes `v`;
+/// `Some(None)` clears the column. Mirrors the
+/// [`VestingEventOverridePatch`] shape for the Slice-3 FMV track.
+#[derive(Debug, Clone, Default)]
+pub struct SellToCoverOverridePatch {
+    /// Stringified `NUMERIC(5,4)` fraction in `[0, 1]` (e.g.,
+    /// `"0.4500"`).
+    pub tax_withholding_percent: Option<Option<String>>,
+    /// Stringified `NUMERIC(20,6)` per-share sell price.
+    pub share_sell_price: Option<Option<String>>,
+    /// `USD | EUR | GBP`.
+    pub share_sell_currency: Option<Option<String>>,
+}
+
+/// Outcome of [`apply_sell_to_cover_override`]. See [`OverrideOutcome`]
+/// for the rationale behind the `#[allow(clippy::large_enum_variant)]`
+/// suppression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
+pub enum SellToCoverOutcome {
+    /// The patch landed. `updated_at` on the returned row advances;
+    /// `is_sell_to_cover_override = true` and
+    /// `sell_to_cover_overridden_at = now()`.
+    Applied(VestingEventRow),
+    /// The `expected_updated_at` predicate did not match the DB row's
+    /// current `updated_at`. The handler returns 409 with code
+    /// `resource.stale_client_state`.
+    Conflict,
+    /// The event id was not found or is not owned by `user_id`
+    /// (RLS-filtered, or the row was deleted after the handler's
+    /// read). The handler surfaces 404. The prior Slice-3-style
+    /// `get_event` lookup distinguishes NotFound from Conflict; this
+    /// outcome is returned for the sell-to-cover-specific path when
+    /// the pre-read has already fired and produced `None`.
+    NotFound,
+}
+
+/// Outcome of [`clear_sell_to_cover_override`]. See
+/// [`OverrideOutcome`] for the rationale behind the
+/// `#[allow(clippy::large_enum_variant)]` suppression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
+pub enum SellToCoverClearOutcome {
+    /// The narrow revert landed. The returned row has the sell-to-
+    /// cover triplet cleared, `is_sell_to_cover_override = false`,
+    /// `sell_to_cover_overridden_at = NULL`; every Slice-3 FMV-track
+    /// column is preserved verbatim (AC-7.5.2).
+    Cleared(VestingEventRow),
+    /// OCC mismatch (AC-10.5).
+    Conflict,
+    /// Row absent or RLS-filtered.
+    NotFound,
+}
+
+/// Apply a sell-to-cover override to a single `vesting_events` row.
+///
+/// Semantics (AC-7.3.*, AC-8.3b, AC-7.4.4):
+///
+///   * The UPDATE is predicated on `updated_at = $expected` — on
+///     mismatch we return [`SellToCoverOutcome::Conflict`] and the
+///     handler surfaces 409 with `code = "resource.stale_client_state"`.
+///     A zero-rows result on a row that was pre-verified to exist
+///     (via [`get_event`]) is stale-state; a zero-rows result without
+///     a prior read is ambiguous between stale-state and RLS-filtered.
+///     Callers SHOULD pre-verify existence and treat the resulting
+///     `None` as Conflict.
+///   * Any field in `patch` whose outer `Option` is `Some` overwrites
+///     the corresponding column; `None` leaves the column untouched.
+///   * `is_sell_to_cover_override = true` and
+///     `sell_to_cover_overridden_at = now()` are set unconditionally
+///     — this is the write that claims sell-to-cover-manual-edit
+///     ownership of the row. The Slice-3 `is_user_override` /
+///     `overridden_at` pair is left untouched here; the handler is
+///     responsible for composing an `apply_override` call when the
+///     body also mutates FMV or vest_date or shares.
+///   * The `vesting_events_touch_updated_at` trigger advances
+///     `updated_at` as part of the same UPDATE, so the returned row
+///     carries the new token the caller's next PUT must match.
+///
+/// Cross-field CHECKs (`sell_to_cover_triplet_coherent` and
+/// `sell_to_cover_override_flag_coherent`) are defense-in-depth. The
+/// handler's validator is expected to reject partial-triplet patches
+/// before this path is reached.
+///
+/// Cross-tenant calls are filtered by RLS (USING) — the UPDATE
+/// matches zero rows and the helper returns [`SellToCoverOutcome::Conflict`]
+/// indistinguishably from a stale-state case. Callers that need the
+/// 404-vs-409 split pre-read via [`get_event`].
+pub async fn apply_sell_to_cover_override(
+    tx: &mut Tx<'_>,
+    user_id: Uuid,
+    event_id: Uuid,
+    patch: &SellToCoverOverridePatch,
+    expected_updated_at: chrono::DateTime<chrono::Utc>,
+) -> Result<SellToCoverOutcome, sqlx::Error> {
+    // Compose the SET list dynamically: we only touch columns the
+    // patch names. `is_sell_to_cover_override` +
+    // `sell_to_cover_overridden_at` are always set. `updated_at` is
+    // trigger-maintained, not written by the handler.
+    let mut qb: QueryBuilder<sqlx::Postgres> = QueryBuilder::new(
+        "UPDATE vesting_events \
+         SET is_sell_to_cover_override = true, \
+             sell_to_cover_overridden_at = now()",
+    );
+
+    if let Some(ref pct_opt) = patch.tax_withholding_percent {
+        qb.push(", tax_withholding_percent = ");
+        match pct_opt {
+            Some(s) => {
+                qb.push_bind(s.clone());
+                qb.push("::numeric");
+            }
+            None => {
+                qb.push("NULL");
+            }
+        }
+    }
+    if let Some(ref price_opt) = patch.share_sell_price {
+        qb.push(", share_sell_price = ");
+        match price_opt {
+            Some(s) => {
+                qb.push_bind(s.clone());
+                qb.push("::numeric");
+            }
+            None => {
+                qb.push("NULL");
+            }
+        }
+    }
+    if let Some(ref cur_opt) = patch.share_sell_currency {
+        qb.push(", share_sell_currency = ");
+        match cur_opt {
+            Some(s) => {
+                qb.push_bind(s.clone());
+            }
+            None => {
+                qb.push("NULL");
+            }
+        }
+    }
+
+    qb.push(" WHERE id = ");
+    qb.push_bind(event_id);
+    qb.push(" AND user_id = ");
+    qb.push_bind(user_id);
+    qb.push(" AND updated_at = ");
+    qb.push_bind(expected_updated_at);
+    qb.push(" RETURNING ");
+    qb.push(RETURNING_COLUMNS);
+
+    let row = qb.build().fetch_optional(tx.as_executor()).await?;
+    match row {
+        Some(r) => Ok(SellToCoverOutcome::Applied(row_to_event(&r)?)),
+        None => {
+            // Distinguish NotFound from Conflict by re-checking
+            // row presence under RLS. Matches the discipline the
+            // Slice-3 `clear_override` uses for the same case.
+            let exists =
+                sqlx::query("SELECT 1 AS n FROM vesting_events WHERE id = $1 AND user_id = $2")
+                    .bind(event_id)
+                    .bind(user_id)
+                    .fetch_optional(tx.as_executor())
+                    .await?;
+            if exists.is_some() {
+                Ok(SellToCoverOutcome::Conflict)
+            } else {
+                Ok(SellToCoverOutcome::NotFound)
+            }
+        }
+    }
+}
+
+/// Narrow revert of the sell-to-cover track only (AC-7.5.2,
+/// ADR-018 §3 `clearSellToCoverOverride`).
+///
+/// Clears `tax_withholding_percent`, `share_sell_price`,
+/// `share_sell_currency`, and sets `is_sell_to_cover_override = false`
+/// plus `sell_to_cover_overridden_at = NULL`. **Preserves every
+/// Slice-3 FMV-track column verbatim** — `fmv_at_vest`,
+/// `fmv_currency`, `is_user_override`, `overridden_at`, `vest_date`,
+/// and `shares_vested_this_event` are all untouched. Callers that
+/// want the full revert — both tracks, plus `vest_date` and
+/// `shares_vested_this_event` reverted to algorithm output — use
+/// [`clear_override`] instead.
+///
+/// Predicated on `updated_at = $expected` per AC-10.5 (same OCC
+/// discipline as [`apply_override`] and [`apply_sell_to_cover_override`]).
+pub async fn clear_sell_to_cover_override(
+    tx: &mut Tx<'_>,
+    user_id: Uuid,
+    event_id: Uuid,
+    expected_updated_at: chrono::DateTime<chrono::Utc>,
+) -> Result<SellToCoverClearOutcome, sqlx::Error> {
+    let row = sqlx::query(&format!(
+        r#"
+        UPDATE vesting_events
+           SET tax_withholding_percent     = NULL,
+               share_sell_price            = NULL,
+               share_sell_currency         = NULL,
+               is_sell_to_cover_override   = false,
+               sell_to_cover_overridden_at = NULL
+         WHERE id = $1 AND user_id = $2 AND updated_at = $3
+     RETURNING {RETURNING_COLUMNS}
+        "#,
+    ))
+    .bind(event_id)
+    .bind(user_id)
+    .bind(expected_updated_at)
+    .fetch_optional(tx.as_executor())
+    .await?;
+
+    match row {
+        Some(r) => Ok(SellToCoverClearOutcome::Cleared(row_to_event(&r)?)),
+        None => {
+            let exists =
+                sqlx::query("SELECT 1 AS n FROM vesting_events WHERE id = $1 AND user_id = $2")
+                    .bind(event_id)
+                    .bind(user_id)
+                    .fetch_optional(tx.as_executor())
+                    .await?;
+            if exists.is_some() {
+                Ok(SellToCoverClearOutcome::Conflict)
+            } else {
+                Ok(SellToCoverClearOutcome::NotFound)
+            }
+        }
+    }
+}
+
+/// Slice-3b alias of [`list_for_grant`]. The Slice-1/-3 helper
+/// already selects the full row (including Slice-3b columns after
+/// the migration); the alias documents intent at call sites that
+/// specifically care about the sell-to-cover surface (AC-5.1.1 +
+/// AC-7.2.1 dialog listing).
+///
+/// Kept as a separate entry point so future Slice-4+ specialization
+/// (e.g., compute derived sell-to-cover values server-side and
+/// return them alongside the row) has a natural home without
+/// rewriting Slice-3 callers.
+pub async fn list_with_sell_to_cover_for_grant(
+    tx: &mut Tx<'_>,
+    user_id: Uuid,
+    grant_id: Uuid,
+) -> Result<Vec<VestingEventRow>, sqlx::Error> {
+    list_for_grant(tx, user_id, grant_id).await
+}
+
 /// Fetch a single `vesting_events` row by id, scoped to the owner.
 /// Returns `None` when the row is absent or RLS-filtered. Used by
 /// [`clear_override`] and by handler pre-checks.
@@ -815,7 +1143,12 @@ const RETURNING_COLUMNS: &str = "\
     fmv_currency, \
     is_user_override, \
     overridden_at, \
-    updated_at\
+    updated_at, \
+    tax_withholding_percent::text AS tax_withholding_percent_text, \
+    share_sell_price::text AS share_sell_price_text, \
+    share_sell_currency, \
+    is_sell_to_cover_override, \
+    sell_to_cover_overridden_at\
 ";
 
 fn select_all_columns_for_grant() -> String {
@@ -848,6 +1181,11 @@ fn row_to_event(row: &sqlx::postgres::PgRow) -> Result<VestingEventRow, sqlx::Er
         is_user_override: row.try_get("is_user_override")?,
         overridden_at: row.try_get("overridden_at")?,
         updated_at: row.try_get("updated_at")?,
+        tax_withholding_percent: row.try_get("tax_withholding_percent_text")?,
+        share_sell_price: row.try_get("share_sell_price_text")?,
+        share_sell_currency: row.try_get("share_sell_currency")?,
+        is_sell_to_cover_override: row.try_get("is_sell_to_cover_override")?,
+        sell_to_cover_overridden_at: row.try_get("sell_to_cover_overridden_at")?,
     })
 }
 
